@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - '*'
+    tags:
+      - '![0-9]+.*'
+    paths:
+      - '**/**'
+      - '!*.md'
+      - '!.gitignore'
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: windows-2019
+    steps:
+      - name: Checkout last commit
+        uses: actions/checkout@v4
+
+      - name: Install llvm if necessary
+        shell: pwsh
+        run: |
+          $version = ""
+          if (Get-Command "clang-format" -ErrorAction SilentlyContinue){
+            $version = clang-format --version
+            $pat = ".*\s+(\d+\.\d+\.\d+)"
+            if ($version -match $pat) {
+              $version = $matches[1]
+            }
+          }
+          if ($version -ne "") {
+            Write-Host "clang-format version：$version"
+            if ([version]$version -ge [version]"18.1.6") {
+              Write-Host "clang-format OK"
+            } else {
+              Write-Host "clang-format vesion does not meet"
+              choco install llvm --version=18.1.6
+            }
+          } else {
+            Write-Host "clang-format not installed"
+            choco install llvm --version=18.1.6
+          }
+      - name: Code style lint
+        shell: pwsh
+        run: .\clang-format.ps1 -i
+
+  build:
+    needs: lint
+    runs-on: windows-2019
+    steps:
+
+      - name: Checkout last commit
+        uses: actions/checkout@v4
+
+      # xmake 2.9.4 or later
+      - uses: xmake-io/github-action-setup-xmake@v1
+        with:
+          xmake-version: '2.9.4'
+          actions-cache-folder: '.xmake-cache'
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Copy Rime files
+        shell: pwsh
+        run: |
+          .\get-rime.ps1 -use toy -tag latest
+
+      - name: Build rime.toy
+        id: build_rime_toy
+        run: |
+          xmake
+
+      - name: Compress zip
+        run: |
+          .\makezip.ps1
+
+      # create nightly release
+      - name: Create Nightly release
+        if: ${{ github.repository == 'fxliang/rime.toy' && github.ref == 'refs/heads/master' }}
+        uses: 'marvinpinto/action-automatic-releases@latest'
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          automatic_release_tag: latest
+          prerelease: true
+          title: "Nightly Build"
+          files: |
+            ./rime.toy.zip
+
