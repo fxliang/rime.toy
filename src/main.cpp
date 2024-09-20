@@ -14,6 +14,7 @@ bool to_commit = true;
 bool is_composing = false;
 std::string commit_str = "";
 UINT original_codepage;
+bool horizontal = true, escape_ansi = false;
 
 #ifdef IME_STUFF
 HWND hwnd_previous;
@@ -453,9 +454,15 @@ void print_composition(RimeComposition *composition) {
   for (size_t i = 0; i <= len; ++i) {
     if (start < end) {
       if (i == start) {
-        putchar('[');
+        if (escape_ansi)
+          printf("\x1b[7m");
+        else
+          putchar('[');
       } else if (i == end) {
-        putchar(']');
+        if (escape_ansi)
+          printf("\x1b[0m");
+        else
+          putchar(']');
       }
     }
     if (i == cursor)
@@ -469,13 +476,16 @@ void print_composition(RimeComposition *composition) {
 void print_menu(RimeMenu *menu) {
   if (menu->num_candidates == 0)
     return;
-  printf("page: %d%c (of size %d)\n", menu->page_no + 1,
-         menu->is_last_page ? '$' : ' ', menu->page_size);
+  // printf("\tpage: %d%c (of size %d)\n", menu->page_no + 1,
+  //        menu->is_last_page ? '$' : ' ', menu->page_size);
   for (int i = 0; i < menu->num_candidates; ++i) {
     bool highlighted = i == menu->highlighted_candidate_index;
-    printf("%d. %c%s%c%s\n", i + 1, highlighted ? '[' : ' ',
-           menu->candidates[i].text, highlighted ? ']' : ' ',
-           menu->candidates[i].comment ? menu->candidates[i].comment : "");
+    const char *sep0 = escape_ansi ? "\x1b[7m" : "[";
+    const char *sep1 = escape_ansi ? "\x1b[0m" : "]";
+    printf("%s%d.%s%s%s%s", highlighted ? sep0 : " ", i + 1,
+           menu->candidates[i].text,
+           menu->candidates[i].comment ? menu->candidates[i].comment : "",
+           horizontal ? "" : "\n", highlighted ? sep1 : " ");
   }
 }
 
@@ -711,7 +721,15 @@ BOOL WINAPI console_ctrl_handler(DWORD ctrl_type) {
   return FALSE;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+  for (auto i = 0; i < argc; i++) {
+    std::string arg = argv[i];
+    if (arg == "/v")
+      horizontal = false;
+    if (arg == "/e")
+      escape_ansi = true;
+  }
+
   original_codepage = GetConsoleOutputCP();
   SetConsoleOutputCP(CP_UTF8);
   setup_rime();
