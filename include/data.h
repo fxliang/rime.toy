@@ -38,8 +38,8 @@ struct TextAttribute {
 };
 
 struct Text {
-  Text() : str(L"") {}
-  Text(std::wstring const &_str) : str(_str) {}
+  Text() : str("") {}
+  Text(std::string const &_str) : str(_str) {}
   void clear() {
     str.clear();
     attributes.clear();
@@ -63,7 +63,7 @@ struct Text {
     }
     return false;
   }
-  std::wstring str;
+  std::string str;
   std::vector<TextAttribute> attributes;
 };
 
@@ -162,10 +162,16 @@ struct Status {
             status.composing == composing && status.disabled == disabled &&
             status.full_shape == full_shape);
   }
+  bool operator!=(const Status status) {
+    return (status.schema_name != schema_name ||
+            status.schema_id != schema_id || status.ascii_mode != ascii_mode ||
+            status.composing != composing || status.disabled != disabled ||
+            status.full_shape != full_shape);
+  }
   // 輸入方案
-  std::wstring schema_name;
+  std::string schema_name;
   // 輸入方案 id
-  std::wstring schema_id;
+  std::string schema_id;
   // 轉換開關
   bool ascii_mode;
   // 寫作狀態
