@@ -4,15 +4,17 @@
 #include <filesystem>
 #include <iostream>
 #include <rime_api.h>
-namespace fs = std::filesystem;
+using namespace std;
+namespace fs = filesystem;
 
 HHOOK hHook = NULL;
 BYTE keyState[256] = {0};
 RimeSessionId session_id = NULL;
 Context old_ctx;
+Status old_sta;
 bool to_commit = true;
 bool is_composing = false;
-std::string commit_str = "";
+string commit_str = "";
 UINT original_codepage;
 bool horizontal = true, escape_ansi = false;
 bool hook_enabled = true;
@@ -29,8 +31,7 @@ KeyInfo ki(0);
 
 int expand_ibus_modifier(int m) { return (m & 0xff) | ((m & 0xff00) << 16); }
 // ----------------------------------------------------------------------------
-inline std::wstring string_to_wstring(const std::string &str,
-                                      int code_page = CP_ACP) {
+inline wstring string_to_wstring(const string &str, int code_page = CP_ACP) {
   // support CP_ACP and CP_UTF8 only
   if (code_page != 0 && code_page != CP_UTF8)
     return L"";
@@ -39,7 +40,7 @@ inline std::wstring string_to_wstring(const std::string &str,
       MultiByteToWideChar(code_page, 0, str.c_str(), (int)str.size(), NULL, 0);
   if (len <= 0)
     return L"";
-  std::wstring res;
+  wstring res;
   WCHAR *buffer = new WCHAR[len + 1];
   MultiByteToWideChar(code_page, 0, str.c_str(), (int)str.size(), buffer, len);
   buffer[len] = '\0';
@@ -48,8 +49,7 @@ inline std::wstring string_to_wstring(const std::string &str,
   return res;
 }
 
-inline std::string wstring_to_string(const std::wstring &wstr,
-                                     int code_page = CP_ACP) {
+inline string wstring_to_string(const wstring &wstr, int code_page = CP_ACP) {
   // support CP_ACP and CP_UTF8 only
   if (code_page != 0 && code_page != CP_UTF8)
     return "";
@@ -57,7 +57,7 @@ inline std::string wstring_to_string(const std::wstring &wstr,
                                 NULL, 0, NULL, NULL);
   if (len <= 0)
     return "";
-  std::string res;
+  string res;
   char *buffer = new char[len + 1];
   WideCharToMultiByte(code_page, 0, wstr.c_str(), (int)wstr.size(), buffer, len,
                       NULL, NULL);
@@ -85,56 +85,7 @@ void on_message(void *context_object, RimeSessionId session_id,
   }
 }
 
-void get_candidate_info(CandidateInfo &cinfo, RimeContext &ctx) {
-  cinfo.candies.resize(ctx.menu.num_candidates);
-  cinfo.comments.resize(ctx.menu.num_candidates);
-  cinfo.labels.resize(ctx.menu.num_candidates);
-  for (int i = 0; i < ctx.menu.num_candidates; ++i) {
-    cinfo.candies[i].str =
-        string_to_wstring(ctx.menu.candidates[i].text, CP_UTF8);
-    if (ctx.menu.candidates[i].comment) {
-      cinfo.comments[i].str =
-          string_to_wstring(ctx.menu.candidates[i].comment, CP_UTF8);
-    }
-    if (RIME_STRUCT_HAS_MEMBER(ctx, ctx.select_labels) && ctx.select_labels) {
-      cinfo.labels[i].str = string_to_wstring(ctx.select_labels[i], CP_UTF8);
-    } else if (ctx.menu.select_keys) {
-      cinfo.labels[i].str = std::wstring(1, ctx.menu.select_keys[i]);
-    } else {
-      cinfo.labels[i].str = std::to_wstring((i + 1) % 10);
-    }
-  }
-  cinfo.highlighted = ctx.menu.highlighted_candidate_index;
-  cinfo.currentPage = ctx.menu.page_no;
-  cinfo.is_last_page = ctx.menu.is_last_page;
-}
-
-inline int utf8towcslen(const char *utf8_str, int utf8_len) {
-  return MultiByteToWideChar(CP_UTF8, 0, utf8_str, utf8_len, NULL, 0);
-}
-
-void get_context(Context &weasel_context, RimeContext ctx) {
-  if (ctx.composition.length > 0) {
-    weasel_context.preedit.str =
-        string_to_wstring(ctx.composition.preedit, CP_UTF8);
-    if (ctx.composition.sel_start < ctx.composition.sel_end) {
-      TextAttribute attr;
-      attr.type = HIGHLIGHTED;
-      attr.range.start =
-          utf8towcslen(ctx.composition.preedit, ctx.composition.sel_start);
-      attr.range.end =
-          utf8towcslen(ctx.composition.preedit, ctx.composition.sel_end);
-
-      weasel_context.preedit.attributes.push_back(attr);
-    }
-  }
-  if (ctx.menu.num_candidates) {
-    CandidateInfo &cinfo(weasel_context.cinfo);
-    get_candidate_info(cinfo, ctx);
-  }
-}
-
-void send_input_to_window(HWND hwnd, const std::wstring &text) {
+void send_input_to_window(HWND hwnd, const wstring &text) {
   for (const auto &ch : text) {
     INPUT input;
     input.type = INPUT_KEYBOARD;
@@ -143,10 +94,8 @@ void send_input_to_window(HWND hwnd, const std::wstring &text) {
     input.ki.dwFlags = KEYEVENTF_UNICODE;
     input.ki.time = 0;
     input.ki.dwExtraInfo = GetMessageExtraInfo();
-
     INPUT inputRelease = input;
     inputRelease.ki.dwFlags |= KEYEVENTF_KEYUP;
-
     SendInput(1, &input, sizeof(INPUT));
     SendInput(1, &inputRelease, sizeof(INPUT));
   }
@@ -159,22 +108,16 @@ void clear_screen() {
   DWORD cCharsWritten;
   CONSOLE_SCREEN_BUFFER_INFO csbi;
   DWORD dwConSize;
-  // 获取控制台屏幕缓冲区信息
-  if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) {
+  if (!GetConsoleScreenBufferInfo(hConsole, &csbi))
     return;
-  }
   dwConSize = csbi.dwSize.X * csbi.dwSize.Y;
-  // 用空格填充缓冲区
   if (!FillConsoleOutputCharacter(hConsole, (TCHAR)' ', dwConSize, coordScreen,
-                                  &cCharsWritten)) {
+                                  &cCharsWritten))
     return;
-  }
-  // 设置缓冲区属性
   if (!FillConsoleOutputAttribute(hConsole, csbi.wAttributes, dwConSize,
                                   coordScreen, &cCharsWritten)) {
     return;
   }
-  // 将光标移动到左上角
   SetConsoleCursorPosition(hConsole, coordScreen);
 }
 // ----------------------------------------------------------------------------
@@ -428,118 +371,6 @@ bool ConvertKeyEvent(UINT vkey, KeyInfo kinfo, const LPBYTE keyState,
   return false;
 }
 // ----------------------------------------------------------------------------
-
-void print_status(RimeStatus *status) {
-  printf("schema: %s / %s\n", status->schema_id, status->schema_name);
-  printf("status: ");
-  if (status->is_disabled)
-    printf("disabled ");
-  if (status->is_composing)
-    printf("composing ");
-  if (status->is_ascii_mode)
-    printf("ascii ");
-  if (status->is_full_shape)
-    printf("full_shape ");
-  if (status->is_simplified)
-    printf("simplified ");
-  printf("\n");
-}
-
-void print_composition(RimeComposition *composition) {
-  const char *preedit = composition->preedit;
-  if (!preedit)
-    return;
-  size_t len = strlen(preedit);
-  size_t start = composition->sel_start;
-  size_t end = composition->sel_end;
-  size_t cursor = composition->cursor_pos;
-  for (size_t i = 0; i <= len; ++i) {
-    if (start < end) {
-      if (i == start) {
-        if (escape_ansi)
-          printf("\x1b[7m");
-        else
-          putchar('[');
-      } else if (i == end) {
-        if (escape_ansi)
-          printf("\x1b[0m");
-        else
-          putchar(']');
-      }
-    }
-    if (i == cursor)
-      putchar('|');
-    if (i < len)
-      putchar(preedit[i]);
-  }
-  printf("\n");
-}
-
-void print_menu(RimeMenu *menu) {
-  if (menu->num_candidates == 0)
-    return;
-  // printf("\tpage: %d%c (of size %d)\n", menu->page_no + 1,
-  //        menu->is_last_page ? '$' : ' ', menu->page_size);
-  for (int i = 0; i < menu->num_candidates; ++i) {
-    bool highlighted = i == menu->highlighted_candidate_index;
-    const char *sep0 = escape_ansi ? "\x1b[7m" : "[";
-    const char *sep1 = escape_ansi ? "\x1b[0m" : "]";
-    printf("%s%d.%s%s%s%s", highlighted ? sep0 : " ", i + 1,
-           menu->candidates[i].text,
-           menu->candidates[i].comment ? menu->candidates[i].comment : "",
-           horizontal ? "" : "\n", highlighted ? sep1 : " ");
-  }
-}
-
-void print_context(RimeContext *context) {
-  if (context->composition.length > 0 || context->menu.num_candidates > 0) {
-    print_composition(&context->composition);
-  } else {
-    // printf("(not composing)\n");
-  }
-  print_menu(&context->menu);
-}
-
-void print(RimeSessionId session_id) {
-  RimeApi *rime = rime_get_api();
-
-  RIME_STRUCT(RimeCommit, commit);
-  RIME_STRUCT(RimeStatus, status);
-  RIME_STRUCT(RimeContext, context);
-
-  if (rime->get_commit(session_id, &commit)) {
-    // printf("commit: %s\n", commit.text);
-    commit_str = std::string(commit.text);
-    to_commit = true;
-    rime->free_commit(&commit);
-  } else {
-    to_commit = false;
-    commit_str.clear();
-  }
-
-  auto is_composing_buff = is_composing;
-  if (rime->get_status(session_id, &status)) {
-    // print_status(&status);
-    is_composing = status.is_composing;
-    rime->free_status(&status);
-  } else
-    is_composing = false;
-
-  if (is_composing_buff != is_composing || to_commit)
-    clear_screen();
-
-  if (rime->get_context(session_id, &context)) {
-    Context ctx;
-    get_context(ctx, context);
-    if (ctx != old_ctx) {
-      old_ctx = ctx;
-      clear_screen();
-      print_context(&context);
-    }
-    rime->free_context(&context);
-  }
-}
-
 #ifdef IME_STUFF /* not ok yet */
 // disable ime, a possible solution
 void disable_ime(HWND hWnd) {
@@ -555,6 +386,172 @@ void restore_ime(HWND hWnd) {
     ImmAssociateContext(hWnd, hOriginalIMC);
 }
 #endif
+
+void get_candidate_info(CandidateInfo &cinfo, RimeContext &ctx) {
+  cinfo.candies.resize(ctx.menu.num_candidates);
+  cinfo.comments.resize(ctx.menu.num_candidates);
+  cinfo.labels.resize(ctx.menu.num_candidates);
+  for (int i = 0; i < ctx.menu.num_candidates; ++i) {
+    cinfo.candies[i].str = ctx.menu.candidates[i].text;
+    if (ctx.menu.candidates[i].comment) {
+      cinfo.comments[i].str = ctx.menu.candidates[i].comment;
+    }
+    if (RIME_STRUCT_HAS_MEMBER(ctx, ctx.select_labels) && ctx.select_labels) {
+      cinfo.labels[i].str = ctx.select_labels[i];
+    } else if (ctx.menu.select_keys) {
+      cinfo.labels[i].str = string(1, ctx.menu.select_keys[i]);
+    } else {
+      cinfo.labels[i].str = to_string((i + 1) % 10);
+    }
+  }
+  cinfo.highlighted = ctx.menu.highlighted_candidate_index;
+  cinfo.currentPage = ctx.menu.page_no;
+  cinfo.is_last_page = ctx.menu.is_last_page;
+}
+
+void get_context(Context &context, RimeSessionId id) {
+  RimeApi *rime = rime_get_api();
+  assert(rime);
+  RIME_STRUCT(RimeContext, ctx);
+  if (rime->get_context(id, &ctx)) {
+    if (ctx.composition.length > 0) {
+      context.preedit.str = ctx.composition.preedit;
+      if (ctx.composition.sel_start < ctx.composition.sel_end) {
+        TextAttribute attr;
+        attr.type = HIGHLIGHTED;
+        attr.range.start = ctx.composition.sel_start;
+        attr.range.end = ctx.composition.sel_end;
+        attr.range.cursor = ctx.composition.cursor_pos;
+        context.preedit.attributes.push_back(attr);
+      }
+    }
+    if (ctx.menu.num_candidates) {
+      CandidateInfo &cinfo(context.cinfo);
+      get_candidate_info(cinfo, ctx);
+    }
+    rime->free_context(&ctx);
+  }
+}
+
+void get_status(Status &status, RimeSessionId id) {
+  RimeApi *rime = rime_get_api();
+  assert(rime);
+  RIME_STRUCT(RimeStatus, status_);
+  if (rime->get_status(id, &status_)) {
+    status.ascii_mode = !!status_.is_ascii_mode;
+    status.composing = !!status_.is_composing;
+    status.disabled = !!status_.is_disabled;
+    status.full_shape = !!status_.is_full_shape;
+    status.schema_id = status_.schema_id;
+    status.schema_name = status_.schema_name;
+    rime->free_status(&status_);
+  }
+}
+
+void get_commit() {
+  RimeApi *rime = rime_get_api();
+  assert(rime);
+  RIME_STRUCT(RimeCommit, commit);
+  if (rime->get_commit(session_id, &commit)) {
+    commit_str = string(commit.text);
+    to_commit = true;
+    rime->free_commit(&commit);
+  } else {
+    to_commit = false;
+    commit_str.clear();
+  }
+}
+
+void draw_preedit(const Text &preedit) {
+  const auto &str = preedit.str;
+  if (str.empty())
+    return;
+  TextRange range;
+  const auto &attrs = preedit.attributes;
+  for (size_t j = 0; j < attrs.size(); ++j) {
+    if (attrs[j].type == HIGHLIGHTED) {
+      range = attrs[j].range;
+      break;
+    }
+  }
+  if (range.start < range.end) {
+    if (range.start > 0)
+      cout << str.substr(0, range.start);
+    cout << (escape_ansi ? "\x1b[7m" : "[");
+    cout << str.substr(range.start, range.end - range.start);
+    cout << (escape_ansi ? "\x1b[0m" : "]");
+    if (range.end < str.length())
+      cout << str.substr(range.end);
+  } else {
+    cout << "|" << str;
+  }
+  cout << endl;
+}
+
+size_t calc_display_width(const string &utf8str) {
+  size_t width = 0;
+  for (auto i = 0; i < utf8str.length(); ++i) {
+    if (static_cast<unsigned char>(utf8str[i]) < 0x80)
+      width++;
+    else {
+      if ((utf8str[i] & 0xE0) == 0xC0) {
+        i += 1;
+      } else if ((utf8str[i] & 0xF0) == 0xE0) {
+        i += 2;
+      } else if ((utf8str[i] & 0xF8) == 0xF0) {
+        i += 3;
+      }
+      width += 2;
+    }
+  }
+  return width;
+}
+
+void update_ui() {
+  Context ctx;
+  Status sta;
+  get_commit();
+  get_context(ctx, session_id);
+  get_status(sta, session_id);
+  if (sta != old_sta)
+    old_sta = sta;
+  if (ctx != old_ctx) {
+    old_ctx = ctx;
+    clear_screen();
+    draw_preedit(ctx.preedit);
+    if (!sta.composing)
+      cout << sta.schema_name << " " << (sta.ascii_mode ? "英" : "中") << endl;
+    if (ctx.empty())
+      return;
+    else {
+      const char *sep0 = escape_ansi ? "\x1b[7m" : "[";
+      const char *sep1 = escape_ansi ? "\x1b[0m" : "]";
+      unique_ptr<size_t[]> widths;
+      size_t max_width = 0;
+      if (!horizontal) {
+        widths = make_unique<size_t[]>(ctx.cinfo.candies.size());
+        for (auto i = 0; i < ctx.cinfo.candies.size(); i++) {
+          widths[i] = calc_display_width(ctx.cinfo.candies[i].str);
+          widths[i] += calc_display_width(ctx.cinfo.labels[i].str);
+          widths[i] += calc_display_width(ctx.cinfo.comments[i].str);
+          widths[i] += 1;
+          if (!escape_ansi)
+            widths[i] += 2;
+          max_width = max(max_width, widths[i]);
+        }
+      }
+
+      for (auto i = 0; i < ctx.cinfo.candies.size(); i++) {
+        bool highlighted = i == ctx.cinfo.highlighted;
+        cout << (highlighted ? sep0 : "") << ctx.cinfo.labels[i].str << "."
+             << ctx.cinfo.candies[i].str
+             << (horizontal ? " " : string(max_width - widths[i] + 1, ' '))
+             << ctx.cinfo.comments[i].str << (highlighted ? sep1 : "")
+             << (horizontal ? " " : "\n");
+      }
+    }
+  }
+}
 
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
   HWND hwnd = GetForegroundWindow();
@@ -598,9 +595,9 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     for (int i = 0; i < 256; ++i) {
       if (i == pKeyboard->vkCode && tmp != keyState[pKeyboard->vkCode]) {
         if (keyState[i] & 0x80) {
-          std::cout << "Key " << std::hex << i << " is pressed." << std::endl;
+          cout << "Key " << hex << i << " is pressed." << endl;
         } else {
-          std::cout << "Key " << std::hex << i << " is released." << std::endl;
+          cout << "Key " << hex << i << " is released." << endl;
         }
       }
     }
@@ -635,21 +632,19 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     ki.isKeyUp = (flags & LLKHF_UP) ? 1 : 0;
     KeyEvent ke;
     if (ConvertKeyEvent(pKeyboard->vkCode, ki, keyState, ke)) {
-      // std::cout << std::hex << "ke.keycode = " <<  ke.keycode << ", ke.mask =
-      // " << ke.mask << std::endl;
-#if 1
+      // cout << hex << "ke.keycode = " <<  ke.keycode << ", ke.mask =
+      // " << ke.mask << endl;
       // todo: capslock to be handled
       RimeApi *rime_api = rime_get_api();
       assert(rime_api);
       auto eat = rime_api->process_key(session_id, ke.keycode,
                                        expand_ibus_modifier(ke.mask));
-      print(session_id);
       if (eat) {
+        update_ui();
         if (to_commit)
           send_input_to_window(hwnd, string_to_wstring(commit_str, CP_UTF8));
         return 1;
       }
-#endif
     }
   }
   return CallNextHookEx(hHook, nCode, wParam, lParam);
@@ -669,21 +664,20 @@ void clean_up() {
 void set_hook() {
   hHook = SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
   if (hHook == NULL) {
-    std::cerr << "Failed to install hook!" << std::endl;
+    cerr << "Failed to install hook!" << endl;
     clean_up();
     exit(1);
   }
 }
 
-fs::path data_path(std::string subdir) {
+fs::path data_path(string subdir) {
   wchar_t _path[MAX_PATH] = {0};
   GetModuleFileNameW(NULL, _path, _countof(_path));
   return fs::path(_path).remove_filename().append(subdir);
 }
 
-inline fs::path get_log_path() {
+fs::path get_log_path() {
   WCHAR _path[MAX_PATH] = {0};
-  // default location
   ExpandEnvironmentStringsW(L"%TEMP%\\rime.toy", _path, _countof(_path));
   fs::path path = fs::path(_path);
   if (!fs::exists(path)) {
@@ -693,13 +687,13 @@ inline fs::path get_log_path() {
 }
 
 void setup_rime() {
-  RIME_STRUCT(RimeTraits, weasel_traits);
+  RIME_STRUCT(RimeTraits, traits);
   auto shared_path = data_path("shared");
   auto usr_path = data_path("usr");
   auto log_path = get_log_path();
-  std::cout << "shared data dir: " << shared_path.u8string() << std::endl
-            << "user data dir: " << usr_path.u8string() << std::endl
-            << "log dir: " << log_path.u8string() << std::endl;
+  cout << "shared data dir: " << shared_path.u8string() << endl
+       << "user data dir: " << usr_path.u8string() << endl
+       << "log dir: " << log_path.u8string() << endl;
   if (!fs::exists(shared_path))
     fs::create_directory(shared_path);
   if (!fs::exists(usr_path))
@@ -709,23 +703,23 @@ void setup_rime() {
   static auto shared_dir = shared_path.u8string();
   static auto usr_dir = usr_path.u8string();
   static auto log_dir = log_path.u8string();
-  weasel_traits.shared_data_dir = shared_dir.c_str();
-  weasel_traits.user_data_dir = usr_dir.c_str();
-  weasel_traits.log_dir = log_dir.c_str();
-  weasel_traits.prebuilt_data_dir = weasel_traits.shared_data_dir;
-  weasel_traits.distribution_name = "rime.toy";
-  weasel_traits.distribution_code_name = "rime.toy";
-  weasel_traits.distribution_version = "0.0.1.0";
-  weasel_traits.app_name = "rime.toy";
+  traits.shared_data_dir = shared_dir.c_str();
+  traits.user_data_dir = usr_dir.c_str();
+  traits.log_dir = log_dir.c_str();
+  traits.prebuilt_data_dir = traits.shared_data_dir;
+  traits.distribution_name = "rime.toy";
+  traits.distribution_code_name = "rime.toy";
+  traits.distribution_version = "0.0.1.0";
+  traits.app_name = "rime.toy";
   RimeApi *rime_api = rime_get_api();
   assert(rime_api);
-  rime_api->setup(&weasel_traits);
+  rime_api->setup(&traits);
   rime_api->set_notification_handler(&on_message, nullptr);
 }
 
 BOOL WINAPI console_ctrl_handler(DWORD ctrl_type) {
   if (ctrl_type == CTRL_C_EVENT) {
-    std::cout << "Control+c detected, cleaning up..." << std::endl;
+    cout << "Control+c detected, cleaning up..." << endl;
     clean_up();
     exit(0);
   }
@@ -734,7 +728,7 @@ BOOL WINAPI console_ctrl_handler(DWORD ctrl_type) {
 
 int main(int argc, char *argv[]) {
   for (auto i = 0; i < argc; i++) {
-    std::string arg = argv[i];
+    string arg = argv[i];
     if (arg == "/v")
       horizontal = false;
     if (arg == "/e")
@@ -755,7 +749,7 @@ int main(int argc, char *argv[]) {
   assert(session_id);
   set_hook();
   if (!SetConsoleCtrlHandler(console_ctrl_handler, TRUE)) {
-    std::cerr << "Error: Could not set control handler." << std::endl;
+    cerr << "Error: Could not set control handler." << endl;
     clean_up();
     return 1;
   }
@@ -765,7 +759,7 @@ int main(int argc, char *argv[]) {
     DispatchMessage(&msg);
   }
 
-  std::cout << "cleaning up..." << std::endl;
+  cout << "cleaning up..." << endl;
   clean_up();
   return 0;
 }

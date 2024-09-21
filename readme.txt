@@ -18,3 +18,4 @@ rime.toy
   4. 使用快捷键（如Shift_L）切换中英文的时候，未能清空当前的composition
   5. 没有复杂的UI样式，全是控制台（短期内无计划做ui）
   6. 不是所有应用中都可以输入文字
+  7. librime-predict似乎还不能正常使用
