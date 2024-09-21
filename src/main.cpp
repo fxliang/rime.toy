@@ -15,6 +15,8 @@ bool is_composing = false;
 std::string commit_str = "";
 UINT original_codepage;
 bool horizontal = true, escape_ansi = false;
+bool hook_enabled = true;
+const int TOGGLE_KEY = VK_F12;
 
 #ifdef IME_STUFF
 HWND hwnd_previous;
@@ -567,6 +569,15 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
   if (nCode == HC_ACTION) {
     KBDLLHOOKSTRUCT *pKeyboard = (KBDLLHOOKSTRUCT *)lParam;
     BYTE tmp = keyState[pKeyboard->vkCode];
+    if ((wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) &&
+        pKeyboard->vkCode == TOGGLE_KEY && (keyState[VK_RCONTROL] & 0x80)) {
+      hook_enabled = !hook_enabled;
+      return 1;
+    }
+    // if not enabled, ignore it;
+    if (!hook_enabled)
+      return CallNextHookEx(hHook, nCode, wParam, lParam);
+
     if (pKeyboard->vkCode != VK_CAPITAL) {
       if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
         keyState[pKeyboard->vkCode] |= 0x80; // 设置按键状态为按下
