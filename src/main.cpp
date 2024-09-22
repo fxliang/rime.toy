@@ -12,13 +12,17 @@ BYTE keyState[256] = {0};
 RimeSessionId session_id = NULL;
 Context old_ctx;
 Status old_sta;
-bool to_commit = true;
+bool committed = true;
 bool is_composing = false;
 string commit_str = "";
 UINT original_codepage;
 bool horizontal = true, escape_ansi = false;
 bool hook_enabled = true;
 const int TOGGLE_KEY = VK_F12;
+
+KeyEvent prevKeyEvent;
+int keyCountToSimulate = 0;
+BOOL prevfEaten = FALSE;
 
 #ifdef IME_STUFF
 HWND hwnd_previous;
@@ -27,6 +31,7 @@ HIMC hOriginalIMC = NULL;
 
 KeyInfo ki(0);
 
+void clear_screen();
 // ----------------------------------------------------------------------------
 
 int expand_ibus_modifier(int m) { return (m & 0xff) | ((m & 0xff00) << 16); }
@@ -69,8 +74,8 @@ inline string wstring_to_string(const wstring &wstr, int code_page = CP_ACP) {
 
 void on_message(void *context_object, RimeSessionId session_id,
                 const char *message_type, const char *message_value) {
-  printf("message: [%p] [%s] %s\n", (void *)session_id, message_type,
-         message_value);
+  // printf("message: [%p] [%s] %s\n", (void *)session_id, message_type,
+  //        message_value);
   RimeApi *rime = rime_get_api();
   if (RIME_API_AVAILABLE(rime, get_state_label) &&
       !strcmp(message_type, "option")) {
@@ -79,6 +84,7 @@ void on_message(void *context_object, RimeSessionId session_id,
     const char *state_label =
         rime->get_state_label(session_id, option_name, state);
     if (state_label) {
+      clear_screen();
       printf("updated option: %s = %d // %s\n", option_name, state,
              state_label);
     }
@@ -454,10 +460,8 @@ void get_commit() {
   RIME_STRUCT(RimeCommit, commit);
   if (rime->get_commit(session_id, &commit)) {
     commit_str = string(commit.text);
-    to_commit = true;
     rime->free_commit(&commit);
   } else {
-    to_commit = false;
     commit_str.clear();
   }
 }
@@ -553,6 +557,25 @@ void update_ui() {
   }
 }
 
+void print_keyevent(KeyEvent &ke) {
+  cout << hex << "ke.keycode = " << ke.keycode << ", ke.mask = " << ke.mask
+       << endl;
+}
+
+void print_keystates_changes() {
+#ifdef PRINT_KEY_UPDATE
+  for (int i = 0; i < 256; ++i) {
+    if (i == pKeyboard->vkCode && tmp != keyState[pKeyboard->vkCode]) {
+      if (keyState[i] & 0x80) {
+        cout << "Key " << hex << i << " is pressed." << endl;
+      } else {
+        cout << "Key " << hex << i << " is released." << endl;
+      }
+    }
+  }
+#endif
+}
+
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
   HWND hwnd = GetForegroundWindow();
 #ifdef IME_STUFF /* not ok yet */
@@ -591,17 +614,6 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
         keyState[pKeyboard->vkCode] &= ~0x01; // 设置按键状态为松开
       }
     }
-#ifdef PRINT_KEY_UPDATE
-    for (int i = 0; i < 256; ++i) {
-      if (i == pKeyboard->vkCode && tmp != keyState[pKeyboard->vkCode]) {
-        if (keyState[i] & 0x80) {
-          cout << "Key " << hex << i << " is pressed." << endl;
-        } else {
-          cout << "Key " << hex << i << " is released." << endl;
-        }
-      }
-    }
-#endif
     // get KBDLLHOOKSTRUCT info, generate keyinfo
     DWORD vkCode = pKeyboard->vkCode;
     DWORD scanCode = pKeyboard->scanCode;
@@ -632,21 +644,52 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     ki.isKeyUp = (flags & LLKHF_UP) ? 1 : 0;
     KeyEvent ke;
     if (ConvertKeyEvent(pKeyboard->vkCode, ki, keyState, ke)) {
-      // cout << hex << "ke.keycode = " <<  ke.keycode << ", ke.mask =
-      // " << ke.mask << endl;
+      // print_keyevent(ke);
       // todo: capslock to be handled
       RimeApi *rime_api = rime_get_api();
       assert(rime_api);
-      auto eat = rime_api->process_key(session_id, ke.keycode,
-                                       expand_ibus_modifier(ke.mask));
+      bool eat = false;
+      if (!keyCountToSimulate)
+        eat = rime_api->process_key(session_id, ke.keycode,
+                                    expand_ibus_modifier(ke.mask));
+      if (ke.keycode == ibus::Caps_Lock) {
+        if (prevKeyEvent.keycode == ibus::Caps_Lock && prevfEaten == TRUE &&
+            (ke.mask & ibus::RELEASE_MASK) && (!keyCountToSimulate)) {
+          if (GetKeyState(VK_CAPITAL) & 0x01) {
+            if (committed || (!eat && old_sta.composing)) {
+              keyCountToSimulate = 2;
+              INPUT inputs[2];
+              inputs[0].type = INPUT_KEYBOARD;
+              inputs[0].ki = {VK_CAPITAL, 0, 0, 0, 0};
+              inputs[1].type = INPUT_KEYBOARD;
+              inputs[1].ki = {VK_CAPITAL, 0, KEYEVENTF_KEYUP, 0, 0};
+              ::SendInput(sizeof(inputs) / sizeof(INPUT), inputs,
+                          sizeof(INPUT));
+            }
+          }
+          eat = TRUE;
+        }
+        if (keyCountToSimulate)
+          keyCountToSimulate--;
+      }
+      prevfEaten = eat;
+      prevKeyEvent = ke;
+
       if (eat) {
         update_ui();
-        if (to_commit)
+        if (!commit_str.empty()) {
           send_input_to_window(hwnd, string_to_wstring(commit_str, CP_UTF8));
+          committed = true;
+        } else
+          committed = false;
+        if ((ke.keycode == ibus::Caps_Lock && keyCountToSimulate) ||
+            old_sta.ascii_mode)
+          goto skip;
         return 1;
       }
     }
   }
+skip:
   return CallNextHookEx(hHook, nCode, wParam, lParam);
 }
 
