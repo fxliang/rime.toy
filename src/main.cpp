@@ -85,8 +85,7 @@ void on_message(void *context_object, RimeSessionId session_id,
         rime->get_state_label(session_id, option_name, state);
     if (state_label) {
       clear_screen();
-      printf("updated option: %s = %d // %s\n", option_name, state,
-             state_label);
+      printf("%s %s", old_sta.schema_name.c_str(), state_label);
     }
   }
 }
@@ -523,8 +522,13 @@ void update_ui() {
     old_ctx = ctx;
     clear_screen();
     draw_preedit(ctx.preedit);
+
+    static RimeApi *rime = rime_get_api();
+    const char *alabel = rime->get_state_label(session_id, "ascii_mode", 1);
+    const char *nlabel = rime->get_state_label(session_id, "ascii_mode", 0);
     if (!sta.composing)
-      cout << sta.schema_name << " " << (sta.ascii_mode ? "英" : "中") << endl;
+      cout << sta.schema_name << " " << (sta.ascii_mode ? alabel : nlabel)
+           << endl;
     if (ctx.empty())
       return;
     else {
