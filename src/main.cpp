@@ -18,7 +18,7 @@ string commit_str = "";
 UINT original_codepage;
 bool horizontal = true, escape_ansi = false;
 bool hook_enabled = true;
-const int TOGGLE_KEY = VK_F12;
+const int TOGGLE_KEY = 0x31; // key '1'
 
 KeyEvent prevKeyEvent;
 int keyCountToSimulate = 0;
@@ -590,7 +590,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     KBDLLHOOKSTRUCT *pKeyboard = (KBDLLHOOKSTRUCT *)lParam;
     BYTE tmp = keyState[pKeyboard->vkCode];
     if ((wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) &&
-        pKeyboard->vkCode == TOGGLE_KEY && (keyState[VK_RCONTROL] & 0x80)) {
+        pKeyboard->vkCode == TOGGLE_KEY && (keyState[VK_LCONTROL] & 0x80)) {
       hook_enabled = !hook_enabled;
       return 1;
     }
