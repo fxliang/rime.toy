@@ -518,17 +518,17 @@ void update_ui() {
   get_status(sta, session_id);
   if (sta != old_sta)
     old_sta = sta;
+  static RimeApi *rime = rime_get_api();
+  const char *alabel = rime->get_state_label(session_id, "ascii_mode", 1);
+  const char *nlabel = rime->get_state_label(session_id, "ascii_mode", 0);
   if (ctx != old_ctx) {
     old_ctx = ctx;
     clear_screen();
     draw_preedit(ctx.preedit);
 
-    static RimeApi *rime = rime_get_api();
-    const char *alabel = rime->get_state_label(session_id, "ascii_mode", 1);
-    const char *nlabel = rime->get_state_label(session_id, "ascii_mode", 0);
     if (!sta.composing)
       cout << sta.schema_name << " " << (sta.ascii_mode ? alabel : nlabel)
-           << endl;
+           << (hook_enabled ? " " : " 禁用") << endl;
     if (ctx.empty())
       return;
     else {
@@ -557,6 +557,12 @@ void update_ui() {
              << ctx.cinfo.comments[i].str << (highlighted ? sep1 : "")
              << (horizontal ? " " : "\n");
       }
+    }
+  } else {
+    if (!sta.composing) {
+      clear_screen();
+      cout << sta.schema_name << " " << (sta.ascii_mode ? alabel : nlabel)
+           << (hook_enabled ? " " : " 禁用") << endl;
     }
   }
 }
@@ -596,12 +602,12 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if ((wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) &&
         pKeyboard->vkCode == TOGGLE_KEY && (keyState[VK_LCONTROL] & 0x80)) {
       hook_enabled = !hook_enabled;
+      RimeApi *rime_api = rime_get_api();
+      rime_api->clear_composition(session_id);
+      clear_screen();
+      update_ui();
       return 1;
     }
-    // if not enabled, ignore it;
-    if (!hook_enabled)
-      return CallNextHookEx(hHook, nCode, wParam, lParam);
-
     if (pKeyboard->vkCode != VK_CAPITAL) {
       if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
         keyState[pKeyboard->vkCode] |= 0x80; // 设置按键状态为按下
@@ -618,6 +624,10 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
         keyState[pKeyboard->vkCode] &= ~0x01; // 设置按键状态为松开
       }
     }
+    // if not enabled, ignore it;
+    if (!hook_enabled)
+      return CallNextHookEx(hHook, nCode, wParam, lParam);
+
     // get KBDLLHOOKSTRUCT info, generate keyinfo
     DWORD vkCode = pKeyboard->vkCode;
     DWORD scanCode = pKeyboard->scanCode;
@@ -794,6 +804,7 @@ int main(int argc, char *argv[]) {
   fprintf(stderr, "ready.\n");
   session_id = rime_api->create_session();
   assert(session_id);
+  update_ui();
   set_hook();
   if (!SetConsoleCtrlHandler(console_ctrl_handler, TRUE)) {
     cerr << "Error: Could not set control handler." << endl;
