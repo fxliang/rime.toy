@@ -53,6 +53,9 @@ jobs:
   build:
     needs: lint
     runs-on: windows-2019
+    strategy:
+      matrix:
+        arch: [x64, x86]
     steps:
 
       - name: Checkout last commit
@@ -74,21 +77,45 @@ jobs:
       - name: Build rime.toy
         id: build_rime_toy
         run: |
-          xmake
+          xmake f -a ${{ matrix.arch }} && xmake
 
       - name: Compress zip
         run: |
-          .\makezip.ps1
+          .\makezip.ps1 -zipFileName rime.toy.${{ matrix.arch }}.zip
 
-      # create nightly release
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rime.toy.${{ matrix.arch }}
+          path: ./rime.toy.${{ matrix.arch }}.zip
+
+  create_release:
+    needs: build
+    runs-on: windows-2019
+    steps:
+      - name: Checkout last commit
+        uses: actions/checkout@v4
+
+      - name: Download x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: rime.toy.x64
+          path: ./artifacts
+
+      - name: Download x86 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: rime.toy.x86
+          path: ./artifacts
+
       - name: Create Nightly release
         if: ${{ github.repository == 'fxliang/rime.toy' && github.ref == 'refs/heads/master' }}
-        uses: 'marvinpinto/action-automatic-releases@latest'
+        uses: marvinpinto/action-automatic-releases@latest
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           automatic_release_tag: latest
           prerelease: true
           title: "Nightly Build"
           files: |
-            ./rime.toy.zip
-
+            ./artifacts/rime.toy.x64.zip
+            ./artifacts/rime.toy.x86.zip
