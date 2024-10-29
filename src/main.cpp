@@ -3,7 +3,12 @@
 #include <data.h>
 #include <filesystem>
 #include <iostream>
+#include <resource.h>
 #include <rime_api.h>
+#include <sstream>
+#include <trayicon.h>
+#include <ui.h>
+
 using namespace std;
 namespace fs = filesystem;
 
@@ -15,25 +20,23 @@ Status old_sta;
 bool committed = true;
 bool is_composing = false;
 string commit_str = "";
-UINT original_codepage;
 bool horizontal = true, escape_ansi = false;
 bool hook_enabled = true;
 const int TOGGLE_KEY = 0x31; // key '1'
+RECT rect;
 
 KeyEvent prevKeyEvent;
 int keyCountToSimulate = 0;
 BOOL prevfEaten = FALSE;
 
-#ifdef IME_STUFF
 HWND hwnd_previous;
-HIMC hOriginalIMC = NULL;
-#endif
 
 KeyInfo ki(0);
+PopupWindow *pop;
+TrayIcon *trayIcon;
+HINSTANCE hInst;
 
-void clear_screen();
 // ----------------------------------------------------------------------------
-
 int expand_ibus_modifier(int m) { return (m & 0xff) | ((m & 0xff00) << 16); }
 // ----------------------------------------------------------------------------
 inline wstring string_to_wstring(const string &str, int code_page = CP_ACP) {
@@ -53,7 +56,6 @@ inline wstring string_to_wstring(const string &str, int code_page = CP_ACP) {
   delete[] buffer;
   return res;
 }
-
 inline string wstring_to_string(const wstring &wstr, int code_page = CP_ACP) {
   // support CP_ACP and CP_UTF8 only
   if (code_page != 0 && code_page != CP_UTF8)
@@ -71,6 +73,8 @@ inline string wstring_to_string(const wstring &wstr, int code_page = CP_ACP) {
   delete[] buffer;
   return res;
 }
+#define wtou8(x) wstring_to_string(x, CP_UTF8)
+#define u8tow(x) string_to_wstring(x, CP_UTF8)
 
 void on_message(void *context_object, RimeSessionId session_id,
                 const char *message_type, const char *message_value) {
@@ -84,7 +88,10 @@ void on_message(void *context_object, RimeSessionId session_id,
     const char *state_label =
         rime->get_state_label(session_id, option_name, state);
     if (state_label) {
-      clear_screen();
+      if (pop) {
+        pop->SetText(L"");
+        pop->Hide();
+      }
       printf("%s %s", old_sta.schema_name.c_str(), state_label);
     }
   }
@@ -106,25 +113,6 @@ void send_input_to_window(HWND hwnd, const wstring &text) {
   }
 }
 
-// ----------------------------------------------------------------------------
-void clear_screen() {
-  HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-  COORD coordScreen = {0, 0};
-  DWORD cCharsWritten;
-  CONSOLE_SCREEN_BUFFER_INFO csbi;
-  DWORD dwConSize;
-  if (!GetConsoleScreenBufferInfo(hConsole, &csbi))
-    return;
-  dwConSize = csbi.dwSize.X * csbi.dwSize.Y;
-  if (!FillConsoleOutputCharacter(hConsole, (TCHAR)' ', dwConSize, coordScreen,
-                                  &cCharsWritten))
-    return;
-  if (!FillConsoleOutputAttribute(hConsole, csbi.wAttributes, dwConSize,
-                                  coordScreen, &cCharsWritten)) {
-    return;
-  }
-  SetConsoleCursorPosition(hConsole, coordScreen);
-}
 // ----------------------------------------------------------------------------
 ibus::Keycode TranslateKeycode(UINT vkey, KeyInfo kinfo) {
   switch (vkey) {
@@ -376,21 +364,6 @@ bool ConvertKeyEvent(UINT vkey, KeyInfo kinfo, const LPBYTE keyState,
   return false;
 }
 // ----------------------------------------------------------------------------
-#ifdef IME_STUFF /* not ok yet */
-// disable ime, a possible solution
-void disable_ime(HWND hWnd) {
-  hOriginalIMC = ImmGetContext(hWnd);
-  if (hOriginalIMC) {
-    ImmAssociateContext(hWnd, NULL);
-  }
-}
-
-// recover
-void restore_ime(HWND hWnd) {
-  if (hOriginalIMC)
-    ImmAssociateContext(hWnd, hOriginalIMC);
-}
-#endif
 
 void get_candidate_info(CandidateInfo &cinfo, RimeContext &ctx) {
   cinfo.candies.resize(ctx.menu.num_candidates);
@@ -465,54 +438,9 @@ void get_commit() {
   }
 }
 
-void draw_preedit(const Text &preedit) {
-  const auto &str = preedit.str;
-  if (str.empty())
-    return;
-  TextRange range;
-  const auto &attrs = preedit.attributes;
-  for (size_t j = 0; j < attrs.size(); ++j) {
-    if (attrs[j].type == HIGHLIGHTED) {
-      range = attrs[j].range;
-      break;
-    }
-  }
-  if (range.start < range.end) {
-    if (range.start > 0)
-      cout << str.substr(0, range.start);
-    cout << (escape_ansi ? "\x1b[7m" : "[");
-    cout << str.substr(range.start, range.end - range.start);
-    cout << (escape_ansi ? "\x1b[0m" : "]");
-    if (range.end < str.length())
-      cout << str.substr(range.end);
-  } else {
-    cout << "|" << str;
-  }
-  cout << endl;
-}
-
-size_t calc_display_width(const string &utf8str) {
-  size_t width = 0;
-  for (auto i = 0; i < utf8str.length(); ++i) {
-    if (static_cast<unsigned char>(utf8str[i]) < 0x80)
-      width++;
-    else {
-      if ((utf8str[i] & 0xE0) == 0xC0) {
-        i += 1;
-      } else if ((utf8str[i] & 0xF0) == 0xE0) {
-        i += 2;
-      } else if ((utf8str[i] & 0xF8) == 0xF0) {
-        i += 3;
-      }
-      width += 2;
-    }
-  }
-  return width;
-}
-
+Status sta;
 void update_ui() {
   Context ctx;
-  Status sta;
   get_commit();
   get_context(ctx, session_id);
   get_status(sta, session_id);
@@ -523,79 +451,49 @@ void update_ui() {
   const char *nlabel = rime->get_state_label(session_id, "ascii_mode", 0);
   if (ctx != old_ctx) {
     old_ctx = ctx;
-    clear_screen();
-    draw_preedit(ctx.preedit);
 
-    if (!sta.composing)
-      cout << sta.schema_name << " " << (sta.ascii_mode ? alabel : nlabel)
-           << (hook_enabled ? " " : " 禁用") << endl;
-    if (ctx.empty())
+    // if (!sta.composing)
+    //   cout << sta.schema_name << " " << (sta.ascii_mode ? alabel : nlabel)
+    //        << (hook_enabled ? " " : " 禁用") << endl;
+    if (ctx.empty()) {
+      pop->Hide();
       return;
-    else {
-      const char *sep0 = escape_ansi ? "\x1b[7m" : "[";
-      const char *sep1 = escape_ansi ? "\x1b[0m" : "]";
-      unique_ptr<size_t[]> widths;
-      size_t max_width = 0;
-      if (!horizontal) {
-        widths = make_unique<size_t[]>(ctx.cinfo.candies.size());
-        for (auto i = 0; i < ctx.cinfo.candies.size(); i++) {
-          widths[i] = calc_display_width(ctx.cinfo.candies[i].str);
-          widths[i] += calc_display_width(ctx.cinfo.labels[i].str);
-          widths[i] += calc_display_width(ctx.cinfo.comments[i].str);
-          widths[i] += 1;
-          if (!escape_ansi)
-            widths[i] += 2;
-          max_width = max(max_width, widths[i]);
-        }
-      }
-
+    } else {
+      std::wstring text_ = u8tow(ctx.preedit.str) + L" ";
       for (auto i = 0; i < ctx.cinfo.candies.size(); i++) {
         bool highlighted = i == ctx.cinfo.highlighted;
-        cout << (highlighted ? sep0 : "") << ctx.cinfo.labels[i].str << "."
-             << ctx.cinfo.candies[i].str
-             << (horizontal ? " " : string(max_width - widths[i] + 1, ' '))
-             << ctx.cinfo.comments[i].str << (highlighted ? sep1 : "")
-             << (horizontal ? " " : "\n");
+        text_ += u8tow(ctx.cinfo.labels[i].str) + L". " +
+                 u8tow(ctx.cinfo.candies[i].str) + L" ";
+      }
+      if (pop) {
+        pop->SetText(text_);
+        POINT pt;
+        if (GetCursorPos(&pt)) {
+          pop->UpdatePos(pt.x, pt.y);
+        } else
+          pop->UpdatePos(rect.left + (rect.right - rect.left) / 2 - 150,
+                         rect.bottom - (rect.bottom - rect.top) / 2 - 100);
+        pop->Show();
       }
     }
   } else {
-    if (!sta.composing) {
-      clear_screen();
-      cout << sta.schema_name << " " << (sta.ascii_mode ? alabel : nlabel)
-           << (hook_enabled ? " " : " 禁用") << endl;
-    }
+    // if (!sta.composing) {
+    //   cout << sta.schema_name << " " << (sta.ascii_mode ? alabel : nlabel)
+    //        << (hook_enabled ? " " : " 禁用") << endl;
+    // }
   }
-}
-
-void print_keyevent(KeyEvent &ke) {
-  cout << hex << "ke.keycode = " << ke.keycode << ", ke.mask = " << ke.mask
-       << endl;
-}
-
-void print_keystates_changes() {
-#ifdef PRINT_KEY_UPDATE
-  for (int i = 0; i < 256; ++i) {
-    if (i == pKeyboard->vkCode && tmp != keyState[pKeyboard->vkCode]) {
-      if (keyState[i] & 0x80) {
-        cout << "Key " << hex << i << " is pressed." << endl;
-      } else {
-        cout << "Key " << hex << i << " is released." << endl;
-      }
-    }
-  }
-#endif
 }
 
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
   HWND hwnd = GetForegroundWindow();
-#ifdef IME_STUFF /* not ok yet */
-  disable_ime(hwnd);
-  if (hwnd != hwnd_previous) {
-    if (!hwnd_previous)
-      restore_ime(hwnd_previous);
-    hwnd_previous = hwnd;
+  if (hwnd) {
+    GetWindowRect(hwnd, &rect);
   }
-#endif
+  if (hwnd != hwnd_previous) {
+    hwnd_previous = hwnd;
+    pop->SetText(L"");
+    pop->Hide();
+  }
   if (nCode == HC_ACTION) {
     KBDLLHOOKSTRUCT *pKeyboard = (KBDLLHOOKSTRUCT *)lParam;
     BYTE tmp = keyState[pKeyboard->vkCode];
@@ -604,7 +502,10 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
       hook_enabled = !hook_enabled;
       RimeApi *rime_api = rime_get_api();
       rime_api->clear_composition(session_id);
-      clear_screen();
+      if (pop) {
+        pop->SetText(L"");
+        pop->Hide();
+      }
       update_ui();
       return 1;
     }
@@ -658,8 +559,6 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     ki.isKeyUp = (flags & LLKHF_UP) ? 1 : 0;
     KeyEvent ke;
     if (ConvertKeyEvent(pKeyboard->vkCode, ki, keyState, ke)) {
-      // print_keyevent(ke);
-      // todo: capslock to be handled
       RimeApi *rime_api = rime_get_api();
       assert(rime_api);
       bool eat = false;
@@ -692,7 +591,9 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
       if (eat) {
         update_ui();
         if (!commit_str.empty()) {
-          send_input_to_window(hwnd, string_to_wstring(commit_str, CP_UTF8));
+          send_input_to_window(hwnd, u8tow(commit_str));
+          if (!sta.composing)
+            pop->Hide();
           committed = true;
         } else
           committed = false;
@@ -715,7 +616,6 @@ void clean_up() {
   rime_api->destroy_session(session_id);
   rime_api->finalize();
   release_hook();
-  SetConsoleOutputCP(original_codepage);
 }
 
 void set_hook() {
@@ -748,9 +648,6 @@ void setup_rime() {
   auto shared_path = data_path("shared");
   auto usr_path = data_path("usr");
   auto log_path = get_log_path();
-  cout << "shared data dir: " << shared_path.u8string() << endl
-       << "user data dir: " << usr_path.u8string() << endl
-       << "log dir: " << log_path.u8string() << endl;
   if (!fs::exists(shared_path))
     fs::create_directory(shared_path);
   if (!fs::exists(usr_path))
@@ -766,7 +663,7 @@ void setup_rime() {
   traits.prebuilt_data_dir = traits.shared_data_dir;
   traits.distribution_name = "rime.toy";
   traits.distribution_code_name = "rime.toy";
-  traits.distribution_version = "0.0.1.0";
+  traits.distribution_version = "0.0.2.0";
   traits.app_name = "rime.toy";
   RimeApi *rime_api = rime_get_api();
   assert(rime_api);
@@ -774,26 +671,33 @@ void setup_rime() {
   rime_api->set_notification_handler(&on_message, nullptr);
 }
 
-BOOL WINAPI console_ctrl_handler(DWORD ctrl_type) {
-  if (ctrl_type == CTRL_C_EVENT) {
-    cout << "Control+c detected, cleaning up..." << endl;
-    clean_up();
-    exit(0);
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+  trayIcon->ProcessMessage(hwnd, msg, wParam, lParam);
+  switch (msg) {
+  case WM_CLOSE:
+    DestroyWindow(hwnd);
+    break;
+  case WM_DESTROY:
+    PostQuitMessage(0);
+    break;
+  default:
+    return DefWindowProc(hwnd, msg, wParam, lParam);
   }
-  return FALSE;
+  return 0;
 }
 
-int main(int argc, char *argv[]) {
-  for (auto i = 0; i < argc; i++) {
-    string arg = argv[i];
-    if (arg == "/v")
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                    LPWSTR lpCmdLine, int nCmdShow) {
+  wstring cmdLine(lpCmdLine);
+  wistringstream wiss(cmdLine);
+  wstring arg;
+  while (wiss >> arg) {
+    if (arg == L"/v") {
       horizontal = false;
-    if (arg == "/e")
+    } else if (arg == L"/e") {
       escape_ansi = true;
+    }
   }
-
-  original_codepage = GetConsoleOutputCP();
-  SetConsoleOutputCP(CP_UTF8);
   setup_rime();
   fprintf(stderr, "initializing...\n");
   RimeApi *rime_api = rime_get_api();
@@ -806,18 +710,38 @@ int main(int argc, char *argv[]) {
   assert(session_id);
   update_ui();
   set_hook();
-  if (!SetConsoleCtrlHandler(console_ctrl_handler, TRUE)) {
-    cerr << "Error: Could not set control handler." << endl;
-    clean_up();
-    return 1;
-  }
+  // --------------------------------------------------------------------------
+  pop = new PopupWindow(hInstance, L"PopupClass", L"My Popup");
+  pop->CreatePopup();
+  // --------------------------------------------------------------------------
+  hInst = hInstance;
+  // 注册窗口类
+  WNDCLASS wc = {0};
+  wc.lpfnWndProc = WndProc;
+  wc.hInstance = hInstance;
+  wc.lpszClassName = L"Rime.Toy.App";
+  wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
+  wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+  RegisterClass(&wc);
+
+  // 创建一个隐藏窗口
+  HWND hwnd = CreateWindow(L"Rime.Toy.App", L"Rime.Toy.App",
+                           WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 0,
+                           0, NULL, NULL, hInstance, NULL);
+  // 创建托盘图标
+  trayIcon = new TrayIcon(hInstance, hwnd, L"rime.toy");
+  trayIcon->SetIcon(wc.hIcon); // 使用默认图标
+  trayIcon->SetTooltip(L"rime.toy\n右键菜单可退出^_^");
+  trayIcon->Show();
+  // 不显示窗口
+  ShowWindow(hwnd, SW_HIDE);
+  // --------------------------------------------------------------------------
   MSG msg;
   while (GetMessage(&msg, NULL, 0, 0)) {
     TranslateMessage(&msg);
     DispatchMessage(&msg);
   }
-
-  cout << "cleaning up..." << endl;
   clean_up();
+  delete trayIcon;
   return 0;
 }
