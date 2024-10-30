@@ -18,23 +18,14 @@ RimeSessionId session_id = NULL;
 Context old_ctx;
 Status old_sta;
 bool committed = true;
-bool is_composing = false;
 string commit_str = "";
 bool horizontal = true, escape_ansi = false;
 bool hook_enabled = true;
-const int TOGGLE_KEY = 0x31; // key '1'
 RECT rect;
-
-KeyEvent prevKeyEvent;
-int keyCountToSimulate = 0;
-BOOL prevfEaten = FALSE;
-
-HWND hwnd_previous;
 
 KeyInfo ki(0);
 PopupWindow *pop;
 TrayIcon *trayIcon;
-HINSTANCE hInst;
 
 // ----------------------------------------------------------------------------
 int expand_ibus_modifier(int m) { return (m & 0xff) | ((m & 0xff00) << 16); }
@@ -484,7 +475,67 @@ void update_ui() {
   }
 }
 
+KeyInfo parse_key(WPARAM wParam, LPARAM lParam) {
+  KeyInfo ki(0);
+  KBDLLHOOKSTRUCT *pKeyboard = (KBDLLHOOKSTRUCT *)lParam;
+  BYTE tmp = keyState[pKeyboard->vkCode];
+  DWORD vkCode = pKeyboard->vkCode;
+  DWORD scanCode = pKeyboard->scanCode;
+  DWORD flags = pKeyboard->flags;
+  DWORD time = pKeyboard->time;
+  ULONG_PTR dwExtraInfo = pKeyboard->dwExtraInfo;
+
+  if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP)
+    ki.repeatCount = 1;
+  else if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
+    if ((keyState[pKeyboard->vkCode] & 0x80) && ki.repeatCount < 0xffff &&
+        scanCode == ki.scanCode)
+      ki.repeatCount++;
+    else
+      ki.repeatCount = 1;
+  }
+  ki.scanCode = scanCode;
+  ki.isExtended = (flags & LLKHF_EXTENDED) != 0;
+  ki.contextCode = 0;
+  // for WM_KEYDOWN or WM_SYSKEYDOWN, The value is 1 if the key is down before
+  // the message is sent, or it is zero if the key is up. The value is always
+  // 1 for a WM_KEYUP and WM_SYSKEYUP message.
+  ki.prevKeyState =
+      (((wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) && (tmp & 0x80)) ||
+       (wParam == WM_KEYUP || wParam == WM_SYSKEYUP))
+          ? 1
+          : 0;
+  ki.isKeyUp = (flags & LLKHF_UP) ? 1 : 0;
+  return ki;
+}
+
+void update_keystates(WPARAM wParam, LPARAM lParam) {
+  KBDLLHOOKSTRUCT *pKeyboard = (KBDLLHOOKSTRUCT *)lParam;
+  if (pKeyboard->vkCode != VK_CAPITAL) {
+    if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
+      keyState[pKeyboard->vkCode] |= 0x80; // 设置按键状态为按下
+    } else if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP) {
+      keyState[pKeyboard->vkCode] &= ~0x80; // 设置按键状态为松开
+    }
+    keyState[VK_SHIFT] = (keyState[VK_LSHIFT] | keyState[VK_RSHIFT]);
+    keyState[VK_CONTROL] = (keyState[VK_LCONTROL] | keyState[VK_RCONTROL]);
+    keyState[VK_MENU] = (keyState[VK_LMENU] | keyState[VK_RMENU]);
+  } else {
+    if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
+      keyState[pKeyboard->vkCode] |= 0x01; // 设置按键状态为按下
+    } else if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP) {
+      keyState[pKeyboard->vkCode] &= ~0x01; // 设置按键状态为松开
+    }
+  }
+}
+
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
+  const int TOGGLE_KEY = 0x31; // key '1'
+  static KeyEvent prevKeyEvent;
+  static BOOL prevfEaten = FALSE;
+  static int keyCountToSimulate = 0;
+  static HWND hwnd_previous = nullptr;
+
   HWND hwnd = GetForegroundWindow();
   if (hwnd) {
     GetWindowRect(hwnd, &rect);
@@ -496,7 +547,6 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
   }
   if (nCode == HC_ACTION) {
     KBDLLHOOKSTRUCT *pKeyboard = (KBDLLHOOKSTRUCT *)lParam;
-    BYTE tmp = keyState[pKeyboard->vkCode];
     if ((wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) &&
         pKeyboard->vkCode == TOGGLE_KEY && (keyState[VK_LCONTROL] & 0x80)) {
       hook_enabled = !hook_enabled;
@@ -509,54 +559,13 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
       update_ui();
       return 1;
     }
-    if (pKeyboard->vkCode != VK_CAPITAL) {
-      if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
-        keyState[pKeyboard->vkCode] |= 0x80; // 设置按键状态为按下
-      } else if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP) {
-        keyState[pKeyboard->vkCode] &= ~0x80; // 设置按键状态为松开
-      }
-      keyState[VK_SHIFT] = (keyState[VK_LSHIFT] | keyState[VK_RSHIFT]);
-      keyState[VK_CONTROL] = (keyState[VK_LCONTROL] | keyState[VK_RCONTROL]);
-      keyState[VK_MENU] = (keyState[VK_LMENU] | keyState[VK_RMENU]);
-    } else {
-      if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
-        keyState[pKeyboard->vkCode] |= 0x01; // 设置按键状态为按下
-      } else if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP) {
-        keyState[pKeyboard->vkCode] &= ~0x01; // 设置按键状态为松开
-      }
-    }
+    update_keystates(wParam, lParam);
     // if not enabled, ignore it;
     if (!hook_enabled)
       return CallNextHookEx(hHook, nCode, wParam, lParam);
 
     // get KBDLLHOOKSTRUCT info, generate keyinfo
-    DWORD vkCode = pKeyboard->vkCode;
-    DWORD scanCode = pKeyboard->scanCode;
-    DWORD flags = pKeyboard->flags;
-    DWORD time = pKeyboard->time;
-    ULONG_PTR dwExtraInfo = pKeyboard->dwExtraInfo;
-
-    if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP)
-      ki.repeatCount = 1;
-    else if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
-      if ((keyState[pKeyboard->vkCode] & 0x80) && ki.repeatCount < 0xffff &&
-          scanCode == ki.scanCode)
-        ki.repeatCount++;
-      else
-        ki.repeatCount = 1;
-    }
-    ki.scanCode = scanCode;
-    ki.isExtended = (flags & LLKHF_EXTENDED) != 0;
-    ki.contextCode = 0;
-    // for WM_KEYDOWN or WM_SYSKEYDOWN, The value is 1 if the key is down before
-    // the message is sent, or it is zero if the key is up. The value is always
-    // 1 for a WM_KEYUP and WM_SYSKEYUP message.
-    ki.prevKeyState =
-        (((wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) && (tmp & 0x80)) ||
-         (wParam == WM_KEYUP || wParam == WM_SYSKEYUP))
-            ? 1
-            : 0;
-    ki.isKeyUp = (flags & LLKHF_UP) ? 1 : 0;
+    ki = parse_key(wParam, lParam);
     KeyEvent ke;
     if (ConvertKeyEvent(pKeyboard->vkCode, ki, keyState, ke)) {
       RimeApi *rime_api = rime_get_api();
@@ -688,9 +697,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                     LPWSTR lpCmdLine, int nCmdShow) {
-  wstring cmdLine(lpCmdLine);
+  wstring cmdLine(lpCmdLine), arg;
   wistringstream wiss(cmdLine);
-  wstring arg;
   while (wiss >> arg) {
     if (arg == L"/v") {
       horizontal = false;
@@ -699,22 +707,18 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     }
   }
   setup_rime();
-  fprintf(stderr, "initializing...\n");
   RimeApi *rime_api = rime_get_api();
   assert(rime_api);
   rime_api->initialize(NULL);
   if (rime_api->start_maintenance(true))
     rime_api->join_maintenance_thread();
-  fprintf(stderr, "ready.\n");
   session_id = rime_api->create_session();
   assert(session_id);
-  update_ui();
   set_hook();
   // --------------------------------------------------------------------------
-  pop = new PopupWindow(hInstance, L"PopupClass", L"My Popup");
+  pop = new PopupWindow(hInstance, L"Rime.Toy.UI", L"Rime.Toy.App");
   pop->CreatePopup();
   // --------------------------------------------------------------------------
-  hInst = hInstance;
   // 注册窗口类
   WNDCLASS wc = {0};
   wc.lpfnWndProc = WndProc;
