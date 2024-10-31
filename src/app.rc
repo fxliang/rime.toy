@@ -1,3 +1,4 @@
 #include "resource.h"
 // 定义应用程序图标
 IDI_ICON_MAIN ICON "rime.toy.ico"
+IDI_ICON_ASCII ICON "ascii.ico"

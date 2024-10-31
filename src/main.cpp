@@ -17,6 +17,7 @@ BYTE keyState[256] = {0};
 RimeSessionId session_id = NULL;
 Context old_ctx;
 Status old_sta;
+Status sta;
 bool committed = true;
 string commit_str = "";
 bool horizontal = true, escape_ansi = false;
@@ -26,6 +27,8 @@ RECT rect;
 KeyInfo ki(0);
 PopupWindow *pop;
 TrayIcon *trayIcon;
+HICON ascii_icon;
+HICON ime_icon;
 
 // ----------------------------------------------------------------------------
 int expand_ibus_modifier(int m) { return (m & 0xff) | ((m & 0xff00) << 16); }
@@ -65,6 +68,7 @@ inline string wstring_to_string(const wstring &wstr, int code_page = CP_ACP) {
   return res;
 }
 #define wtou8(x) wstring_to_string(x, CP_UTF8)
+#define wtoacp(x) wstring_to_string(x)
 #define u8tow(x) string_to_wstring(x, CP_UTF8)
 
 void on_message(void *context_object, RimeSessionId session_id,
@@ -78,12 +82,27 @@ void on_message(void *context_object, RimeSessionId session_id,
     const char *option_name = message_value + !state;
     const char *state_label =
         rime->get_state_label(session_id, option_name, state);
-    if (state_label) {
-      if (pop) {
-        pop->SetText(L"");
-        pop->Hide();
+    if (string(option_name) == "ascii_mode") {
+      if (trayIcon) {
+        trayIcon->SetIcon(state ? ascii_icon : ime_icon);
       }
-      printf("%s %s", old_sta.schema_name.c_str(), state_label);
+    }
+    if (state_label) {
+      HWND hwnd = GetForegroundWindow();
+      if (hwnd) {
+        GetWindowRect(hwnd, &rect);
+      }
+      auto msg = u8tow(sta.schema_name + " " + string(state_label));
+      if (pop) {
+        pop->SetText(L"", msg);
+        POINT pt;
+        if (GetCursorPos(&pt)) {
+          pop->UpdatePos(pt.x, pt.y);
+        } else
+          pop->UpdatePos(rect.left + (rect.right - rect.left) / 2 - 150,
+                         rect.bottom - (rect.bottom - rect.top) / 2 - 100);
+        pop->ShowWithTimeout(500);
+      }
     }
   }
 }
@@ -429,7 +448,6 @@ void get_commit() {
   }
 }
 
-Status sta;
 void update_ui() {
   Context ctx;
   get_commit();
@@ -597,20 +615,19 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
       prevfEaten = eat;
       prevKeyEvent = ke;
 
-      if (eat) {
-        update_ui();
-        if (!commit_str.empty()) {
-          send_input_to_window(hwnd, u8tow(commit_str));
-          if (!sta.composing)
-            pop->Hide();
-          committed = true;
-        } else
-          committed = false;
-        if ((ke.keycode == ibus::Caps_Lock && keyCountToSimulate) ||
-            old_sta.ascii_mode)
-          goto skip;
+      update_ui();
+      if (!commit_str.empty()) {
+        send_input_to_window(hwnd, u8tow(commit_str));
+        if (!sta.composing)
+          pop->Refresh();
+        committed = true;
+      } else
+        committed = false;
+      if ((ke.keycode == ibus::Caps_Lock && keyCountToSimulate) ||
+          old_sta.ascii_mode)
+        goto skip;
+      if (eat)
         return 1;
-      }
     }
   }
 skip:
@@ -720,6 +737,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   pop->CreatePopup();
   // --------------------------------------------------------------------------
   // 注册窗口类
+
+  ime_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
+  ascii_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_ASCII));
   WNDCLASS wc = {0};
   wc.lpfnWndProc = WndProc;
   wc.hInstance = hInstance;
