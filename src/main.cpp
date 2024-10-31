@@ -482,6 +482,7 @@ void update_ui() {
         } else
           pop->UpdatePos(rect.left + (rect.right - rect.left) / 2 - 150,
                          rect.bottom - (rect.bottom - rect.top) / 2 - 100);
+        pop->Refresh();
         pop->Show();
       }
     }
