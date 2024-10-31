@@ -33,43 +33,6 @@ HICON ime_icon;
 // ----------------------------------------------------------------------------
 int expand_ibus_modifier(int m) { return (m & 0xff) | ((m & 0xff00) << 16); }
 // ----------------------------------------------------------------------------
-inline wstring string_to_wstring(const string &str, int code_page = CP_ACP) {
-  // support CP_ACP and CP_UTF8 only
-  if (code_page != 0 && code_page != CP_UTF8)
-    return L"";
-  // calc len
-  int len =
-      MultiByteToWideChar(code_page, 0, str.c_str(), (int)str.size(), NULL, 0);
-  if (len <= 0)
-    return L"";
-  wstring res;
-  WCHAR *buffer = new WCHAR[len + 1];
-  MultiByteToWideChar(code_page, 0, str.c_str(), (int)str.size(), buffer, len);
-  buffer[len] = '\0';
-  res.append(buffer);
-  delete[] buffer;
-  return res;
-}
-inline string wstring_to_string(const wstring &wstr, int code_page = CP_ACP) {
-  // support CP_ACP and CP_UTF8 only
-  if (code_page != 0 && code_page != CP_UTF8)
-    return "";
-  int len = WideCharToMultiByte(code_page, 0, wstr.c_str(), (int)wstr.size(),
-                                NULL, 0, NULL, NULL);
-  if (len <= 0)
-    return "";
-  string res;
-  char *buffer = new char[len + 1];
-  WideCharToMultiByte(code_page, 0, wstr.c_str(), (int)wstr.size(), buffer, len,
-                      NULL, NULL);
-  buffer[len] = '\0';
-  res.append(buffer);
-  delete[] buffer;
-  return res;
-}
-#define wtou8(x) wstring_to_string(x, CP_UTF8)
-#define wtoacp(x) wstring_to_string(x)
-#define u8tow(x) string_to_wstring(x, CP_UTF8)
 
 void on_message(void *context_object, RimeSessionId session_id,
                 const char *message_type, const char *message_value) {
@@ -471,11 +434,16 @@ void update_ui() {
       std::wstring text_ = u8tow(ctx.preedit.str) + L" ";
       for (auto i = 0; i < ctx.cinfo.candies.size(); i++) {
         bool highlighted = i == ctx.cinfo.highlighted;
+        text_ += highlighted ? L"[" : L"";
         text_ += u8tow(ctx.cinfo.labels[i].str) + L". " +
-                 u8tow(ctx.cinfo.candies[i].str) + L" ";
+                 u8tow(ctx.cinfo.candies[i].str) + L" " +
+                 u8tow(ctx.cinfo.comments[i].str);
+        text_ += highlighted ? L"] " : L" ";
       }
       if (pop) {
-        pop->SetText(text_);
+        // pop->SetText(text_);
+        ctx.aux.clear();
+        pop->Update(ctx, sta);
         POINT pt;
         if (GetCursorPos(&pt)) {
           pop->UpdatePos(pt.x, pt.y);
@@ -735,9 +703,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   set_hook();
   // --------------------------------------------------------------------------
   pop = new PopupWindow(hInstance, L"Rime.Toy.UI", L"Rime.Toy.App");
-  pop->CreatePopup();
-  // --------------------------------------------------------------------------
-  // 注册窗口类
+  // pop->CreatePopup();
+  //  --------------------------------------------------------------------------
+  //  注册窗口类
 
   ime_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
   ascii_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_ASCII));
