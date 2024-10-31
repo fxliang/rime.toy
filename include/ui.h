@@ -13,26 +13,70 @@ public:
   void Hide();
   void UpdatePos(int x, int y);
   bool IsVisible() const;
-  void SetText(const std::wstring &text); // 新增方法
+  void ShowWithTimeout(size_t millisec);
+  void SetText(const std::wstring &text,
+               const std::wstring &aux = L""); // 新增方法
+  void Refresh();
+
 private:
   static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
                                      LPARAM lParam);
   void RegisterWindowClass();
+  bool IsShown() const { return shown; }
+
+  static VOID CALLBACK OnTimer(_In_ HWND hwnd, _In_ UINT uMsg,
+                               _In_ UINT_PTR idEvent, _In_ DWORD dwTime);
+  static const int AUTOHIDE_TIMER = 20121220;
+  static UINT_PTR timer;
+
+  bool shown;
   HINSTANCE hInstance_;
   const wchar_t *className_;
   const wchar_t *windowTitle_;
   HWND hwnd_;
-  bool isVisible_;
   static std::wstring text_; // 用于存储文本
+  static std::wstring aux_;  // 用于存储文本
 };
 
+UINT_PTR PopupWindow::timer = 0;
 std::wstring PopupWindow::text_ = L""; // 用于存储文本
+std::wstring PopupWindow::aux_ = L"";  // 用于存储文本
 
+void PopupWindow::Refresh() {
+  if (!hwnd_)
+    return;
+  if (timer) {
+    Hide();
+    KillTimer(hwnd_, AUTOHIDE_TIMER);
+  }
+  if (hwnd_) {
+    InvalidateRect(hwnd_, NULL, TRUE); // 请求重绘
+  }
+}
+void PopupWindow::ShowWithTimeout(size_t millisec) {
+  if (!hwnd_)
+    return;
+  ShowWindow(hwnd_, SW_SHOWNA);
+  shown = true;
+  SetTimer(hwnd_, AUTOHIDE_TIMER, static_cast<UINT>(millisec),
+           &PopupWindow::OnTimer);
+  timer = UINT_PTR(this);
+}
+VOID CALLBACK PopupWindow::OnTimer(_In_ HWND hwnd, _In_ UINT uMsg,
+                                   _In_ UINT_PTR idEvent, _In_ DWORD dwTime) {
+  KillTimer(hwnd, idEvent);
+  PopupWindow *self = (PopupWindow *)timer;
+  timer = 0;
+  if (self) {
+    self->Hide();
+    self->shown = false;
+  }
+}
 // Constructor to initialize the instance, class name, and window title
 PopupWindow::PopupWindow(HINSTANCE hInstance, const wchar_t *className,
                          const wchar_t *windowTitle)
     : hInstance_(hInstance), className_(className), windowTitle_(windowTitle),
-      hwnd_(NULL), isVisible_(false) {
+      hwnd_(NULL), shown(false) {
   RegisterWindowClass();
 }
 // Destructor to clean up resources
@@ -68,17 +112,17 @@ HWND PopupWindow::CreatePopup() {
 }
 // Show the popup window
 void PopupWindow::Show() {
-  if (hwnd_ && !isVisible_) {
+  if (hwnd_ && !shown) {
     ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
     UpdateWindow(hwnd_);
-    isVisible_ = true;
+    shown = true;
   }
 }
 // Hide the popup window
 void PopupWindow::Hide() {
-  if (hwnd_ && isVisible_) {
+  if (hwnd_ && shown) {
     ShowWindow(hwnd_, SW_HIDE);
-    isVisible_ = false;
+    shown = false;
   }
 }
 // Update the position of the popup window
@@ -92,7 +136,7 @@ void PopupWindow::UpdatePos(int x, int y) {
   }
 }
 // Check if the popup window is currently visible
-bool PopupWindow::IsVisible() const { return isVisible_; }
+bool PopupWindow::IsVisible() const { return shown; }
 // Window procedure to handle messages
 LRESULT CALLBACK PopupWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
                                          LPARAM lParam) {
@@ -116,10 +160,11 @@ LRESULT CALLBACK PopupWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
     FillRect(hdc, &rc, (HBRUSH)(COLOR_WINDOW + 1));
     HFONT oldFont = (HFONT)SelectObject(hdc, hFont);
     SIZE textSize;
-    GetTextExtentPoint32(hdc, text_.c_str(), text_.length(), &textSize);
+    auto text = (aux_.empty()) ? text_ : aux_;
+    GetTextExtentPoint32(hdc, text.c_str(), text.length(), &textSize);
     SetWindowPos(hwnd, nullptr, 0, 0, textSize.cx + 20, textSize.cy + 20,
                  SWP_NOMOVE | SWP_NOZORDER);
-    TextOut(hdc, 10, 10, text_.c_str(), text_.length());
+    TextOut(hdc, 10, 10, text.c_str(), text.length());
     EndPaint(hwnd, &ps);
     return 0;
   }
@@ -130,8 +175,9 @@ LRESULT CALLBACK PopupWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
   return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 // Set the text to be displayed in the popup window
-void PopupWindow::SetText(const std::wstring &text) {
+void PopupWindow::SetText(const std::wstring &text, const std::wstring &aux) {
   text_ = text;
+  aux_ = aux;
   if (hwnd_) {
     InvalidateRect(hwnd_, NULL, TRUE); // 请求重绘
   }
