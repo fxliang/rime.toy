@@ -20,7 +20,7 @@ Status old_sta;
 Status sta;
 bool committed = true;
 string commit_str = "";
-bool horizontal = true, escape_ansi = false;
+bool horizontal = false, escape_ansi = false;
 bool hook_enabled = true;
 RECT rect;
 
@@ -57,7 +57,8 @@ void on_message(void *context_object, RimeSessionId session_id,
       }
       auto msg = u8tow(sta.schema_name + " " + string(state_label));
       if (pop) {
-        pop->SetText(L"", msg);
+        // pop->SetText(L"", msg);
+        pop->SetText(msg);
         POINT pt;
         if (GetCursorPos(&pt)) {
           pop->UpdatePos(pt.x, pt.y);
@@ -686,11 +687,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   wstring cmdLine(lpCmdLine), arg;
   wistringstream wiss(cmdLine);
   while (wiss >> arg) {
-    if (arg == L"/v") {
-      horizontal = false;
-    } else if (arg == L"/e") {
-      escape_ansi = true;
-    }
+    if (arg == L"/h")
+      horizontal = true;
   }
   setup_rime();
   RimeApi *rime_api = rime_get_api();
@@ -702,13 +700,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   assert(session_id);
   set_hook();
   // --------------------------------------------------------------------------
-  pop = new PopupWindow(hInstance, L"Rime.Toy.UI", L"Rime.Toy.App");
-  // pop->CreatePopup();
-  //  --------------------------------------------------------------------------
-  //  注册窗口类
-
+  pop = new PopupWindow();
+  pop->SetHorizontal(horizontal);
   ime_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
   ascii_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_ASCII));
+  //  注册窗口类
   WNDCLASS wc = {0};
   wc.lpfnWndProc = WndProc;
   wc.hInstance = hInstance;
