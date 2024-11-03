@@ -162,31 +162,12 @@ private:
         lpSize->cy += (LONG)(overhangMetrics.bottom);
     }
   }
-  void Resize() {
-    GetTextSize(m_text, &m_winSize);
-    m_winSize.cx += m_padding * 2;
-    m_winSize.cy += m_padding * 2;
-    SetWindowPos(m_hWnd, HWND_TOPMOST, 0, 0, m_winSize.cx, m_winSize.cy,
-                 SWP_NOMOVE | SWP_NOACTIVATE);
-    D2D1_SIZE_U oPixelSize = {(UINT32)m_winSize.cx, (UINT32)m_winSize.cy};
-    m_pRenderTarget->Resize(&oPixelSize);
-  }
-
   void Render() {
     m_pRenderTarget->BeginDraw();
+    m_pRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::White));
     if (m_horizontal) {
-      ComPtr<IDWriteTextLayout> pTextLayout = nullptr;
-      if (FAILED(m_pWriteFactory->CreateTextLayout(
-              m_text.c_str(), m_text.length(), pTextFormat.Get(), m_winSize.cx,
-              m_winSize.cy, pTextLayout.GetAddressOf())))
-        return;
-      m_pRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::White));
-      m_pRenderTarget->DrawTextLayout({(float)m_padding, (float)m_padding},
-                                      pTextLayout.Get(), m_pBrush.Get(),
-                                      D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
+      DrawHorizontal();
     } else {
-
-      m_pRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::White));
       DrawUIVertical();
     }
     m_pRenderTarget->EndDraw();
@@ -248,6 +229,66 @@ private:
     m_pRenderTarget->Resize(&oPixelSize);
   }
 
+  void ResizeHorizontal() {
+    SIZE textSize{0, 0};
+    SIZE winSize{0, 0};
+    if (!m_ctx.preedit.empty()) {
+      const auto &preedit = u8tow(m_ctx.preedit.str);
+      GetTextSize(preedit, &textSize);
+      winSize.cx = textSize.cx;
+      winSize.cy = textSize.cy;
+    } else if (!m_ctx.aux.empty()) {
+      const auto &aux = u8tow(m_ctx.aux.str);
+      GetTextSize(aux, &textSize);
+      winSize.cx = textSize.cx;
+      winSize.cy = textSize.cy;
+    }
+    if (m_ctx.cinfo.candies.size()) {
+      m_text.clear();
+      winSize.cy += m_padding;
+      const auto &cinfo = m_ctx.cinfo;
+      for (auto i = 0; i < cinfo.candies.size(); i++) {
+        bool highlighted = i == cinfo.highlighted;
+        m_text += highlighted ? L"[" : L"";
+        m_text += u8tow(cinfo.labels[i].str) + L". " +
+                  u8tow(cinfo.candies[i].str) + L" " +
+                  u8tow(cinfo.comments[i].str);
+        m_text += highlighted ? L"] " : L" ";
+      }
+      GetTextSize(m_text, &textSize);
+      winSize.cx = MAX(winSize.cx, textSize.cx);
+      winSize.cy += textSize.cy;
+    }
+    m_winSize.cx = winSize.cx + m_padding * 2;
+    m_winSize.cy = winSize.cy + m_padding * 2;
+
+    SetWindowPos(m_hWnd, HWND_TOPMOST, 0, 0, m_winSize.cx, m_winSize.cy,
+                 SWP_NOMOVE | SWP_NOACTIVATE);
+    D2D1_SIZE_U oPixelSize = {(UINT32)m_winSize.cx, (UINT32)m_winSize.cy};
+    m_pRenderTarget->Resize(&oPixelSize);
+  }
+  void DrawHorizontal() {
+    SIZE textSize{0, 0};
+    SIZE winSize{0, 0};
+    if (!m_ctx.preedit.empty()) {
+      const auto &preedit = u8tow(m_ctx.preedit.str);
+      GetTextSize(preedit, &textSize);
+      DrawTextAt(preedit, m_padding, m_padding);
+      winSize.cx = textSize.cx;
+      winSize.cy = textSize.cy;
+    } else if (!m_ctx.aux.empty()) {
+      const auto &aux = u8tow(m_ctx.aux.str);
+      GetTextSize(aux, &textSize);
+      DrawTextAt(aux, m_padding, m_padding);
+      winSize.cx = textSize.cx;
+      winSize.cy = textSize.cy;
+    }
+    if (m_ctx.cinfo.candies.size()) {
+      winSize.cy += m_padding;
+      DrawTextAt(m_text, m_padding, winSize.cy);
+    }
+  }
+
   void DrawUIVertical() {
     SIZE textSize{0, 0};
     SIZE winSize{0, 0};
@@ -302,16 +343,7 @@ private:
 
   void OnPaint() {
     if (m_horizontal) {
-      m_text = u8tow(m_ctx.preedit.str) + L" ";
-      for (auto i = 0; i < m_ctx.cinfo.candies.size(); i++) {
-        bool highlighted = i == m_ctx.cinfo.highlighted;
-        m_text += highlighted ? L"[" : L"";
-        m_text += u8tow(m_ctx.cinfo.labels[i].str) + L". " +
-                  u8tow(m_ctx.cinfo.candies[i].str) + L" " +
-                  u8tow(m_ctx.cinfo.comments[i].str);
-        m_text += highlighted ? L"] " : L" ";
-      }
-      Resize();
+      ResizeHorizontal();
     } else {
       ResizeVertical();
     }
