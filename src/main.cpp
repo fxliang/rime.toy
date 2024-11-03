@@ -57,7 +57,6 @@ void on_message(void *context_object, RimeSessionId session_id,
       }
       auto msg = u8tow(sta.schema_name + " " + string(state_label));
       if (pop) {
-        // pop->SetText(L"", msg);
         pop->SetText(msg);
         POINT pt;
         if (GetCursorPos(&pt)) {
