@@ -5,7 +5,7 @@ target(project_name)
   set_languages("c++20")
   add_files("src/*.cpp", "src/*.rc")
   add_includedirs("./include")
-  add_links("user32", "Shlwapi", "imm32", "rime", "gdi32", "Shell32", "d2d1", "dwrite", 'dxgi', 'd3d11', 'dcomp')
+  add_links("user32", "Shlwapi", "shcore", "rime", "gdi32", "Shell32", "d2d1", "dwrite", 'dxgi', 'd3d11', 'dcomp')
   if is_plat('windows') then
     add_cxflags("/utf-8")
     if is_mode("debug") then
@@ -16,6 +16,7 @@ target(project_name)
     add_ldflags('-static-libgcc -static-libstdc++ -static', {force=true})
   end
 
+  add_defines("_WIN32_WINNT=0x0603") -- 添加宏定义
   add_defines("UNICODE", "_UNICODE")
   if is_plat('mingw') then
     add_ldflags("-municode -mwindows", {force = true})
