@@ -652,9 +652,9 @@ void setup_rime() {
   static auto shared_dir = shared_path.u8string();
   static auto usr_dir = usr_path.u8string();
   static auto log_dir = log_path.u8string();
-  traits.shared_data_dir = shared_dir.c_str();
-  traits.user_data_dir = usr_dir.c_str();
-  traits.log_dir = log_dir.c_str();
+  traits.shared_data_dir = reinterpret_cast<const char *>(shared_dir.c_str());
+  traits.user_data_dir = reinterpret_cast<const char *>(usr_dir.c_str());
+  traits.log_dir = reinterpret_cast<const char *>(log_dir.c_str());
   traits.prebuilt_data_dir = traits.shared_data_dir;
   traits.distribution_name = "rime.toy";
   traits.distribution_code_name = "rime.toy";

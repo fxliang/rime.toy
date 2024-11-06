@@ -2,10 +2,10 @@ local project_name = "rime.toy"
 
 target(project_name)
   set_kind(binary)
-  set_languages("c++17")
+  set_languages("c++20")
   add_files("src/*.cpp", "src/*.rc")
   add_includedirs("./include")
-  add_links("user32", "Shlwapi", "imm32", "rime", "gdi32", "Shell32", "d2d1", "dwrite")
+  add_links("user32", "Shlwapi", "imm32", "rime", "gdi32", "Shell32", "d2d1", "dwrite", 'dxgi', 'd3d11', 'dcomp')
   if is_plat('windows') then
     add_cxflags("/utf-8")
     if is_mode("debug") then
