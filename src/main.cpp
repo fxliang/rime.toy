@@ -1,5 +1,6 @@
 // Copyright fxliang
 // Distrobuted under GPLv3 https://www.gnu.org/licenses/gpl-3.0.en.html
+#include "config.h"
 #include <WeaselUI.h>
 #include <data.h>
 #include <filesystem>
@@ -706,8 +707,17 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   set_hook();
   // --------------------------------------------------------------------------
   ui = new UI();
+  RimeConfig config = {NULL};
+  if (rime_api->config_open("weasel", &config)) {
+    OutputDebugString(L"open weasel config ok");
+    _UpdateUIStyle(&config, ui, true);
+    rime_api->config_close(&config);
+  } else {
+    OutputDebugString(L"open weasel config failed");
+  }
   ui->SetHorizontal(horizontal);
   ui->Create(nullptr);
+  // --------------------------------------------------------------------------
   ime_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
   ascii_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_ASCII));
   //  注册窗口类

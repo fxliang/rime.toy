@@ -43,10 +43,11 @@ private:
   SIZE m_winSize{0, 0};
   RECT m_inputPos{0, 0, 0, 0};
   float m_dpiScale = 96.0f / 72.0f;
-  size_t m_fontPoint = 20;
 
   Context &m_ctx;
   Status &m_status;
+  UIStyle &m_style;
+  UIStyle &m_ostyle;
   UINT m_padding = 10;
   BOOL &m_horizontal;
   // ------------------------------------------------------------
