@@ -1,5 +1,6 @@
 // Copyright fxliang
 // Distrobuted under GPLv3 https://www.gnu.org/licenses/gpl-3.0.en.html
+#include <WeaselUI.h>
 #include <data.h>
 #include <filesystem>
 #include <iostream>
@@ -7,9 +8,9 @@
 #include <rime_api.h>
 #include <sstream>
 #include <trayicon.h>
-#include <ui.h>
 
 using namespace std;
+using namespace weasel;
 namespace fs = filesystem;
 
 HHOOK hHook = NULL;
@@ -25,7 +26,7 @@ bool hook_enabled = true;
 RECT rect;
 
 KeyInfo ki(0);
-PopupWindow *pop;
+UI *ui;
 TrayIcon *trayIcon;
 HICON ascii_icon;
 HICON ime_icon;
@@ -56,15 +57,18 @@ void on_message(void *context_object, RimeSessionId session_id,
         GetWindowRect(hwnd, &rect);
       }
       auto msg = u8tow(sta.schema_name + " " + string(state_label));
-      if (pop) {
-        pop->SetText(msg);
+      if (ui) {
+        ui->SetText(msg);
+        ui->Refresh();
         POINT pt;
         if (GetCursorPos(&pt)) {
-          pop->UpdatePos(pt.x, pt.y);
-        } else
-          pop->UpdatePos(rect.left + (rect.right - rect.left) / 2 - 150,
-                         rect.bottom - (rect.bottom - rect.top) / 2 - 100);
-        pop->ShowWithTimeout(500);
+          ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
+        } else {
+          pt.x = rect.left + (rect.right - rect.left) / 2 - 150;
+          pt.y = rect.bottom - (rect.bottom - rect.top) / 2 - 100;
+          ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
+        }
+        ui->ShowWithTimeout(500);
       }
     }
   }
@@ -428,7 +432,7 @@ void update_ui() {
     //   cout << sta.schema_name << " " << (sta.ascii_mode ? alabel : nlabel)
     //        << (hook_enabled ? " " : " 禁用") << endl;
     if (ctx.empty()) {
-      pop->Hide();
+      ui->Hide();
       return;
     } else {
       std::wstring text_ = u8tow(ctx.preedit.str) + L" ";
@@ -440,18 +444,19 @@ void update_ui() {
                  u8tow(ctx.cinfo.comments[i].str);
         text_ += highlighted ? L"] " : L" ";
       }
-      if (pop) {
-        // pop->SetText(text_);
+      if (ui) {
         ctx.aux.clear();
-        pop->Update(ctx, sta);
+        ui->Update(ctx, sta);
+        ui->Refresh();
         POINT pt;
         if (GetCursorPos(&pt)) {
-          pop->UpdatePos(pt.x, pt.y);
-        } else
-          pop->UpdatePos(rect.left + (rect.right - rect.left) / 2 - 150,
-                         rect.bottom - (rect.bottom - rect.top) / 2 - 100);
-        pop->Refresh();
-        pop->Show();
+          ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
+        } else {
+          pt.x = rect.left + (rect.right - rect.left) / 2 - 150;
+          pt.y = rect.bottom - (rect.bottom - rect.top) / 2 - 100;
+          ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
+        }
+        ui->Show();
       }
     }
   } else {
@@ -529,8 +534,8 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
   }
   if (hwnd != hwnd_previous) {
     hwnd_previous = hwnd;
-    pop->SetText(L"");
-    pop->Hide();
+    ui->SetText(L"");
+    ui->Hide();
   }
   if (nCode == HC_ACTION) {
     KBDLLHOOKSTRUCT *pKeyboard = (KBDLLHOOKSTRUCT *)lParam;
@@ -539,9 +544,9 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
       hook_enabled = !hook_enabled;
       RimeApi *rime_api = rime_get_api();
       rime_api->clear_composition(session_id);
-      if (pop) {
-        pop->SetText(L"");
-        pop->Hide();
+      if (ui) {
+        ui->SetText(L"");
+        ui->Hide();
       }
       update_ui();
       return 1;
@@ -588,7 +593,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
       if (!commit_str.empty()) {
         send_input_to_window(hwnd, u8tow(commit_str));
         if (!sta.composing)
-          pop->Refresh();
+          ui->Refresh();
         committed = true;
       } else
         committed = false;
@@ -695,12 +700,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   rime_api->initialize(NULL);
   if (rime_api->start_maintenance(true))
     rime_api->join_maintenance_thread();
+  rime_api->deploy_config_file("weasel.yaml", "config_version");
   session_id = rime_api->create_session();
   assert(session_id);
   set_hook();
   // --------------------------------------------------------------------------
-  pop = new PopupWindow();
-  pop->SetHorizontal(horizontal);
+  ui = new UI();
+  ui->SetHorizontal(horizontal);
+  ui->Create(nullptr);
   ime_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
   ascii_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_ASCII));
   //  注册窗口类

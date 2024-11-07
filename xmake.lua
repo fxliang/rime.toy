@@ -1,11 +1,16 @@
 local project_name = "rime.toy"
 
+add_includedirs("./include")
+add_defines("UNICODE", "_UNICODE", "_WIN32_WINNT=0x0603")
+includes("WeaselUI")
+
 target(project_name)
   set_kind(binary)
-  set_languages("c++20")
+  set_languages("c++17")
   add_files("src/*.cpp", "src/*.rc")
   add_includedirs("./include")
   add_links("user32", "Shlwapi", "shcore", "rime", "gdi32", "Shell32", "d2d1", "dwrite", 'dxgi', 'd3d11', 'dcomp')
+  add_deps('WeaselUI')
   if is_plat('windows') then
     add_cxflags("/utf-8")
     if is_mode("debug") then
@@ -17,7 +22,6 @@ target(project_name)
   end
 
   add_defines("_WIN32_WINNT=0x0603") -- 添加宏定义
-  add_defines("UNICODE", "_UNICODE")
   if is_plat('mingw') then
     add_ldflags("-municode -mwindows", {force = true})
   else
