@@ -3,7 +3,7 @@ param (
     [switch]$i
 )
 
-$TOY_SOURCE_PATH = @("src", "include")
+$TOY_SOURCE_PATH = @("src", "include", "WeaselUI")
 $excludePatterns = Get-Content .exclude_pattern.txt
 
 function ShouldExclude($filePath) {
