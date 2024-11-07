@@ -1,11 +1,12 @@
 #include "WeaselPanel.h"
+#include <string>
 
 using namespace weasel;
 
 WeaselPanel::WeaselPanel(UI &ui)
     : m_hWnd(nullptr), m_pBrush(nullptr), m_pWriteFactory(nullptr),
       m_horizontal(ui.horizontal()), m_ctx(ui.ctx()), m_status(ui.status()),
-      pTextFormat(nullptr) {
+      m_style(ui.style()), m_ostyle(ui.ostyle()), pTextFormat(nullptr) {
   Create(nullptr);
 }
 
@@ -375,7 +376,7 @@ void WeaselPanel::InitDirect2D() {
   HR(m_pWriteFactory->CreateTextFormat(
       L"Microsoft Yahei", NULL, DWRITE_FONT_WEIGHT_NORMAL,
       DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-      m_fontPoint * m_dpiScale, L"",
+      m_style.font_point * m_dpiScale, L"",
       reinterpret_cast<IDWriteTextFormat **>(
           pTextFormat.ReleaseAndGetAddressOf())));
   ComPtr<IDWriteFontFallback> pSysFallback;
