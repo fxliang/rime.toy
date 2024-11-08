@@ -1,6 +1,6 @@
 target("WeaselUI")
   set_kind("static")
-  add_links("user32", "Shlwapi", "shcore", "gdi32", "Shell32", "d2d1", "dwrite", 'dxgi', 'd3d11', 'dcomp')
+  add_links("user32", "Shlwapi", "dwmapi","shcore", "gdi32", "Shell32", "d2d1", "dwrite", 'dxgi', 'd3d11', 'dcomp')
   add_files("./*.cpp")
   if is_plat('windows') then
     add_cxflags("/utf-8")

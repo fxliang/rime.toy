@@ -9,7 +9,39 @@
 #include <dwrite_2.h>
 #include <dxgi1_3.h>
 
+#include <Dwmapi.h>
+#include <ShellScalingApi.h>
+#include <memory>
+#include <versionhelpers.h>
+#include <wrl/client.h>
+
 namespace weasel {
+struct D2D {
+  D2D(UIStyle &style, HWND hwnd);
+  void InitDirect2D();
+  void InitDirectWriteResources();
+  void InitDpiInfo();
+  ComPtr<ID3D11Device> direct3dDevice;
+  ComPtr<IDXGIDevice> dxgiDevice;
+  ComPtr<IDXGIFactory2> dxFactory;
+  ComPtr<IDXGISwapChain1> swapChain;
+  ComPtr<ID2D1Factory2> d2Factory;
+  ComPtr<ID2D1Device1> d2Device;
+  ComPtr<ID2D1DeviceContext> dc;
+  ComPtr<IDXGISurface2> surface;
+  ComPtr<ID2D1Bitmap1> bitmap;
+  ComPtr<IDCompositionDevice> dcompDevice;
+  ComPtr<IDCompositionTarget> target;
+  ComPtr<IDCompositionVisual> visual;
+  ComPtr<ID2D1SolidColorBrush> brush;
+  ComPtr<IDWriteTextFormat1> pTextFormat;
+  ComPtr<IDWriteFactory2> m_pWriteFactory;
+  ComPtr<ID2D1SolidColorBrush> m_pBrush;
+  UIStyle &m_style;
+  HWND m_hWnd;
+  float m_dpiX;
+  float m_dpiY;
+};
 class WeaselPanel {
 public:
   WeaselPanel(UI &ui);
@@ -35,7 +67,6 @@ private:
   void ResizeHorizontal();
   void DrawHorizontal();
   void DrawUIVertical();
-  void InitDirect2D();
   void OnPaint();
   static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
                                      LPARAM lParam);
@@ -52,22 +83,6 @@ private:
   UINT m_padding = 10;
   BOOL &m_horizontal;
   // ------------------------------------------------------------
-  ComPtr<ID3D11Device> direct3dDevice;
-  ComPtr<IDXGIDevice> dxgiDevice;
-  ComPtr<IDXGIFactory2> dxFactory;
-  ComPtr<IDXGISwapChain1> swapChain;
-  ComPtr<ID2D1Factory2> d2Factory;
-  ComPtr<ID2D1Device1> d2Device;
-  ComPtr<ID2D1DeviceContext> dc;
-  ComPtr<IDXGISurface2> surface;
-  ComPtr<ID2D1Bitmap1> bitmap;
-  ComPtr<IDCompositionDevice> dcompDevice;
-  ComPtr<IDCompositionTarget> target;
-  ComPtr<IDCompositionVisual> visual;
-  ComPtr<ID2D1SolidColorBrush> brush;
-  // ------------------------------------------------------------
-  ComPtr<IDWriteTextFormat1> pTextFormat;
-  ComPtr<IDWriteFactory2> m_pWriteFactory;
-  ComPtr<ID2D1SolidColorBrush> m_pBrush;
+  std::shared_ptr<D2D> m_pD2D;
 };
 } // namespace weasel
