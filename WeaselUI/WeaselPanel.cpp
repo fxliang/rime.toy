@@ -77,8 +77,8 @@ void WeaselPanel::GetTextSize(const wstring &text, LPSIZE lpSize) {
     lpSize->cy += (LONG)(overhangMetrics.bottom);
 }
 
-void WeaselPanel::FillRoundRect(const RECT &rect, float radius,
-                                uint32_t color) {
+void WeaselPanel::FillRoundRect(const RECT &rect, float radius, uint32_t border,
+                                uint32_t color, uint32_t border_color) {
   float a = ((color >> 24) & 0xFF) / 255.0f;
   float b = ((color >> 16) & 0xFF) / 255.0f;
   float g = ((color >> 8) & 0xFF) / 255.0f;
@@ -97,6 +97,17 @@ void WeaselPanel::FillRoundRect(const RECT &rect, float radius,
   ComPtr<ID2D1SolidColorBrush> brush;
   HR(dc->CreateSolidColorBrush(D2D1::ColorF(r, g, b, a), &brush));
   dc->FillGeometry(roundedRectGeometry.Get(), brush.Get());
+  float hb = (float)border / 2;
+  D2D1_ROUNDED_RECT borderRect =
+      D2D1::RoundedRect(D2D1::RectF(static_cast<float>(rect.left) + hb,
+                                    static_cast<float>(rect.top) + hb,
+                                    static_cast<float>(rect.right) - hb,
+                                    static_cast<float>(rect.bottom) - hb),
+                        radius - hb, // radiusX
+                        radius - hb  // radiusY
+      );
+  brush->SetColor(D2d1ColorFromColorRef(border_color));
+  dc->DrawRoundedRectangle(&borderRect, brush.Get(), m_style.border);
 }
 
 D2D1::ColorF WeaselPanel::D2d1ColorFromColorRef(uint32_t color) {
@@ -110,7 +121,9 @@ D2D1::ColorF WeaselPanel::D2d1ColorFromColorRef(uint32_t color) {
 void WeaselPanel::Render() {
   dc->BeginDraw();
   dc->Clear(D2D1::ColorF({0.0f, 0.0f, 0.0f, 0.0f}));
-  FillRoundRect({0, 0, m_winSize.cx, m_winSize.cy}, 10.0f, 0xafffffff);
+  FillRoundRect({0, 0, m_winSize.cx, m_winSize.cy},
+                (float)m_style.round_corner_ex, m_style.border,
+                m_style.back_color, m_style.border_color);
   if (m_horizontal) {
     DrawHorizontal();
   } else {
@@ -238,11 +251,13 @@ void WeaselPanel::DrawUIVertical() {
   if (!m_ctx.preedit.empty()) {
     const auto &preedit = u8tow(m_ctx.preedit.str);
     GetTextSize(preedit, &textSize);
+    m_pBrush->SetColor(D2d1ColorFromColorRef(m_style.text_color));
     DrawTextAt(preedit, m_padding, m_padding);
     winSize.cx += m_padding + textSize.cx;
     winSize.cy += m_padding + textSize.cy;
   } else if (!m_ctx.aux.empty()) {
     const auto &aux = u8tow(m_ctx.aux.str);
+    m_pBrush->SetColor(D2d1ColorFromColorRef(m_style.text_color));
     DrawTextAt(aux, m_padding, m_padding);
     GetTextSize(aux, &textSize);
     winSize.cx += m_padding + textSize.cx;
@@ -255,10 +270,7 @@ void WeaselPanel::DrawUIVertical() {
       const auto &label = u8tow(cinfo.labels[i].str);
       const auto &candie = u8tow(cinfo.candies[i].str);
       const auto &command = u8tow(cinfo.comments[i].str);
-      if (i == cinfo.highlighted)
-        m_pBrush->SetColor(D2d1ColorFromColorRef(0xff9e5a00));
-      else
-        m_pBrush->SetColor(D2D1::ColorF(D2D1::ColorF::Black));
+      bool hilited = (i == cinfo.highlighted);
       LONG xl, yl, xt, yt, xc, yc;
       size_t x = m_padding, y = winSize.cy + m_padding;
       size_t h = 0;
@@ -285,12 +297,27 @@ void WeaselPanel::DrawUIVertical() {
       cand_width = MAX(cand_width, x + textSize.cx);
 
       RECT rc = {xl, yl, xl + (LONG)cand_width, yl + (LONG)h};
-      if (i == cinfo.highlighted)
-        FillRoundRect(rc, m_padding, 0xdff0f0e0);
+      auto color = hilited ? m_style.hilited_candidate_back_color
+                           : m_style.candidate_back_color;
+      auto border_color = hilited ? m_style.hilited_candidate_border_color
+                                  : m_style.candidate_border_color;
+      FillRoundRect(rc, m_style.round_corner, m_style.border, color,
+                    border_color);
+
+      color =
+          hilited ? m_style.hilited_label_text_color : m_style.label_text_color;
+      m_pBrush->SetColor(D2d1ColorFromColorRef(color));
       DrawTextAt(label, xl, yl);
+      color = hilited ? m_style.hilited_candidate_text_color
+                      : m_style.candidate_text_color;
+      m_pBrush->SetColor(D2d1ColorFromColorRef(color));
       DrawTextAt(candie, xt, yt);
-      if (!command.empty())
+      if (!command.empty()) {
+        color = hilited ? m_style.hilited_comment_text_color
+                        : m_style.comment_text_color;
+        m_pBrush->SetColor(D2d1ColorFromColorRef(color));
         DrawTextAt(command, xc, yc);
+      }
       winSize.cy += h;
     }
     winSize.cy += m_padding;
