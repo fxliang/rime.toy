@@ -136,8 +136,8 @@ static inline void _RemoveSpaceAroundSep(std::wstring &str) {
 }
 // parset bool type configuration to T type value trueValue / falseValue
 template <class T>
-static void _RimeGetBool(RimeConfig *config, char *key, bool cond, T &value,
-                         const T &trueValue, const T &falseValue) {
+static void _RimeGetBool(RimeConfig *config, const char *key, bool cond,
+                         T &value, const T &trueValue, const T &falseValue) {
   RimeApi *rime_api = rime_get_api();
   Bool tempb = False;
   if (rime_api->config_get_bool(config, key, &tempb) || cond)

@@ -115,7 +115,7 @@ void UI::Destroy(bool full) {
 }
 void UI::SetText(const wstring &text) {
   ctx_.clear();
-  ctx_.aux.str = wtou8(text);
+  ctx_.aux.str = text;
   Refresh();
 }
 void UI::SetHorizontal(bool hor) { m_horizontal = hor; }

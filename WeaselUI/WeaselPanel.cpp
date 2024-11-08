@@ -148,12 +148,12 @@ void WeaselPanel::ResizeVertical() {
   SIZE textSize{0, 0};
   SIZE winSize{0, 0};
   if (!m_ctx.preedit.empty()) {
-    const auto &preedit = u8tow(m_ctx.preedit.str);
+    const auto &preedit = (m_ctx.preedit.str);
     GetTextSize(preedit, &textSize);
     winSize.cx += m_padding + textSize.cx;
     winSize.cy += m_padding + textSize.cy;
   } else if (!m_ctx.aux.empty()) {
-    const auto &aux = u8tow(m_ctx.aux.str);
+    const auto &aux = (m_ctx.aux.str);
     GetTextSize(aux, &textSize);
     winSize.cx += m_padding + textSize.cx;
     winSize.cy += m_padding + textSize.cy;
@@ -162,9 +162,9 @@ void WeaselPanel::ResizeVertical() {
   if (m_ctx.cinfo.candies.size()) {
     const auto &cinfo = m_ctx.cinfo;
     for (auto i = 0; i < cinfo.candies.size(); i++) {
-      const auto &label = u8tow(cinfo.labels[i].str);
-      const auto &candie = u8tow(cinfo.candies[i].str);
-      const auto &command = u8tow(cinfo.comments[i].str);
+      const auto &label = (cinfo.labels[i].str);
+      const auto &candie = (cinfo.candies[i].str);
+      const auto &command = (cinfo.comments[i].str);
       size_t x = m_padding, y = winSize.cy + m_padding;
       size_t h = 0;
       GetTextSize(label, &textSize);
@@ -193,12 +193,12 @@ void WeaselPanel::ResizeHorizontal() {
   SIZE textSize{0, 0};
   SIZE winSize{0, 0};
   if (!m_ctx.preedit.empty()) {
-    const auto &preedit = u8tow(m_ctx.preedit.str);
+    const auto &preedit = (m_ctx.preedit.str);
     GetTextSize(preedit, &textSize);
     winSize.cx = textSize.cx;
     winSize.cy = textSize.cy;
   } else if (!m_ctx.aux.empty()) {
-    const auto &aux = u8tow(m_ctx.aux.str);
+    const auto &aux = (m_ctx.aux.str);
     GetTextSize(aux, &textSize);
     winSize.cx = textSize.cx;
     winSize.cy = textSize.cy;
@@ -210,9 +210,8 @@ void WeaselPanel::ResizeHorizontal() {
     for (auto i = 0; i < cinfo.candies.size(); i++) {
       bool highlighted = i == cinfo.highlighted;
       m_text += highlighted ? L"[" : L"";
-      m_text += u8tow(cinfo.labels[i].str) + L". " +
-                u8tow(cinfo.candies[i].str) + L" " +
-                u8tow(cinfo.comments[i].str);
+      m_text += (cinfo.labels[i].str) + L". " + (cinfo.candies[i].str) + L" " +
+                (cinfo.comments[i].str);
       m_text += highlighted ? L"] " : L" ";
     }
     GetTextSize(m_text, &textSize);
@@ -230,13 +229,13 @@ void WeaselPanel::DrawHorizontal() {
   SIZE textSize{0, 0};
   SIZE winSize{0, 0};
   if (!m_ctx.preedit.empty()) {
-    const auto &preedit = u8tow(m_ctx.preedit.str);
+    const auto &preedit = (m_ctx.preedit.str);
     GetTextSize(preedit, &textSize);
     DrawTextAt(preedit, m_padding, m_padding);
     winSize.cx = textSize.cx;
     winSize.cy = textSize.cy;
   } else if (!m_ctx.aux.empty()) {
-    const auto &aux = u8tow(m_ctx.aux.str);
+    const auto &aux = (m_ctx.aux.str);
     GetTextSize(aux, &textSize);
     DrawTextAt(aux, m_padding, m_padding);
     winSize.cx = textSize.cx;
@@ -251,14 +250,14 @@ void WeaselPanel::DrawUIVertical() {
   SIZE textSize{0, 0};
   SIZE winSize{0, 0};
   if (!m_ctx.preedit.empty()) {
-    const auto &preedit = u8tow(m_ctx.preedit.str);
+    const auto &preedit = (m_ctx.preedit.str);
     GetTextSize(preedit, &textSize);
     m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(m_style.text_color));
     DrawTextAt(preedit, m_padding, m_padding);
     winSize.cx += m_padding + textSize.cx;
     winSize.cy += m_padding + textSize.cy;
   } else if (!m_ctx.aux.empty()) {
-    const auto &aux = u8tow(m_ctx.aux.str);
+    const auto &aux = (m_ctx.aux.str);
     m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(m_style.text_color));
     DrawTextAt(aux, m_padding, m_padding);
     GetTextSize(aux, &textSize);
@@ -269,9 +268,9 @@ void WeaselPanel::DrawUIVertical() {
   if (m_ctx.cinfo.candies.size()) {
     const auto &cinfo = m_ctx.cinfo;
     for (auto i = 0; i < cinfo.candies.size(); i++) {
-      const auto &label = u8tow(cinfo.labels[i].str);
-      const auto &candie = u8tow(cinfo.candies[i].str);
-      const auto &command = u8tow(cinfo.comments[i].str);
+      const auto &label = (cinfo.labels[i].str);
+      const auto &candie = (cinfo.candies[i].str);
+      const auto &command = (cinfo.comments[i].str);
       bool hilited = (i == cinfo.highlighted);
       LONG xl, yl, xt, yt, xc, yc;
       size_t x = m_padding, y = winSize.cy + m_padding;
