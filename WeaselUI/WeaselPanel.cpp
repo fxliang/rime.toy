@@ -6,6 +6,8 @@
 
 using namespace weasel;
 
+#define STYLEORWEIGHT (L":[^:]*[^a-f0-9:]+[^:]*")
+
 WeaselPanel::WeaselPanel(UI &ui)
     : m_hWnd(nullptr), m_horizontal(ui.horizontal()), m_ctx(ui.ctx()),
       m_status(ui.status()), m_style(ui.style()), m_ostyle(ui.ostyle()) {
@@ -366,8 +368,6 @@ LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
   return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-#define STYLEORWEIGHT (L":[^:]*[^a-f0-9:]+[^:]*")
-
 D2D::D2D(UIStyle &style, HWND hwnd)
     : m_style(style), m_hWnd(hwnd), m_dpiX(96.0f), m_dpiY(96.0f) {
   InitDpiInfo();
@@ -550,8 +550,39 @@ void D2D::InitDirectWriteResources() {
                                m_pBrush.ReleaseAndGetAddressOf()));
 }
 
+inline BOOL GetVersionEx2(LPOSVERSIONINFOW lpVersionInformation) {
+  HMODULE hNtDll = GetModuleHandleW(L"NTDLL"); // 获取ntdll.dll的句柄
+  typedef NTSTATUS(NTAPI * tRtlGetVersion)(
+      PRTL_OSVERSIONINFOW povi); // RtlGetVersion的原型
+  tRtlGetVersion pRtlGetVersion = NULL;
+  if (hNtDll) {
+    pRtlGetVersion = (tRtlGetVersion)GetProcAddress(
+        hNtDll, "RtlGetVersion"); // 获取RtlGetVersion地址
+  }
+  if (pRtlGetVersion) {
+    return pRtlGetVersion((PRTL_OSVERSIONINFOW)lpVersionInformation) >=
+           0; // 调用RtlGetVersion
+  }
+  return FALSE;
+}
+
+static inline BOOL IsWinVersionGreaterThan(DWORD dwMajorVersion,
+                                           DWORD dwMinorVersion) {
+  OSVERSIONINFOEXW ovi = {sizeof ovi};
+  GetVersionEx2((LPOSVERSIONINFOW)&ovi);
+  if ((ovi.dwMajorVersion == dwMajorVersion &&
+       ovi.dwMinorVersion >= dwMinorVersion) ||
+      ovi.dwMajorVersion > dwMajorVersion)
+    return true;
+  else
+    return false;
+}
+
+// Use WinBlue for Windows 8.1
+#define IsWindowsBlueOrLaterEx() IsWinVersionGreaterThan(6, 3)
+
 void D2D::InitDpiInfo() {
-  if (!IsWindows8Point1OrGreater())
+  if (!IsWindowsBlueOrLaterEx())
     return;
   HMONITOR const monitor = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
   unsigned x = 0;
@@ -559,6 +590,10 @@ void D2D::InitDpiInfo() {
   HR(GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &x, &y));
   m_dpiX = static_cast<float>(x);
   m_dpiY = static_cast<float>(y);
+  if (m_dpiY) {
+    m_dpiX = m_dpiY = 96.0;
+    m_dpiScaleFontPoint = m_dpiY / 72.0f;
+  }
 }
 
 void D2D::_SetFontFallback(ComPtr<IDWriteTextFormat1> textFormat,
