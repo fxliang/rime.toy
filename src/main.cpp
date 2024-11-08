@@ -717,6 +717,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   }
   ui->SetHorizontal(horizontal);
   ui->Create(nullptr);
+  rime_api->set_option(session_id, "soft_cursor",
+                       Bool(!ui->style().inline_preedit));
   // --------------------------------------------------------------------------
   ime_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
   ascii_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_ASCII));
