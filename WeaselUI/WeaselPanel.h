@@ -21,6 +21,8 @@ struct D2D {
   void InitDirectWriteResources();
   void InitDpiInfo();
   void InitFontFormats();
+  void GetTextSize(const wstring &text, size_t nCount,
+                   ComPtr<IDWriteTextFormat1> pTextFormat, LPSIZE lpSize);
   void _SetFontFallback(ComPtr<IDWriteTextFormat1> textFormat,
                         const std::vector<std::wstring> &fontVector);
   void _ParseFontFace(const std::wstring &fontFaceStr,
@@ -64,7 +66,6 @@ public:
   HWND m_hWnd;
 
 private:
-  void GetTextSize(const wstring &text, LPSIZE lpSize);
   void FillRoundRect(const RECT &rect, float radius, uint32_t border,
                      uint32_t back_color, uint32_t border_color);
   D2D1::ColorF D2d1ColorFromColorRef(uint32_t color);
