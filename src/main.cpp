@@ -21,7 +21,7 @@ Context old_ctx;
 Status old_sta;
 Status sta;
 bool committed = true;
-string commit_str = "";
+wstring commit_str = L"";
 bool horizontal = false, escape_ansi = false;
 bool hook_enabled = true;
 RECT rect;
@@ -348,16 +348,16 @@ void get_candidate_info(CandidateInfo &cinfo, RimeContext &ctx) {
   cinfo.comments.resize(ctx.menu.num_candidates);
   cinfo.labels.resize(ctx.menu.num_candidates);
   for (int i = 0; i < ctx.menu.num_candidates; ++i) {
-    cinfo.candies[i].str = ctx.menu.candidates[i].text;
+    cinfo.candies[i].str = u8tow(ctx.menu.candidates[i].text);
     if (ctx.menu.candidates[i].comment) {
-      cinfo.comments[i].str = ctx.menu.candidates[i].comment;
+      cinfo.comments[i].str = u8tow(ctx.menu.candidates[i].comment);
     }
     if (RIME_STRUCT_HAS_MEMBER(ctx, ctx.select_labels) && ctx.select_labels) {
-      cinfo.labels[i].str = ctx.select_labels[i];
+      cinfo.labels[i].str = u8tow(ctx.select_labels[i]);
     } else if (ctx.menu.select_keys) {
-      cinfo.labels[i].str = string(1, ctx.menu.select_keys[i]);
+      cinfo.labels[i].str = wstring(1, ctx.menu.select_keys[i]);
     } else {
-      cinfo.labels[i].str = to_string((i + 1) % 10);
+      cinfo.labels[i].str = to_wstring((i + 1) % 10);
     }
   }
   cinfo.highlighted = ctx.menu.highlighted_candidate_index;
@@ -371,7 +371,7 @@ void get_context(Context &context, RimeSessionId id) {
   RIME_STRUCT(RimeContext, ctx);
   if (rime->get_context(id, &ctx)) {
     if (ctx.composition.length > 0) {
-      context.preedit.str = ctx.composition.preedit;
+      context.preedit.str = u8tow(ctx.composition.preedit);
       if (ctx.composition.sel_start < ctx.composition.sel_end) {
         TextAttribute attr;
         attr.type = HIGHLIGHTED;
@@ -409,7 +409,7 @@ void get_commit() {
   assert(rime);
   RIME_STRUCT(RimeCommit, commit);
   if (rime->get_commit(session_id, &commit)) {
-    commit_str = string(commit.text);
+    commit_str = u8tow(commit.text);
     rime->free_commit(&commit);
   } else {
     commit_str.clear();
@@ -436,13 +436,13 @@ void update_ui() {
       ui->Hide();
       return;
     } else {
-      std::wstring text_ = u8tow(ctx.preedit.str) + L" ";
+      std::wstring text_ = (ctx.preedit.str) + L" ";
       for (auto i = 0; i < ctx.cinfo.candies.size(); i++) {
         bool highlighted = i == ctx.cinfo.highlighted;
         text_ += highlighted ? L"[" : L"";
-        text_ += u8tow(ctx.cinfo.labels[i].str) + L". " +
-                 u8tow(ctx.cinfo.candies[i].str) + L" " +
-                 u8tow(ctx.cinfo.comments[i].str);
+        text_ += (ctx.cinfo.labels[i].str) + L". " +
+                 (ctx.cinfo.candies[i].str) + L" " +
+                 (ctx.cinfo.comments[i].str);
         text_ += highlighted ? L"] " : L" ";
       }
       if (ui) {
@@ -592,7 +592,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 
       update_ui();
       if (!commit_str.empty()) {
-        send_input_to_window(hwnd, u8tow(commit_str));
+        send_input_to_window(hwnd, commit_str);
         if (!sta.composing)
           ui->Refresh();
         committed = true;
