@@ -1,5 +1,8 @@
 #include "WeaselPanel.h"
+#include <map>
+#include <regex>
 #include <string>
+#include <vector>
 
 using namespace weasel;
 
@@ -363,6 +366,8 @@ LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
   return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
+#define STYLEORWEIGHT (L":[^:]*[^a-f0-9:]+[^:]*")
+
 D2D::D2D(UIStyle &style, HWND hwnd)
     : m_style(style), m_hWnd(hwnd), m_dpiX(96.0f), m_dpiY(96.0f) {
   InitDpiInfo();
@@ -442,28 +447,105 @@ void D2D::InitDirect2D() {
   HR(dc->CreateSolidColorBrush(brushColor, brush.ReleaseAndGetAddressOf()));
 }
 
+std::vector<std::wstring> ws_split(const std::wstring &in,
+                                   const std::wstring &delim) {
+  std::wregex re{delim};
+  return std::vector<std::wstring>{
+      std::wsregex_token_iterator(in.begin(), in.end(), re, -1),
+      std::wsregex_token_iterator()};
+}
+
+static std::wstring _MatchWordsOutLowerCaseTrim1st(const std::wstring &wstr,
+                                                   const std::wstring &pat) {
+  std::wstring mat = L"";
+  std::wsmatch mc;
+  std::wregex pattern(pat, std::wregex::icase);
+  std::wstring::const_iterator iter = wstr.cbegin();
+  std::wstring::const_iterator end = wstr.cend();
+  while (regex_search(iter, end, mc, pattern)) {
+    for (const auto &m : mc) {
+      mat = m;
+      mat = mat.substr(1);
+      break;
+    }
+    iter = mc.suffix().first;
+  }
+  std::wstring res;
+  std::transform(mat.begin(), mat.end(), std::back_inserter(res), ::tolower);
+  return res;
+}
+
+void D2D::InitFontFormats() {
+  DWRITE_WORD_WRAPPING wrapping =
+      ((m_style.max_width == 0 &&
+        m_style.layout_type != UIStyle::LAYOUT_VERTICAL_TEXT) ||
+       (m_style.max_height == 0 &&
+        m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT))
+          ? DWRITE_WORD_WRAPPING_NO_WRAP
+          : DWRITE_WORD_WRAPPING_WHOLE_WORD;
+  DWRITE_WORD_WRAPPING wrapping_preedit =
+      ((m_style.max_width == 0 &&
+        m_style.layout_type != UIStyle::LAYOUT_VERTICAL_TEXT) ||
+       (m_style.max_height == 0 &&
+        m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT))
+          ? DWRITE_WORD_WRAPPING_NO_WRAP
+          : DWRITE_WORD_WRAPPING_CHARACTER;
+  DWRITE_FLOW_DIRECTION flow = m_style.vertical_text_left_to_right
+                                   ? DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
+                                   : DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT;
+
+  HRESULT hResult = S_OK;
+  bool vertical_text = m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT;
+  std::vector<std::wstring> fontFaceStrVector;
+
+  // text font text format set up
+  fontFaceStrVector = ws_split(m_style.font_face, L",");
+  // set main font a invalid font name, to make every font range customizable
+  const std::wstring _mainFontFace = L"_InvalidFontName_";
+  DWRITE_FONT_WEIGHT fontWeight = DWRITE_FONT_WEIGHT_NORMAL;
+  DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
+  // convert percentage to float
+  float linespacing =
+      m_dpiScaleFontPoint * ((float)m_style.linespacing / 100.0f);
+  float baseline = m_dpiScaleFontPoint * ((float)m_style.baseline / 100.0f);
+  if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+    baseline = linespacing / 2;
+  _ParseFontFace(m_style.font_face, fontWeight, fontStyle);
+  fontFaceStrVector[0] =
+      std::regex_replace(fontFaceStrVector[0],
+                         std::wregex(STYLEORWEIGHT, std::wregex::icase), L"");
+  HR(m_pWriteFactory->CreateTextFormat(
+      _mainFontFace.c_str(), NULL, DWRITE_FONT_WEIGHT_NORMAL,
+      DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
+      m_style.font_point * (m_dpiY / 72.0f), L"",
+      reinterpret_cast<IDWriteTextFormat **>(
+          pTextFormat.ReleaseAndGetAddressOf())));
+
+  if (pTextFormat != NULL) {
+    if (vertical_text) {
+      pTextFormat->SetFlowDirection(flow);
+      pTextFormat->SetReadingDirection(DWRITE_READING_DIRECTION_TOP_TO_BOTTOM);
+      pTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+    } else
+      pTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+
+    // pTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+    pTextFormat->SetWordWrapping(wrapping);
+    _SetFontFallback(pTextFormat, fontFaceStrVector);
+    if (m_style.linespacing && m_style.baseline)
+      pTextFormat->SetLineSpacing(DWRITE_LINE_SPACING_METHOD_UNIFORM,
+                                  m_style.font_point * linespacing,
+                                  m_style.font_point * baseline);
+  }
+  decltype(fontFaceStrVector)().swap(fontFaceStrVector);
+}
+
 void D2D::InitDirectWriteResources() {
   // create dwrite objs
   HR(DWriteCreateFactory(
       DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
       reinterpret_cast<IUnknown **>(m_pWriteFactory.ReleaseAndGetAddressOf())));
-  HR(m_pWriteFactory->CreateTextFormat(
-      L"Microsoft Yahei", NULL, DWRITE_FONT_WEIGHT_NORMAL,
-      DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-      m_style.font_point * (m_dpiY / 72.0f), L"",
-      reinterpret_cast<IDWriteTextFormat **>(
-          pTextFormat.ReleaseAndGetAddressOf())));
-  ComPtr<IDWriteFontFallback> pSysFallback;
-  ComPtr<IDWriteFontFallback> pFontFallback = NULL;
-  ComPtr<IDWriteFontFallbackBuilder> pFontFallbackBuilder = NULL;
-  HR(m_pWriteFactory->GetSystemFontFallback(
-      pSysFallback.ReleaseAndGetAddressOf()));
-  HR(m_pWriteFactory->CreateFontFallbackBuilder(
-      pFontFallbackBuilder.ReleaseAndGetAddressOf()));
-  HR(pFontFallbackBuilder->AddMappings(pSysFallback.Get()));
-  HR(pFontFallbackBuilder->CreateFontFallback(
-      pFontFallback.ReleaseAndGetAddressOf()));
-  HR(pTextFormat->SetFontFallback(pFontFallback.Get()));
+  InitFontFormats();
   HR(dc->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black),
                                m_pBrush.ReleaseAndGetAddressOf()));
 }
@@ -477,4 +559,104 @@ void D2D::InitDpiInfo() {
   HR(GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &x, &y));
   m_dpiX = static_cast<float>(x);
   m_dpiY = static_cast<float>(y);
+}
+
+void D2D::_SetFontFallback(ComPtr<IDWriteTextFormat1> textFormat,
+                           const std::vector<std::wstring> &fontVector) {
+  ComPtr<IDWriteFontFallback> pSysFallback;
+  m_pWriteFactory->GetSystemFontFallback(pSysFallback.GetAddressOf());
+  ComPtr<IDWriteFontFallback> pFontFallback = NULL;
+  ComPtr<IDWriteFontFallbackBuilder> pFontFallbackBuilder = NULL;
+  m_pWriteFactory->CreateFontFallbackBuilder(
+      pFontFallbackBuilder.GetAddressOf());
+  std::vector<std::wstring> fallbackFontsVector;
+  for (UINT32 i = 0; i < fontVector.size(); i++) {
+    fallbackFontsVector = ws_split(fontVector[i], L":");
+    std::wstring _fontFaceWstr, firstWstr, lastWstr;
+    if (fallbackFontsVector.size() == 3) {
+      _fontFaceWstr = fallbackFontsVector[0];
+      firstWstr = fallbackFontsVector[1];
+      lastWstr = fallbackFontsVector[2];
+      if (lastWstr.empty())
+        lastWstr = L"10ffff";
+      if (firstWstr.empty())
+        firstWstr = L"0";
+    } else if (fallbackFontsVector.size() == 2) // fontName : codepoint
+    {
+      _fontFaceWstr = fallbackFontsVector[0];
+      firstWstr = fallbackFontsVector[1];
+      if (firstWstr.empty())
+        firstWstr = L"0";
+      lastWstr = L"10ffff";
+    } else if (fallbackFontsVector.size() ==
+               1) // if only font defined, use all range
+    {
+      _fontFaceWstr = fallbackFontsVector[0];
+      firstWstr = L"0";
+      lastWstr = L"10ffff";
+    }
+    UINT first = 0, last = 0x10ffff;
+    try {
+      first = std::stoi(firstWstr.c_str(), 0, 16);
+    } catch (...) {
+      first = 0;
+    }
+    try {
+      last = std::stoi(lastWstr.c_str(), 0, 16);
+    } catch (...) {
+      last = 0x10ffff;
+    }
+    DWRITE_UNICODE_RANGE range = {first, last};
+    const WCHAR *familys = {_fontFaceWstr.c_str()};
+    pFontFallbackBuilder->AddMapping(&range, 1, &familys, 1);
+    decltype(fallbackFontsVector)().swap(fallbackFontsVector);
+  }
+  // add system defalt font fallback
+  pFontFallbackBuilder->AddMappings(pSysFallback.Get());
+  pFontFallbackBuilder->CreateFontFallback(pFontFallback.GetAddressOf());
+  textFormat->SetFontFallback(pFontFallback.Get());
+  decltype(fallbackFontsVector)().swap(fallbackFontsVector);
+  pFontFallback.Reset();
+  pSysFallback.Reset();
+  pFontFallbackBuilder.Reset();
+}
+
+void D2D::_ParseFontFace(const std::wstring &fontFaceStr,
+                         DWRITE_FONT_WEIGHT &fontWeight,
+                         DWRITE_FONT_STYLE &fontStyle) {
+  const std::wstring patWeight(
+      L"(:thin|:extra_light|:ultra_light|:light|:semi_light|:medium|:demi_bold|"
+      L":semi_bold|:bold|:extra_bold|:ultra_bold|:black|:heavy|:extra_black|:"
+      L"ultra_black)");
+  const std::map<std::wstring, DWRITE_FONT_WEIGHT> _mapWeight = {
+      {L"thin", DWRITE_FONT_WEIGHT_THIN},
+      {L"extra_light", DWRITE_FONT_WEIGHT_EXTRA_LIGHT},
+      {L"ultra_light", DWRITE_FONT_WEIGHT_ULTRA_LIGHT},
+      {L"light", DWRITE_FONT_WEIGHT_LIGHT},
+      {L"semi_light", DWRITE_FONT_WEIGHT_SEMI_LIGHT},
+      {L"medium", DWRITE_FONT_WEIGHT_MEDIUM},
+      {L"demi_bold", DWRITE_FONT_WEIGHT_DEMI_BOLD},
+      {L"semi_bold", DWRITE_FONT_WEIGHT_SEMI_BOLD},
+      {L"bold", DWRITE_FONT_WEIGHT_BOLD},
+      {L"extra_bold", DWRITE_FONT_WEIGHT_EXTRA_BOLD},
+      {L"ultra_bold", DWRITE_FONT_WEIGHT_ULTRA_BOLD},
+      {L"black", DWRITE_FONT_WEIGHT_BLACK},
+      {L"heavy", DWRITE_FONT_WEIGHT_HEAVY},
+      {L"extra_black", DWRITE_FONT_WEIGHT_EXTRA_BLACK},
+      {L"normal", DWRITE_FONT_WEIGHT_NORMAL},
+      {L"ultra_black", DWRITE_FONT_WEIGHT_ULTRA_BLACK}};
+  std::wstring weight = _MatchWordsOutLowerCaseTrim1st(fontFaceStr, patWeight);
+  auto it = _mapWeight.find(weight);
+  fontWeight =
+      (it != _mapWeight.end()) ? it->second : DWRITE_FONT_WEIGHT_NORMAL;
+
+  const std::wstring patStyle(L"(:italic|:oblique|:normal)");
+  const std::map<std::wstring, DWRITE_FONT_STYLE> _mapStyle = {
+      {L"italic", DWRITE_FONT_STYLE_ITALIC},
+      {L"oblique", DWRITE_FONT_STYLE_OBLIQUE},
+      {L"normal", DWRITE_FONT_STYLE_NORMAL},
+  };
+  std::wstring style = _MatchWordsOutLowerCaseTrim1st(fontFaceStr, patStyle);
+  auto it2 = _mapStyle.find(style);
+  fontStyle = (it2 != _mapStyle.end()) ? it2->second : DWRITE_FONT_STYLE_NORMAL;
 }
