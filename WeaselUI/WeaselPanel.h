@@ -21,6 +21,12 @@ struct D2D {
   void InitDirect2D();
   void InitDirectWriteResources();
   void InitDpiInfo();
+  void InitFontFormats();
+  void _SetFontFallback(ComPtr<IDWriteTextFormat1> textFormat,
+                        const std::vector<std::wstring> &fontVector);
+  void _ParseFontFace(const std::wstring &fontFaceStr,
+                      DWRITE_FONT_WEIGHT &fontWeight,
+                      DWRITE_FONT_STYLE &fontStyle);
   ComPtr<ID3D11Device> direct3dDevice;
   ComPtr<IDXGIDevice> dxgiDevice;
   ComPtr<IDXGIFactory2> dxFactory;
@@ -41,7 +47,9 @@ struct D2D {
   HWND m_hWnd;
   float m_dpiX;
   float m_dpiY;
+  float m_dpiScaleFontPoint;
 };
+
 class WeaselPanel {
 public:
   WeaselPanel(UI &ui);
