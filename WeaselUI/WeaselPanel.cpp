@@ -4,9 +4,8 @@
 using namespace weasel;
 
 WeaselPanel::WeaselPanel(UI &ui)
-    : m_hWnd(nullptr), m_pBrush(nullptr), m_pWriteFactory(nullptr),
-      m_horizontal(ui.horizontal()), m_ctx(ui.ctx()), m_status(ui.status()),
-      m_style(ui.style()), m_ostyle(ui.ostyle()), pTextFormat(nullptr) {
+    : m_hWnd(nullptr), m_horizontal(ui.horizontal()), m_ctx(ui.ctx()),
+      m_status(ui.status()), m_style(ui.style()), m_ostyle(ui.ostyle()) {
   Create(nullptr);
 }
 
@@ -42,7 +41,9 @@ BOOL WeaselPanel::Create(HWND parent) {
       L"PopupWindowClass", L"PopupWindowPanel", WS_POPUP | WS_VISIBLE,
       CW_USEDEFAULT, CW_USEDEFAULT, 1920, 1920, parent, nullptr,
       GetModuleHandle(nullptr), this);
-  InitDirect2D();
+  if (m_hWnd) {
+    m_pD2D.reset(new D2D(m_style, m_hWnd));
+  }
   UpdateWindow(m_hWnd);
   return !!m_hWnd;
 }
@@ -50,12 +51,12 @@ BOOL WeaselPanel::Create(HWND parent) {
 void WeaselPanel::GetTextSize(const wstring &text, LPSIZE lpSize) {
   lpSize->cx = 0;
   lpSize->cy = 0;
-  if (!pTextFormat)
+  if (!m_pD2D->pTextFormat)
     return;
   ComPtr<IDWriteTextLayout> pTextLayout = nullptr;
-  HR(m_pWriteFactory->CreateTextLayout(text.c_str(), text.length(),
-                                       pTextFormat.Get(), 1000.0f, 1000.0f,
-                                       pTextLayout.ReleaseAndGetAddressOf()));
+  HR(m_pD2D->m_pWriteFactory->CreateTextLayout(
+      text.c_str(), text.length(), m_pD2D->pTextFormat.Get(), 1000.0f, 1000.0f,
+      pTextLayout.ReleaseAndGetAddressOf()));
 
   DWRITE_TEXT_METRICS textMetrics;
   HR(pTextLayout->GetMetrics(&textMetrics));
@@ -92,11 +93,11 @@ void WeaselPanel::FillRoundRect(const RECT &rect, float radius, uint32_t border,
       radius, // radiusX
       radius  // radiusY
   );
-  HR(d2Factory->CreateRoundedRectangleGeometry(roundedRect,
-                                               &roundedRectGeometry));
+  HR(m_pD2D->d2Factory->CreateRoundedRectangleGeometry(roundedRect,
+                                                       &roundedRectGeometry));
   ComPtr<ID2D1SolidColorBrush> brush;
-  HR(dc->CreateSolidColorBrush(D2D1::ColorF(r, g, b, a), &brush));
-  dc->FillGeometry(roundedRectGeometry.Get(), brush.Get());
+  HR(m_pD2D->dc->CreateSolidColorBrush(D2D1::ColorF(r, g, b, a), &brush));
+  m_pD2D->dc->FillGeometry(roundedRectGeometry.Get(), brush.Get());
   float hb = (float)border / 2;
   D2D1_ROUNDED_RECT borderRect =
       D2D1::RoundedRect(D2D1::RectF(static_cast<float>(rect.left) + hb,
@@ -107,7 +108,7 @@ void WeaselPanel::FillRoundRect(const RECT &rect, float radius, uint32_t border,
                         radius - hb  // radiusY
       );
   brush->SetColor(D2d1ColorFromColorRef(border_color));
-  dc->DrawRoundedRectangle(&borderRect, brush.Get(), m_style.border);
+  m_pD2D->dc->DrawRoundedRectangle(&borderRect, brush.Get(), m_style.border);
 }
 
 D2D1::ColorF WeaselPanel::D2d1ColorFromColorRef(uint32_t color) {
@@ -119,8 +120,8 @@ D2D1::ColorF WeaselPanel::D2d1ColorFromColorRef(uint32_t color) {
 }
 
 void WeaselPanel::Render() {
-  dc->BeginDraw();
-  dc->Clear(D2D1::ColorF({0.0f, 0.0f, 0.0f, 0.0f}));
+  m_pD2D->dc->BeginDraw();
+  m_pD2D->dc->Clear(D2D1::ColorF({0.0f, 0.0f, 0.0f, 0.0f}));
   FillRoundRect({0, 0, m_winSize.cx, m_winSize.cy},
                 (float)m_style.round_corner_ex, m_style.border,
                 m_style.back_color, m_style.border_color);
@@ -129,18 +130,19 @@ void WeaselPanel::Render() {
   } else {
     DrawUIVertical();
   }
-  HR(dc->EndDraw());
+  HR(m_pD2D->dc->EndDraw());
   // Make the swap chain available to the composition engine
-  HR(swapChain->Present(1, 0)); // sync
+  HR(m_pD2D->swapChain->Present(1, 0)); // sync
 }
 
 void WeaselPanel::DrawTextAt(const wstring &text, size_t x, size_t y) {
   ComPtr<IDWriteTextLayout> pTextLayout = nullptr;
-  HR(m_pWriteFactory->CreateTextLayout(
-      text.c_str(), text.length(), pTextFormat.Get(), m_winSize.cx,
+  HR(m_pD2D->m_pWriteFactory->CreateTextLayout(
+      text.c_str(), text.length(), m_pD2D->pTextFormat.Get(), m_winSize.cx,
       m_winSize.cy, pTextLayout.ReleaseAndGetAddressOf()));
-  dc->DrawTextLayout({(float)x, (float)y}, pTextLayout.Get(), m_pBrush.Get(),
-                     D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
+  m_pD2D->dc->DrawTextLayout({(float)x, (float)y}, pTextLayout.Get(),
+                             m_pD2D->m_pBrush.Get(),
+                             D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
 }
 void WeaselPanel::ResizeVertical() {
   SIZE textSize{0, 0};
@@ -251,13 +253,13 @@ void WeaselPanel::DrawUIVertical() {
   if (!m_ctx.preedit.empty()) {
     const auto &preedit = u8tow(m_ctx.preedit.str);
     GetTextSize(preedit, &textSize);
-    m_pBrush->SetColor(D2d1ColorFromColorRef(m_style.text_color));
+    m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(m_style.text_color));
     DrawTextAt(preedit, m_padding, m_padding);
     winSize.cx += m_padding + textSize.cx;
     winSize.cy += m_padding + textSize.cy;
   } else if (!m_ctx.aux.empty()) {
     const auto &aux = u8tow(m_ctx.aux.str);
-    m_pBrush->SetColor(D2d1ColorFromColorRef(m_style.text_color));
+    m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(m_style.text_color));
     DrawTextAt(aux, m_padding, m_padding);
     GetTextSize(aux, &textSize);
     winSize.cx += m_padding + textSize.cx;
@@ -306,16 +308,16 @@ void WeaselPanel::DrawUIVertical() {
 
       color =
           hilited ? m_style.hilited_label_text_color : m_style.label_text_color;
-      m_pBrush->SetColor(D2d1ColorFromColorRef(color));
+      m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(color));
       DrawTextAt(label, xl, yl);
       color = hilited ? m_style.hilited_candidate_text_color
                       : m_style.candidate_text_color;
-      m_pBrush->SetColor(D2d1ColorFromColorRef(color));
+      m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(color));
       DrawTextAt(candie, xt, yt);
       if (!command.empty()) {
         color = hilited ? m_style.hilited_comment_text_color
                         : m_style.comment_text_color;
-        m_pBrush->SetColor(D2d1ColorFromColorRef(color));
+        m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(color));
         DrawTextAt(command, xc, yc);
       }
       winSize.cy += h;
@@ -326,7 +328,50 @@ void WeaselPanel::DrawUIVertical() {
   }
 }
 
-void WeaselPanel::InitDirect2D() {
+void WeaselPanel::OnPaint() {
+  if (m_horizontal) {
+    ResizeHorizontal();
+  } else {
+    ResizeVertical();
+  }
+  Render();
+}
+
+LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
+                                         LPARAM lParam) {
+  WeaselPanel *self;
+  if (uMsg == WM_NCCREATE) {
+    self = static_cast<WeaselPanel *>(
+        reinterpret_cast<LPCREATESTRUCT>(lParam)->lpCreateParams);
+    SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
+  } else {
+    self =
+        reinterpret_cast<WeaselPanel *>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+  }
+  switch (uMsg) {
+  case WM_PAINT:
+    if (self) {
+      self->OnPaint();
+      ValidateRect(hwnd, nullptr);
+    }
+    break;
+  case WM_DESTROY:
+    return 0;
+  case WM_LBUTTONUP: {
+    return 0;
+  }
+  }
+  return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
+D2D::D2D(UIStyle &style, HWND hwnd)
+    : m_style(style), m_hWnd(hwnd), m_dpiX(96.0f), m_dpiY(96.0f) {
+  InitDpiInfo();
+  InitDirect2D();
+  InitDirectWriteResources();
+}
+
+void D2D::InitDirect2D() {
   HR(D3D11CreateDevice(nullptr, // Adapter
                        D3D_DRIVER_TYPE_HARDWARE,
                        nullptr, // Module
@@ -396,6 +441,9 @@ void WeaselPanel::InitDirect2D() {
                                                0.34f,  // blue
                                                0.75f); // alpha
   HR(dc->CreateSolidColorBrush(brushColor, brush.ReleaseAndGetAddressOf()));
+}
+
+void D2D::InitDirectWriteResources() {
   // create dwrite objs
   HR(DWriteCreateFactory(
       DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
@@ -403,7 +451,7 @@ void WeaselPanel::InitDirect2D() {
   HR(m_pWriteFactory->CreateTextFormat(
       L"Microsoft Yahei", NULL, DWRITE_FONT_WEIGHT_NORMAL,
       DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-      m_style.font_point * m_dpiScale, L"",
+      m_style.font_point * (m_dpiY / 72.0f), L"",
       reinterpret_cast<IDWriteTextFormat **>(
           pTextFormat.ReleaseAndGetAddressOf())));
   ComPtr<IDWriteFontFallback> pSysFallback;
@@ -421,38 +469,13 @@ void WeaselPanel::InitDirect2D() {
                                m_pBrush.ReleaseAndGetAddressOf()));
 }
 
-void WeaselPanel::OnPaint() {
-  if (m_horizontal) {
-    ResizeHorizontal();
-  } else {
-    ResizeVertical();
-  }
-  Render();
-}
-
-LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
-                                         LPARAM lParam) {
-  WeaselPanel *self;
-  if (uMsg == WM_NCCREATE) {
-    self = static_cast<WeaselPanel *>(
-        reinterpret_cast<LPCREATESTRUCT>(lParam)->lpCreateParams);
-    SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
-  } else {
-    self =
-        reinterpret_cast<WeaselPanel *>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
-  }
-  switch (uMsg) {
-  case WM_PAINT:
-    if (self) {
-      self->OnPaint();
-      ValidateRect(hwnd, nullptr);
-    }
-    break;
-  case WM_DESTROY:
-    return 0;
-  case WM_LBUTTONUP: {
-    return 0;
-  }
-  }
-  return DefWindowProc(hwnd, uMsg, wParam, lParam);
+void D2D::InitDpiInfo() {
+  if (!IsWindows8Point1OrGreater())
+    return;
+  HMONITOR const monitor = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
+  unsigned x = 0;
+  unsigned y = 0;
+  HR(GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &x, &y));
+  m_dpiX = static_cast<float>(x);
+  m_dpiY = static_cast<float>(y);
 }
