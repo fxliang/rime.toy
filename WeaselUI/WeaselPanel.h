@@ -12,7 +12,6 @@
 #include <Dwmapi.h>
 #include <ShellScalingApi.h>
 #include <memory>
-#include <versionhelpers.h>
 #include <wrl/client.h>
 
 namespace weasel {
