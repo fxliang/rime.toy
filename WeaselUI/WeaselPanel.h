@@ -26,7 +26,8 @@ public:
 
 private:
   void GetTextSize(const wstring &text, LPSIZE lpSize);
-  void FillRoundRect(const RECT &rect, float radius, uint32_t color);
+  void FillRoundRect(const RECT &rect, float radius, uint32_t border,
+                     uint32_t back_color, uint32_t border_color);
   D2D1::ColorF D2d1ColorFromColorRef(uint32_t color);
   void Render();
   void DrawTextAt(const wstring &text, size_t x, size_t y);
