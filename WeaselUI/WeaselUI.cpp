@@ -84,9 +84,12 @@ void UI::Update(const Context &ctx, const Status &status) {
   Refresh();
 }
 void UI::Refresh() {
-  if (pimpl_) {
-    pimpl_->Refresh();
-  }
+  if (ctx_.empty())
+    pimpl_->Hide();
+  if (ctx_ != octx_)
+    if (pimpl_) {
+      pimpl_->Refresh();
+    }
 }
 void UI::ShowWithTimeout(size_t millisec) {
   if (pimpl_) {

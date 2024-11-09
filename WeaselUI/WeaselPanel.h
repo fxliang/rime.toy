@@ -11,6 +11,7 @@
 
 #include <Dwmapi.h>
 #include <ShellScalingApi.h>
+#include <algorithm>
 #include <memory>
 #include <wrl/client.h>
 

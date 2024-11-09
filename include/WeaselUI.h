@@ -1,5 +1,5 @@
 #pragma once
-#include <data.h>
+#include <WeaselIPCData.h>
 #include <string>
 #include <windows.h>
 #include <wrl.h>
