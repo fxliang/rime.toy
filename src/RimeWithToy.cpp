@@ -36,7 +36,6 @@ void RimeWithToy::setup_rime() {
   traits.distribution_version = "0.0.2.0";
   traits.app_name = "rime.toy";
   RimeApi *rime_api = rime_get_api();
-  assert(rime_api);
   rime_api->setup(&traits);
   rime_api->set_notification_handler(&on_message, nullptr);
 }
@@ -98,7 +97,6 @@ void RimeWithToy::Initialize() {
     rime_api->config_close(&config);
   } else
     OutputDebugString(L"open weasel config failed");
-  assert(m_ui);
   rime_api->set_option(m_session_id, "soft_cursor",
                        Bool(!m_ui->style().inline_preedit));
 }

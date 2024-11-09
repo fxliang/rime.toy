@@ -2,12 +2,13 @@
 #ifndef _RIME_WITH_TOY
 #define _RIME_WITH_TOY
 
+#include "keymodule.h"
 #include <WeaselIPCData.h>
 #include <WeaselUI.h>
-#include <data.h>
 #include <filesystem>
 #include <functional>
 #include <rime_api.h>
+#include <utils.h>
 
 namespace fs = std::filesystem;
 
@@ -69,4 +70,5 @@ private:
 void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize);
 
 } // namespace weasel
+
 #endif
