@@ -13,10 +13,6 @@ namespace fs = std::filesystem;
 
 namespace weasel {
 
-#ifdef _MSC_VER
-#undef max
-#endif
-
 #define TRANSPARENT_COLOR 0x00000000
 #define ARGB2ABGR(value)                                                       \
   ((value & 0xff000000) | ((value & 0x000000ff) << 16) |                       \
