@@ -1,0 +1,14 @@
+include/rime_*.h
+lib/*.dll
+lib/*.lib
+lib/*.pdb
+lib64/*.dll
+lib64/*.lib
+lib64/*.pdb
+*.exe
+*.dll
+compile_commands.json
+usr
+build
+.xmake
+.cache
