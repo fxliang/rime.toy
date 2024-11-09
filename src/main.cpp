@@ -17,7 +17,6 @@ namespace fs = filesystem;
 HHOOK hHook = NULL;
 BYTE keyState[256] = {0};
 RimeSessionId session_id = NULL;
-Context old_ctx;
 Status old_sta;
 Status sta;
 bool committed = true;
@@ -426,45 +425,32 @@ void update_ui() {
   static RimeApi *rime = rime_get_api();
   const char *alabel = rime->get_state_label(session_id, "ascii_mode", 1);
   const char *nlabel = rime->get_state_label(session_id, "ascii_mode", 0);
-  if (ctx != old_ctx) {
-    old_ctx = ctx;
-
-    // if (!sta.composing)
-    //   cout << sta.schema_name << " " << (sta.ascii_mode ? alabel : nlabel)
-    //        << (hook_enabled ? " " : " 禁用") << endl;
-    if (ctx.empty()) {
-      ui->Hide();
-      return;
-    } else {
-      std::wstring text_ = (ctx.preedit.str) + L" ";
-      for (auto i = 0; i < ctx.cinfo.candies.size(); i++) {
-        bool highlighted = i == ctx.cinfo.highlighted;
-        text_ += highlighted ? L"[" : L"";
-        text_ += (ctx.cinfo.labels[i].str) + L". " +
-                 (ctx.cinfo.candies[i].str) + L" " +
-                 (ctx.cinfo.comments[i].str);
-        text_ += highlighted ? L"] " : L" ";
-      }
-      if (ui) {
-        ctx.aux.clear();
-        ui->Update(ctx, sta);
-        ui->Refresh();
-        POINT pt;
-        if (GetCursorPos(&pt)) {
-          ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
-        } else {
-          pt.x = rect.left + (rect.right - rect.left) / 2 - 150;
-          pt.y = rect.bottom - (rect.bottom - rect.top) / 2 - 100;
-          ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
-        }
-        ui->Show();
-      }
-    }
+  if (ctx.empty()) {
+    ui->Hide();
+    return;
   } else {
-    // if (!sta.composing) {
-    //   cout << sta.schema_name << " " << (sta.ascii_mode ? alabel : nlabel)
-    //        << (hook_enabled ? " " : " 禁用") << endl;
-    // }
+    std::wstring text_ = (ctx.preedit.str) + L" ";
+    for (auto i = 0; i < ctx.cinfo.candies.size(); i++) {
+      bool highlighted = i == ctx.cinfo.highlighted;
+      text_ += highlighted ? L"[" : L"";
+      text_ += (ctx.cinfo.labels[i].str) + L". " + (ctx.cinfo.candies[i].str) +
+               L" " + (ctx.cinfo.comments[i].str);
+      text_ += highlighted ? L"] " : L" ";
+    }
+    if (ui) {
+      ctx.aux.clear();
+      ui->Update(ctx, sta);
+      ui->Refresh();
+      POINT pt;
+      if (GetCursorPos(&pt)) {
+        ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
+      } else {
+        pt.x = rect.left + (rect.right - rect.left) / 2 - 150;
+        pt.y = rect.bottom - (rect.bottom - rect.top) / 2 - 100;
+        ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
+      }
+      ui->Show();
+    }
   }
 }
 
@@ -599,8 +585,9 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
       } else
         committed = false;
       if ((ke.keycode == ibus::Caps_Lock && keyCountToSimulate) ||
-          old_sta.ascii_mode)
+          old_sta.ascii_mode) {
         goto skip;
+      }
       if (eat)
         return 1;
     }
@@ -709,7 +696,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   ui = new UI();
   RimeConfig config = {NULL};
   if (rime_api->config_open("weasel", &config)) {
-    OutputDebugString(L"open weasel config ok");
     _UpdateUIStyle(&config, ui, true);
     rime_api->config_close(&config);
   } else {
