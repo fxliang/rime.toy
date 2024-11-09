@@ -3,6 +3,7 @@
 #include "RimeWithToy.h"
 #include "keymodule.h"
 #include "trayicon.h"
+#include <ShellScalingApi.h>
 #include <WeaselIPCData.h>
 #include <WeaselUI.h>
 #include <iostream>
@@ -164,6 +165,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     if (arg == L"/h")
       horizontal = true;
   }
+  SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
   ui.reset(new UI());
   toy.reset(new RimeWithToy(ui.get()));
   toy->SetTrayIconCallBack(RefeshTrayIcon);
