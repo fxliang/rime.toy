@@ -1,6 +1,7 @@
 // Copyright fxliang
 // Distrobuted under GPLv3 https://www.gnu.org/licenses/gpl-3.0.en.html
 #include "config.h"
+#include "trayicon.h"
 #include <WeaselUI.h>
 #include <data.h>
 #include <filesystem>
@@ -8,7 +9,6 @@
 #include <resource.h>
 #include <rime_api.h>
 #include <sstream>
-#include <trayicon.h>
 
 using namespace std;
 using namespace weasel;
@@ -674,6 +674,32 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   return 0;
 }
 
+void deploy() {
+  OutputDebugString(L"deploy called");
+  RimeApi *rime_api = rime_get_api();
+  rime_api->initialize(NULL);
+  if (rime_api->start_maintenance(true))
+    rime_api->join_maintenance_thread();
+  rime_api->deploy_config_file("weasel.yaml", "config_version");
+  session_id = rime_api->create_session();
+  RimeConfig config = {NULL};
+  if (rime_api->config_open("weasel", &config)) {
+    _UpdateUIStyle(&config, ui, true);
+    rime_api->config_close(&config);
+  } else {
+    OutputDebugString(L"open weasel config failed");
+  }
+  assert(ui);
+  rime_api->set_option(session_id, "soft_cursor",
+                       Bool(!ui->style().inline_preedit));
+}
+void switch_ascii() {
+  OutputDebugString(L"deploy called");
+  RimeApi *rime_api = rime_get_api();
+  BOOL ascii = rime_api->get_option(session_id, "ascii_mode");
+  rime_api->set_option(session_id, "ascii_mode", !ascii);
+}
+
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                     LPWSTR lpCmdLine, int nCmdShow) {
   wstring cmdLine(lpCmdLine), arg;
@@ -683,28 +709,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
       horizontal = true;
   }
   setup_rime();
-  RimeApi *rime_api = rime_get_api();
-  assert(rime_api);
-  rime_api->initialize(NULL);
-  if (rime_api->start_maintenance(true))
-    rime_api->join_maintenance_thread();
-  rime_api->deploy_config_file("weasel.yaml", "config_version");
-  session_id = rime_api->create_session();
-  assert(session_id);
-  set_hook();
-  // --------------------------------------------------------------------------
   ui = new UI();
-  RimeConfig config = {NULL};
-  if (rime_api->config_open("weasel", &config)) {
-    _UpdateUIStyle(&config, ui, true);
-    rime_api->config_close(&config);
-  } else {
-    OutputDebugString(L"open weasel config failed");
-  }
+  assert(ui);
+  deploy();
   ui->SetHorizontal(horizontal);
   ui->Create(nullptr);
-  rime_api->set_option(session_id, "soft_cursor",
-                       Bool(!ui->style().inline_preedit));
+  set_hook();
   // --------------------------------------------------------------------------
   ime_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
   ascii_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_ASCII));
@@ -723,8 +733,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                            0, NULL, NULL, hInstance, NULL);
   // 创建托盘图标
   trayIcon = new TrayIcon(hInstance, hwnd, L"rime.toy");
+  trayIcon->SetDeployFunc([&]() { deploy(); });
+  trayIcon->SetSwichAsciiFunc([&]() { switch_ascii(); });
   trayIcon->SetIcon(wc.hIcon); // 使用默认图标
-  trayIcon->SetTooltip(L"rime.toy\n右键菜单可退出^_^");
+  trayIcon->SetTooltip(L"rime.toy\n左键点击切换ASCII, 右键菜单可退出^_^");
   trayIcon->Show();
   // 不显示窗口
   ShowWindow(hwnd, SW_HIDE);
