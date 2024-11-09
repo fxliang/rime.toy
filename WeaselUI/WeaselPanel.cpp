@@ -7,6 +7,8 @@
 
 using namespace weasel;
 
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 #define STYLEORWEIGHT (L":[^:]*[^a-f0-9:]+[^:]*")
 
 WeaselPanel::WeaselPanel(UI &ui)
@@ -162,7 +164,7 @@ void WeaselPanel::ResizeVertical() {
     winSize.cx += m_padding + textSize.cx;
     winSize.cy += m_padding + textSize.cy;
   }
-  size_t cand_width = std::max(winSize.cx, 0L);
+  size_t cand_width = MAX(winSize.cx, 0L);
   if (m_ctx.cinfo.candies.size()) {
     const auto &cinfo = m_ctx.cinfo;
     for (auto i = 0; i < cinfo.candies.size(); i++) {
@@ -173,22 +175,22 @@ void WeaselPanel::ResizeVertical() {
       size_t h = 0;
       m_pD2D->GetTextSize(label, label.length(), m_pD2D->pTextFormat,
                           &textSize);
-      h = std::max((LONG)h, textSize.cy);
+      h = MAX((LONG)h, textSize.cy);
       x += textSize.cx + m_padding;
       m_pD2D->GetTextSize(candie, candie.length(), m_pD2D->pTextFormat,
                           &textSize);
-      h = std::max((LONG)h, textSize.cy);
+      h = MAX((LONG)h, textSize.cy);
       if (!comment.empty()) {
         x += textSize.cx + m_padding;
         m_pD2D->GetTextSize(comment, comment.length(), m_pD2D->pTextFormat,
                             &textSize);
       }
-      cand_width = std::max(cand_width, x + textSize.cx);
+      cand_width = MAX(cand_width, x + textSize.cx);
       winSize.cy += h;
     }
     winSize.cy += m_padding;
   }
-  winSize.cx = std::max(winSize.cx, (LONG)cand_width);
+  winSize.cx = MAX(winSize.cx, (LONG)cand_width);
   m_winSize.cx = cand_width + m_padding * 2;
   m_winSize.cy = winSize.cy + m_padding;
 
@@ -224,7 +226,7 @@ void WeaselPanel::ResizeHorizontal() {
     }
     m_pD2D->GetTextSize(m_text, m_text.length(), m_pD2D->pTextFormat,
                         &textSize);
-    winSize.cx = std::max(winSize.cx, textSize.cx);
+    winSize.cx = MAX(winSize.cx, textSize.cx);
     winSize.cy += textSize.cy;
   }
   m_winSize.cx = winSize.cx + m_padding * 2;
@@ -290,12 +292,12 @@ void WeaselPanel::DrawUIVertical() {
                           &textSize);
       xl = x;
       yl = y;
-      h = std::max((LONG)h, textSize.cy);
+      h = MAX((LONG)h, textSize.cy);
       x += textSize.cx + m_padding;
 
       m_pD2D->GetTextSize(candie, candie.length(), m_pD2D->pTextFormat,
                           &textSize);
-      h = std::max((LONG)h, textSize.cy);
+      h = MAX((LONG)h, textSize.cy);
       xt = x;
       yt = y;
 
@@ -309,7 +311,7 @@ void WeaselPanel::DrawUIVertical() {
         xc = xt + textSize.cx;
         yc = y;
       }
-      cand_width = std::max(cand_width, x + textSize.cx);
+      cand_width = MAX(cand_width, x + textSize.cx);
 
       RECT rc = {xl, yl, xl + (LONG)cand_width, yl + (LONG)h};
       auto color = hilited ? m_style.hilited_candidate_back_color
