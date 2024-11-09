@@ -24,9 +24,35 @@ void WeaselPanel::DestroyWindow() { ::DestroyWindow(m_hWnd); }
 void WeaselPanel::MoveTo(RECT rc) {
   if (m_hWnd) {
     m_inputPos = rc;
-    SetWindowPos(m_hWnd, HWND_TOPMOST, m_inputPos.left,
-                 m_inputPos.bottom - m_winSize.cy, 0, 0,
-                 SWP_NOSIZE | SWP_NOACTIVATE);
+    RECT rcWorkArea;
+    memset(&rcWorkArea, 0, sizeof(rcWorkArea));
+    HMONITOR hMonitor = MonitorFromRect(&m_inputPos, MONITOR_DEFAULTTONEAREST);
+    if (hMonitor) {
+      MONITORINFO info;
+      info.cbSize = sizeof(MONITORINFO);
+      if (GetMonitorInfo(hMonitor, &info)) {
+        rcWorkArea = info.rcWork;
+      }
+    }
+    RECT rcWindow;
+    GetWindowRect(m_hWnd, &rcWindow);
+    int width = (rcWindow.right - rcWindow.left);
+    int height = (rcWindow.bottom - rcWindow.top);
+    rcWorkArea.right -= width;
+    rcWorkArea.bottom -= height;
+    int x = m_inputPos.left;
+    int y = m_inputPos.bottom;
+    if (x > rcWorkArea.right)
+      x = rcWorkArea.right;
+    if (x < rcWorkArea.left)
+      x = rcWorkArea.right;
+    if (y > rcWorkArea.bottom)
+      y = rcWorkArea.bottom;
+    if (y < rcWorkArea.top)
+      y = rcWorkArea.top;
+    m_inputPos.bottom = y;
+
+    SetWindowPos(m_hWnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
   }
 }
 
