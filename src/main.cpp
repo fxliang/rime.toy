@@ -4,7 +4,6 @@
 #include "trayicon.h"
 #include <WeaselIPCData.h>
 #include <WeaselUI.h>
-#include <data.h>
 #include <iostream>
 #include <resource.h>
 #include <sstream>

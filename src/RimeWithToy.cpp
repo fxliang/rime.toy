@@ -1,7 +1,5 @@
 #include "RimeWithToy.h"
 #include <algorithm>
-#include <data.h>
-#include <functional>
 #include <map>
 #include <regex>
 #include <string>
