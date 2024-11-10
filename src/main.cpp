@@ -6,58 +6,30 @@
 #include <ShellScalingApi.h>
 #include <WeaselIPCData.h>
 #include <WeaselUI.h>
-#include <iostream>
 #include <resource.h>
 #include <sstream>
 
 using namespace std;
 using namespace weasel;
-
-HHOOK hHook = NULL;
-Status status;
-bool committed = true;
-wstring commit_str = L"";
-bool horizontal = false, escape_ansi = false;
-HICON ascii_icon;
-HICON ime_icon;
-
-std::shared_ptr<UI> ui;
-std::shared_ptr<TrayIcon> trayIcon;
-std::shared_ptr<RimeWithToy> toy;
-
 // ----------------------------------------------------------------------------
-
-void send_input_to_window(HWND hwnd, const wstring &text) {
-  for (const auto &ch : text) {
-    INPUT input;
-    input.type = INPUT_KEYBOARD;
-    input.ki.wVk = 0;
-    input.ki.wScan = ch;
-    input.ki.dwFlags = KEYEVENTF_UNICODE;
-    input.ki.time = 0;
-    input.ki.dwExtraInfo = GetMessageExtraInfo();
-    INPUT inputRelease = input;
-    inputRelease.ki.dwFlags |= KEYEVENTF_KEYUP;
-    SendInput(1, &input, sizeof(INPUT));
-    SendInput(1, &inputRelease, sizeof(INPUT));
-  }
-}
-
+HHOOK hHook = NULL;
+std::unique_ptr<UI> m_ui;
+std::unique_ptr<RimeWithToy> m_toy;
+// ----------------------------------------------------------------------------
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
-  const int TOGGLE_KEY = 0x31; // key '1'
   static KeyEvent prevKeyEvent;
   static BOOL prevfEaten = FALSE;
   static int keyCountToSimulate = 0;
   static HWND hwnd_previous = nullptr;
+  static Status status;
+  static bool committed = true;
+  static wstring commit_str = L"";
 
   HWND hwnd = GetForegroundWindow();
-  RECT rect;
-  if (hwnd)
-    GetWindowRect(hwnd, &rect);
   if (hwnd != hwnd_previous) {
     hwnd_previous = hwnd;
-    ui->ctx().clear();
-    ui->Hide();
+    m_ui->ctx().clear();
+    m_ui->Hide();
   }
   if (nCode == HC_ACTION) {
     // update keyState table
@@ -70,7 +42,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (ConvertKeyEvent(pKeyboard, ki, ke)) {
       bool eat = false;
       if (!keyCountToSimulate)
-        eat = toy->ProcessKeyEvent(ke, commit_str);
+        eat = m_toy->ProcessKeyEvent(ke, commit_str);
       // make capslock bindable for rime
       if (ke.keycode == ibus::Caps_Lock) {
         if (prevKeyEvent.keycode == ibus::Caps_Lock && prevfEaten == TRUE &&
@@ -96,23 +68,26 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
       prevfEaten = eat;
       prevKeyEvent = ke;
 
-      toy->UpdateUI();
-      status = ui->status();
+      m_toy->UpdateUI();
+      status = m_ui->status();
 
       // update position
       POINT pt;
       if (GetCursorPos(&pt)) {
-        ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
+        m_ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
       } else {
+        RECT rect;
+        if (hwnd)
+          GetWindowRect(hwnd, &rect);
         pt.x = rect.left + (rect.right - rect.left) / 2 - 150;
         pt.y = rect.bottom - (rect.bottom - rect.top) / 2 - 100;
-        ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
+        m_ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
       }
       if (!commit_str.empty()) {
         send_input_to_window(hwnd, commit_str);
         commit_str.clear();
         if (!status.composing)
-          ui->Hide();
+          m_ui->Hide();
         committed = true;
       } else
         committed = false;
@@ -128,83 +103,52 @@ skip:
   return CallNextHookEx(hHook, nCode, wParam, lParam);
 }
 
-void release_hook() { UnhookWindowsHookEx(hHook); }
-
 void set_hook() {
   hHook = SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
   if (hHook == NULL) {
-    cerr << "Failed to install hook!" << endl;
+    OutputDebugString(L"Failed to install hook!");
     exit(1);
   }
-}
-
-LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-  trayIcon->ProcessMessage(hwnd, msg, wParam, lParam);
-  switch (msg) {
-  case WM_DESTROY:
-    PostQuitMessage(0);
-    break;
-  default:
-    return DefWindowProc(hwnd, msg, wParam, lParam);
-  }
-  return 0;
-}
-
-void RefeshTrayIcon(const Status &status) {
-  if (status.ascii_mode)
-    trayIcon->SetIcon(ascii_icon);
-  else
-    trayIcon->SetIcon(ime_icon);
 }
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                     LPWSTR lpCmdLine, int nCmdShow) {
   wstring cmdLine(lpCmdLine), arg;
   wistringstream wiss(cmdLine);
+  bool horizontal = false;
   while (wiss >> arg) {
     if (arg == L"/h")
       horizontal = true;
   }
   SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
-  ui.reset(new UI());
-  toy.reset(new RimeWithToy(ui.get()));
-  toy->SetTrayIconCallBack(RefeshTrayIcon);
-  ui->SetHorizontal(horizontal);
-  ui->Create(nullptr);
-  set_hook();
+  HICON ime_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
+  HICON ascii_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_ASCII));
+  std::unique_ptr<TrayIcon> trayIcon;
+  m_ui = std::make_unique<UI>();
+  m_toy = std::make_unique<RimeWithToy>(m_ui.get());
+  m_toy->SetTrayIconCallBack([&](const Status &sta) {
+    trayIcon->SetIcon(sta.ascii_mode ? ascii_icon : ime_icon);
+  });
+  m_ui->SetHorizontal(horizontal);
+  m_ui->Create(nullptr);
   // --------------------------------------------------------------------------
-  ime_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
-  ascii_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_ASCII));
-  //  注册窗口类
-  WNDCLASS wc = {0};
-  wc.lpfnWndProc = WndProc;
-  wc.hInstance = hInstance;
-  wc.lpszClassName = L"Rime.Toy.App";
-  wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
-  wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-  RegisterClass(&wc);
-
-  // --------------------------------------------------------------------------
-  // 创建一个隐藏窗口
-  HWND hwnd = CreateWindow(L"Rime.Toy.App", L"Rime.Toy.App",
-                           WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 0,
-                           0, NULL, NULL, hInstance, NULL);
-  // 创建托盘图标
-  trayIcon.reset(new TrayIcon(hInstance, hwnd, L"rime.toy"));
-  trayIcon->SetDeployFunc([&]() { toy->Initialize(); });
-  trayIcon->SetSwichAsciiFunc([&]() { toy->SwitchAsciiMode(); });
-  trayIcon->SetIcon(wc.hIcon); // 使用默认图标
-  trayIcon->SetTooltip(L"rime.toy\n左键点击切换ASCII, 右键菜单可退出^_^");
+  auto tooltip = L"rime.toy\n左键点击切换ASCII\n右键菜单可退出^_^";
+  trayIcon = std::make_unique<TrayIcon>(hInstance, tooltip);
+  trayIcon->SetDeployFunc([&]() {
+    OutputDebugString(L"Deploy Menu clicked");
+    m_toy->Initialize();
+  });
+  trayIcon->SetSwichAsciiFunc([&]() { m_toy->SwitchAsciiMode(); });
+  trayIcon->SetIcon(ime_icon);
   trayIcon->Show();
-  // 不显示窗口
-  ShowWindow(hwnd, SW_HIDE);
   // --------------------------------------------------------------------------
+  set_hook();
   MSG msg;
   while (GetMessage(&msg, NULL, 0, 0)) {
     TranslateMessage(&msg);
     DispatchMessage(&msg);
   }
-  toy->Finalize();
-  release_hook();
+  m_toy->Finalize();
+  UnhookWindowsHookEx(hHook);
   return 0;
 }
