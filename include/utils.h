@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include <sstream>
 #include <string>
 #include <windows.h>
 
@@ -42,4 +43,27 @@ inline std::string wstring_to_string(const std::wstring &wstr,
 #define wtou8(x) wstring_to_string(x, CP_UTF8)
 #define wtoacp(x) wstring_to_string(x)
 #define u8tow(x) string_to_wstring(x, CP_UTF8)
+#define acptow(x) string_to_wstring(x, CP_ACP)
 #define MAX(x, y) ((x > y) ? x : y)
+
+class DebugStream {
+public:
+  DebugStream() = default;
+  ~DebugStream() { OutputDebugString(ss.str().c_str()); }
+  template <typename T> DebugStream &operator<<(const T &value) {
+    ss << value;
+    return *this;
+  }
+  DebugStream &operator<<(const char *value) {
+    if (value) {
+      std::wstring wvalue(u8tow(value)); // utf-8
+      ss << wvalue;
+    }
+    return *this;
+  }
+
+private:
+  std::wstringstream ss;
+};
+
+#define DEBUG (DebugStream() << __FILE__ << "@L" << __LINE__ << ": ")

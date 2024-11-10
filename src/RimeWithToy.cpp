@@ -83,7 +83,7 @@ fs::path RimeWithToy::get_log_path() {
 RimeWithToy::RimeWithToy(UI *ui) : m_ui(ui) { Initialize(); }
 
 void RimeWithToy::Initialize() {
-  OutputDebugString(L"RimeWithToy::Initialize() called");
+  DEBUG << L"RimeWithToy::Initialize() called";
   setup_rime();
   rime_api = rime_get_api();
   rime_api->initialize(NULL);
@@ -96,19 +96,19 @@ void RimeWithToy::Initialize() {
     _UpdateUIStyle(&config, m_ui, true);
     rime_api->config_close(&config);
   } else
-    OutputDebugString(L"open weasel config failed");
+    DEBUG << L"open weasel config failed";
   rime_api->set_option(m_session_id, "soft_cursor",
                        Bool(!m_ui->style().inline_preedit));
 }
 
 void RimeWithToy::Finalize() {
-  OutputDebugString(L"RimeWithToy::Finalize() called");
+  DEBUG << L"RimeWithToy::Finalize() called";
   rime_api->destroy_session(m_session_id);
   rime_api->finalize();
 }
 
 void RimeWithToy::SwitchAsciiMode() {
-  OutputDebugString(L"RimeWithToy::SwitchAsciiMode() called");
+  DEBUG << L"RimeWithToy::SwitchAsciiMode() called";
   BOOL ascii = rime_api->get_option(m_session_id, "ascii_mode");
   rime_api->set_option(m_session_id, "ascii_mode", !ascii);
   Status status;
@@ -118,6 +118,8 @@ void RimeWithToy::SwitchAsciiMode() {
 }
 
 BOOL RimeWithToy::ProcessKeyEvent(KeyEvent keyEvent, wstring &commit_str) {
+  DEBUG << L"keyEvent.keycode = " << std::hex << keyEvent.keycode
+        << L", keyEvent.mask = " << std::hex << keyEvent.mask;
   Bool handled = rime_api->process_key(m_session_id, keyEvent.keycode,
                                        expand_ibus_modifier(keyEvent.mask));
   RIME_STRUCT(RimeCommit, commit);
