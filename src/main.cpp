@@ -106,7 +106,7 @@ skip:
 void set_hook() {
   hHook = SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
   if (hHook == NULL) {
-    OutputDebugString(L"Failed to install hook!");
+    DEBUG << L"Failed to install hook!";
     exit(1);
   }
 }
@@ -135,7 +135,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   auto tooltip = L"rime.toy\n左键点击切换ASCII\n右键菜单可退出^_^";
   trayIcon = std::make_unique<TrayIcon>(hInstance, tooltip);
   trayIcon->SetDeployFunc([&]() {
-    OutputDebugString(L"Deploy Menu clicked");
+    DEBUG << L"Deploy Menu clicked";
     m_toy->Initialize();
   });
   trayIcon->SetSwichAsciiFunc([&]() { m_toy->SwitchAsciiMode(); });
