@@ -1,8 +1,11 @@
 #include "trayicon.h"
+#include <resource.h>
 #include <shellapi.h>
 
-TrayIcon::TrayIcon(HINSTANCE hInstance, HWND hwnd, const std::wstring &tooltip)
-    : hInst(hInstance), hMenu(NULL), deploy_func(nullptr) {
+TrayIcon::TrayIcon(HINSTANCE hInstance, const std::wstring &tooltip)
+    : hInst(hInstance), hMenu(NULL), deploy_func(nullptr),
+      switch_ascii(nullptr) {
+  CreateHwnd();
   nid.cbSize = sizeof(NOTIFYICONDATA);
   nid.hWnd = hwnd;
   nid.uID = 1;
@@ -12,11 +15,28 @@ TrayIcon::TrayIcon(HINSTANCE hInstance, HWND hwnd, const std::wstring &tooltip)
   nid.szTip[_countof(nid.szTip) - 1] = L'\0'; // 确保以空字符结尾
 }
 
-TrayIcon::~TrayIcon() { Hide(); }
+TrayIcon::~TrayIcon() {
+  Hide();
+  DestroyWindow(hwnd);
+}
 
 void TrayIcon::Show() { Shell_NotifyIcon(NIM_ADD, &nid); }
 
 void TrayIcon::Hide() { Shell_NotifyIcon(NIM_DELETE, &nid); }
+
+void TrayIcon::CreateHwnd() {
+  WNDCLASS wc = {0};
+  wc.lpfnWndProc = WndProc;
+  wc.hInstance = hInst;
+  wc.lpszClassName = L"TrayIcon";
+  wc.hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_ICON_MAIN));
+  wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+  ::RegisterClass(&wc);
+  hwnd =
+      CreateWindow(L"TrayIcon", L"TrayIcon", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT,
+                   CW_USEDEFAULT, 0, 0, NULL, NULL, hInst, this);
+  ShowWindow(hwnd, SW_HIDE);
+}
 
 void TrayIcon::SetIcon(HICON hIcon) {
   nid.hIcon = hIcon;
@@ -44,11 +64,10 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
   case WM_USER + 1:
     if (lParam == WM_RBUTTONUP) {
       CreateContextMenu();
-      POINT curPoint;
-      GetCursorPos(&curPoint);
+      POINT pt;
+      GetCursorPos(&pt);
       SetForegroundWindow(hwnd);
-      TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, curPoint.x, curPoint.y, 0, hwnd,
-                     NULL);
+      TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
     } else if (lParam == WM_LBUTTONUP) {
       if (switch_ascii)
         switch_ascii();
@@ -65,4 +84,19 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
     }
     break;
   }
+}
+
+LRESULT CALLBACK TrayIcon::WndProc(HWND hwnd, UINT msg, WPARAM wParam,
+                                   LPARAM lParam) {
+  TrayIcon *self;
+  if (msg == WM_NCCREATE) {
+    self = static_cast<TrayIcon *>(
+        reinterpret_cast<LPCREATESTRUCT>(lParam)->lpCreateParams);
+    SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
+  } else {
+    self = reinterpret_cast<TrayIcon *>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+  }
+  if (self)
+    self->ProcessMessage(hwnd, msg, wParam, lParam);
+  return DefWindowProc(hwnd, msg, wParam, lParam);
 }

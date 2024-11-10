@@ -5,7 +5,7 @@
 
 class TrayIcon {
 public:
-  TrayIcon(HINSTANCE hInstance, HWND hwnd, const std::wstring &tooltip);
+  TrayIcon(HINSTANCE hInstance, const std::wstring &tooltip);
   ~TrayIcon();
   void Show();
   void Hide();
@@ -23,8 +23,12 @@ private:
   HINSTANCE hInst;
   NOTIFYICONDATA nid;
   HMENU hMenu;
+  HWND hwnd;
   std::function<void(void)> deploy_func;
   std::function<void(void)> switch_ascii;
 
   void CreateContextMenu();
+  void CreateHwnd();
+  static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam,
+                                  LPARAM lParam);
 };

@@ -310,4 +310,19 @@ void update_keystates(WPARAM wParam, LPARAM lParam) {
   }
 }
 
+void send_input_to_window(HWND hwnd, const std::wstring &text) {
+  for (const auto &ch : text) {
+    INPUT input;
+    input.type = INPUT_KEYBOARD;
+    input.ki.wVk = 0;
+    input.ki.wScan = ch;
+    input.ki.dwFlags = KEYEVENTF_UNICODE;
+    input.ki.time = 0;
+    input.ki.dwExtraInfo = GetMessageExtraInfo();
+    INPUT inputRelease = input;
+    inputRelease.ki.dwFlags |= KEYEVENTF_KEYUP;
+    SendInput(1, &input, sizeof(INPUT));
+    SendInput(1, &inputRelease, sizeof(INPUT));
+  }
+}
 } // namespace weasel
