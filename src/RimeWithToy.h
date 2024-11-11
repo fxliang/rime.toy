@@ -5,12 +5,9 @@
 #include "keymodule.h"
 #include <WeaselIPCData.h>
 #include <WeaselUI.h>
-#include <filesystem>
-#include <functional>
+#include <regex>
 #include <rime_api.h>
 #include <utils.h>
-
-namespace fs = std::filesystem;
 
 namespace weasel {
 
@@ -45,8 +42,6 @@ public:
   }
 
 private:
-  static fs::path data_path(string subdir);
-  static fs::path get_log_path();
   static void setup_rime();
   static void on_message(void *context_object, RimeSessionId session_id,
                          const char *message_type, const char *message_value);

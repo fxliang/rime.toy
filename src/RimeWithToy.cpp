@@ -1,23 +1,29 @@
 #include "RimeWithToy.h"
+#include <filesystem>
 #include <map>
-#include <regex>
-#include <string>
-#include <windef.h>
-#include <wingdi.h>
+
+namespace fs = std::filesystem;
 
 int expand_ibus_modifier(int m) { return (m & 0xff) | ((m & 0xff00) << 16); }
 
 namespace weasel {
-std::string RimeWithToy::m_message_type;
-std::string RimeWithToy::m_message_value;
-std::string RimeWithToy::m_message_label;
-std::string RimeWithToy::m_option_name;
+
+static fs::path data_path(string subdir) {
+  wchar_t _path[MAX_PATH] = {0};
+  GetModuleFileNameW(NULL, _path, _countof(_path));
+  return fs::path(_path).remove_filename().append(subdir);
+}
+
+string RimeWithToy::m_message_type;
+string RimeWithToy::m_message_value;
+string RimeWithToy::m_message_label;
+string RimeWithToy::m_option_name;
 
 void RimeWithToy::setup_rime() {
   RIME_STRUCT(RimeTraits, traits);
   auto shared_path = data_path("shared");
   auto usr_path = data_path("usr");
-  auto log_path = get_log_path();
+  auto log_path = data_path("log");
   if (!fs::exists(shared_path))
     fs::create_directory(shared_path);
   if (!fs::exists(usr_path))
@@ -59,11 +65,12 @@ void RimeWithToy::on_message(void *context_object, RimeSessionId session_id,
     const char *state_label =
         rime_api->get_state_label(session_id, option_name, state);
     if (state_label) {
-      m_message_label = std::string(state_label);
+      m_message_label = string(state_label);
     }
   }
 }
 
+#if 0
 fs::path RimeWithToy::data_path(string subdir) {
   wchar_t _path[MAX_PATH] = {0};
   GetModuleFileNameW(NULL, _path, _countof(_path));
@@ -79,6 +86,7 @@ fs::path RimeWithToy::get_log_path() {
   }
   return path;
 }
+#endif
 
 RimeWithToy::RimeWithToy(UI *ui) : m_ui(ui) { Initialize(); }
 
@@ -253,88 +261,64 @@ static inline COLORREF blend_colors(COLORREF fcolor, COLORREF bcolor) {
 // convertions from color format to COLOR_ABGR
 static inline int ConvertColorToAbgr(int color, ColorFormat fmt = COLOR_ABGR) {
   if (fmt == COLOR_ABGR)
-    return color;
+    return color & 0xffffffff;
   else if (fmt == COLOR_ARGB)
-    return ARGB2ABGR(color);
+    return ARGB2ABGR(color) & 0xffffffff;
   else
-    return RGBA2ABGR(color);
+    return RGBA2ABGR(color) & 0xffffffff;
 }
 // parse color value, with fallback value
 static Bool _RimeConfigGetColor32bWithFallback(RimeConfig *config,
-                                               const std::string key,
-                                               int &value,
+                                               const string key, int &value,
                                                const ColorFormat &fmt,
-                                               const int &fallback) {
+                                               const unsigned int &fallback) {
   RimeApi *rime_api = rime_get_api();
   char color[256] = {0};
   if (!rime_api->config_get_string(config, key.c_str(), color, 256)) {
     value = fallback;
     return False;
   }
-  std::string color_str = std::string(color);
-  // color code hex
+
+  string color_str = string(color);
+  auto alpha = [&](int &value) {
+    value = (fmt != COLOR_RGBA) ? (value | 0xff000000)
+                                : ((value << 8) | 0x000000ff);
+  };
   if (std::regex_match(color_str, HEX_REGEX)) {
-    std::string tmp = std::regex_replace(color_str, TRIMHEAD_REGEX, "");
-    // limit first 8 code
-    tmp = tmp.substr(0, 8);
-    if (tmp.length() == 6) // color code without alpha, xxyyzz add alpha ff
-    {
-      value = std::stoi(tmp, 0, 16);
-      if (fmt != COLOR_RGBA)
-        value |= 0xff000000;
-      else
-        value = (value << 8) | 0x000000ff;
-    } else if (tmp.length() == 3) // color hex code xyz => xxyyzz and alpha ff
-    {
-      tmp = tmp.substr(0, 1) + tmp.substr(0, 1) + tmp.substr(1, 1) +
-            tmp.substr(1, 1) + tmp.substr(2, 1) + tmp.substr(2, 1);
-
-      value = std::stoi(tmp, 0, 16);
-      if (fmt != COLOR_RGBA)
-        value |= 0xff000000;
-      else
-        value = (value << 8) | 0x000000ff;
-    } else if (tmp.length() == 4) // color hex code vxyz => vvxxyyzz
-    {
-      tmp = tmp.substr(0, 1) + tmp.substr(0, 1) + tmp.substr(1, 1) +
-            tmp.substr(1, 1) + tmp.substr(2, 1) + tmp.substr(2, 1) +
-            tmp.substr(3, 1) + tmp.substr(3, 1);
-
-      std::string tmp1 = tmp.substr(0, 6);
-      int value1 = std::stoi(tmp1, 0, 16);
-      tmp1 = tmp.substr(6);
-      int value2 = std::stoi(tmp1, 0, 16);
-      value = (value1 << (tmp1.length() * 4)) | value2;
-    } else if (tmp.length() > 6 &&
-               tmp.length() <= 8) /* color code with alpha */
-    {
-      // stoi limitation, split to handle
-      std::string tmp1 = tmp.substr(0, 6);
-      int value1 = std::stoi(tmp1, 0, 16);
-      tmp1 = tmp.substr(6);
-      int value2 = std::stoi(tmp1, 0, 16);
-      value = (value1 << (tmp1.length() * 4)) | value2;
-    } else // reject other code, length less then 3 or length == 5
-    {
+    string tmp = std::regex_replace(color_str, TRIMHEAD_REGEX, "").substr(0, 8);
+    switch (tmp.length()) {
+    case 6: // color code without alpha, xxyyzz add alpha ff
+      value = std::stoul(tmp, 0, 16);
+      alpha(value);
+      break;
+    case 3: // color hex code xyz => xxyyzz and alpha ff
+      tmp = string(2, tmp[0]) + string(2, tmp[1]) + string(2, tmp[2]);
+      value = std::stoul(tmp, 0, 16);
+      alpha(value);
+      break;
+    case 4: // color hex code vxyz => vvxxyyzz
+      tmp = string(2, tmp[0]) + string(2, tmp[1]) + string(2, tmp[2]) +
+            string(2, tmp[3]);
+      value = std::stoul(tmp, 0, 16);
+      alpha(value);
+      break;
+    case 7:
+    case 8: // color code with alpha
+      value = std::stoul(tmp, 0, 16);
+      break;
+    default: // invalid length
       value = fallback;
       return False;
     }
     value = ConvertColorToAbgr(value, fmt);
-    value = (value & 0xffffffff);
     return True;
-  }
-  // regular number or other stuff, if user use pure dec number, they should
-  // take care themselves
-  else {
+  } else {
     int tmp = 0;
     if (!rime_api->config_get_int(config, key.c_str(), &tmp)) {
       value = fallback;
       return False;
     }
-    if (fmt != COLOR_RGBA)
-      value = (tmp | 0xff000000) & 0xffffffff;
-    else
-      value = ((tmp << 8) | 0x000000ff) & 0xffffffff;
+    alpha(value);
     value = ConvertColorToAbgr(value, fmt);
     return True;
   }
@@ -354,15 +338,14 @@ static void _RimeGetBool(RimeConfig *config, const char *key, bool cond,
 }
 //	parse string option to T type value, with fallback
 template <typename T>
-void _RimeParseStringOptWithFallback(RimeConfig *config, const std::string key,
-                                     T &value,
-                                     const std::map<std::string, T> amap,
+void _RimeParseStringOptWithFallback(RimeConfig *config, const string key,
+                                     T &value, const std::map<string, T> amap,
                                      const T &fallback) {
   RimeApi *rime_api = rime_get_api();
   char str_buff[256] = {0};
   if (rime_api->config_get_string(config, key.c_str(), str_buff,
                                   sizeof(str_buff) - 1)) {
-    auto it = amap.find(std::string(str_buff));
+    auto it = amap.find(string(str_buff));
     value = (it != amap.end()) ? it->second : fallback;
   } else
     value = fallback;
@@ -402,24 +385,23 @@ _RimeGetStringWithFunc(RimeConfig *config, const char *key, std::wstring &value,
 
 // load color configs to style, by "style/color_scheme" or specific scheme name
 // "color" which is default empty
-bool _UpdateUIStyleColor(RimeConfig *config, UIStyle &style,
-                         std::string color) {
+bool _UpdateUIStyleColor(RimeConfig *config, UIStyle &style, string color) {
   RimeApi *rime_api = rime_get_api();
   const int BUF_SIZE = 255;
   char buffer[BUF_SIZE + 1] = {0};
-  std::string color_mark = "style/color_scheme";
+  string color_mark = "style/color_scheme";
   // color scheme
   if (rime_api->config_get_string(config, color_mark.c_str(), buffer,
                                   BUF_SIZE) ||
       !color.empty()) {
-    std::string prefix("preset_color_schemes/");
+    string prefix("preset_color_schemes/");
     prefix += (color.empty()) ? buffer : color;
     // define color format, default abgr if not set
     ColorFormat fmt = COLOR_ABGR;
-    const std::map<std::string, ColorFormat> _colorFmt = {
-        {std::string("argb"), COLOR_ARGB},
-        {std::string("rgba"), COLOR_RGBA},
-        {std::string("abgr"), COLOR_ABGR}};
+    const std::map<string, ColorFormat> _colorFmt = {
+        {string("argb"), COLOR_ARGB},
+        {string("rgba"), COLOR_RGBA},
+        {string("abgr"), COLOR_ABGR}};
     _RimeParseStringOptWithFallback(config, (prefix + "/color_format"), fmt,
                                     _colorFmt, COLOR_ABGR);
     _RimeConfigGetColor32bWithFallback(config, (prefix + "/back_color"),
@@ -525,32 +507,32 @@ void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize) {
                true, false);
   _RimeGetBool(config, "style/vertical_auto_reverse", initialize,
                style.vertical_auto_reverse, true, false);
-  const std::map<std::string, UIStyle::PreeditType> _preeditMap = {
-      {std::string("composition"), UIStyle::COMPOSITION},
-      {std::string("preview"), UIStyle::PREVIEW},
-      {std::string("preview_all"), UIStyle::PREVIEW_ALL}};
+  const std::map<string, UIStyle::PreeditType> _preeditMap = {
+      {string("composition"), UIStyle::COMPOSITION},
+      {string("preview"), UIStyle::PREVIEW},
+      {string("preview_all"), UIStyle::PREVIEW_ALL}};
   _RimeParseStringOptWithFallback(config, "style/preedit_type",
                                   style.preedit_type, _preeditMap,
                                   style.preedit_type);
-  const std::map<std::string, UIStyle::AntiAliasMode> _aliasModeMap = {
-      {std::string("force_dword"), UIStyle::FORCE_DWORD},
-      {std::string("cleartype"), UIStyle::CLEARTYPE},
-      {std::string("grayscale"), UIStyle::GRAYSCALE},
-      {std::string("aliased"), UIStyle::ALIASED},
-      {std::string("default"), UIStyle::DEFAULT}};
+  const std::map<string, UIStyle::AntiAliasMode> _aliasModeMap = {
+      {string("force_dword"), UIStyle::FORCE_DWORD},
+      {string("cleartype"), UIStyle::CLEARTYPE},
+      {string("grayscale"), UIStyle::GRAYSCALE},
+      {string("aliased"), UIStyle::ALIASED},
+      {string("default"), UIStyle::DEFAULT}};
   _RimeParseStringOptWithFallback(config, "style/antialias_mode",
                                   style.antialias_mode, _aliasModeMap,
                                   style.antialias_mode);
-  const std::map<std::string, UIStyle::HoverType> _hoverTypeMap = {
-      {std::string("none"), UIStyle::HoverType::NONE},
-      {std::string("semi_hilite"), UIStyle::HoverType::SEMI_HILITE},
-      {std::string("hilite"), UIStyle::HoverType::HILITE}};
+  const std::map<string, UIStyle::HoverType> _hoverTypeMap = {
+      {string("none"), UIStyle::HoverType::NONE},
+      {string("semi_hilite"), UIStyle::HoverType::SEMI_HILITE},
+      {string("hilite"), UIStyle::HoverType::HILITE}};
   _RimeParseStringOptWithFallback(config, "style/hover_type", style.hover_type,
                                   _hoverTypeMap, style.hover_type);
-  const std::map<std::string, UIStyle::LayoutAlignType> _alignType = {
-      {std::string("top"), UIStyle::ALIGN_TOP},
-      {std::string("center"), UIStyle::ALIGN_CENTER},
-      {std::string("bottom"), UIStyle::ALIGN_BOTTOM}};
+  const std::map<string, UIStyle::LayoutAlignType> _alignType = {
+      {string("top"), UIStyle::ALIGN_TOP},
+      {string("center"), UIStyle::ALIGN_CENTER},
+      {string("bottom"), UIStyle::ALIGN_BOTTOM}};
   _RimeParseStringOptWithFallback(config, "style/layout/align_type",
                                   style.align_type, _alignType,
                                   style.align_type);
@@ -575,8 +557,8 @@ void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize) {
                style.vertical_text_left_to_right, true, false);
   _RimeGetBool(config, "style/vertical_text_with_wrap", false,
                style.vertical_text_with_wrap, true, false);
-  const std::map<std::string, bool> _text_orientation = {
-      {std::string("horizontal"), false}, {std::string("vertical"), true}};
+  const std::map<string, bool> _text_orientation = {
+      {string("horizontal"), false}, {string("vertical"), true}};
   bool _text_orientation_bool = false;
   _RimeParseStringOptWithFallback(config, "style/text_orientation",
                                   _text_orientation_bool, _text_orientation,
@@ -598,13 +580,12 @@ void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize) {
   _RimeGetIntWithFallback(config, "style/layout/max_height", &style.max_height,
                           NULL, _abs);
   // layout (alternative to style/horizontal)
-  const std::map<std::string, UIStyle::LayoutType> _layoutMap = {
-      {std::string("vertical"), UIStyle::LAYOUT_VERTICAL},
-      {std::string("horizontal"), UIStyle::LAYOUT_HORIZONTAL},
-      {std::string("vertical_text"), UIStyle::LAYOUT_VERTICAL_TEXT},
-      {std::string("vertical+fullscreen"), UIStyle::LAYOUT_VERTICAL_FULLSCREEN},
-      {std::string("horizontal+fullscreen"),
-       UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN}};
+  const std::map<string, UIStyle::LayoutType> _layoutMap = {
+      {string("vertical"), UIStyle::LAYOUT_VERTICAL},
+      {string("horizontal"), UIStyle::LAYOUT_HORIZONTAL},
+      {string("vertical_text"), UIStyle::LAYOUT_VERTICAL_TEXT},
+      {string("vertical+fullscreen"), UIStyle::LAYOUT_VERTICAL_FULLSCREEN},
+      {string("horizontal+fullscreen"), UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN}};
   _RimeParseStringOptWithFallback(config, "style/layout/type",
                                   style.layout_type, _layoutMap,
                                   style.layout_type);
@@ -700,6 +681,6 @@ void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize) {
   char buffer[BUF_SIZE + 1] = {0};
   if (initialize && rime_api->config_get_string(config, "style/color_scheme",
                                                 buffer, BUF_SIZE))
-    _UpdateUIStyleColor(config, style, std::string(""));
+    _UpdateUIStyleColor(config, style, string(""));
 }
 } // namespace weasel
