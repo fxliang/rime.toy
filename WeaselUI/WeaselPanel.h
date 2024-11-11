@@ -42,6 +42,8 @@ struct D2D {
   ComPtr<IDCompositionVisual> visual;
   ComPtr<ID2D1SolidColorBrush> brush;
   ComPtr<IDWriteTextFormat1> pTextFormat;
+  ComPtr<IDWriteTextFormat1> pLabelFormat;
+  ComPtr<IDWriteTextFormat1> pCommentFormat;
   ComPtr<IDWriteFactory2> m_pWriteFactory;
   ComPtr<ID2D1SolidColorBrush> m_pBrush;
   UIStyle &m_style;
@@ -70,7 +72,8 @@ private:
                      uint32_t back_color, uint32_t border_color);
   D2D1::ColorF D2d1ColorFromColorRef(uint32_t color);
   void Render();
-  void DrawTextAt(const wstring &text, size_t x, size_t y);
+  void DrawTextAt(const wstring &text, size_t x, size_t y,
+                  ComPtr<IDWriteTextFormat1> &pTextFormat);
   void ResizeVertical();
   void ResizeHorizontal();
   void DrawHorizontal();
