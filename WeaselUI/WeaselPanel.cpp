@@ -1,9 +1,11 @@
 #include "WeaselPanel.h"
 #include <DWrite.h>
+#include <dwrite_2.h>
 #include <map>
 #include <regex>
 #include <string>
 #include <vector>
+#include <wrl/client.h>
 
 using namespace weasel;
 
@@ -139,10 +141,11 @@ void WeaselPanel::Render() {
   HR(m_pD2D->swapChain->Present(1, 0)); // sync
 }
 
-void WeaselPanel::DrawTextAt(const wstring &text, size_t x, size_t y) {
+void WeaselPanel::DrawTextAt(const wstring &text, size_t x, size_t y,
+                             ComPtr<IDWriteTextFormat1> &pTextFormat) {
   ComPtr<IDWriteTextLayout> pTextLayout = nullptr;
   HR(m_pD2D->m_pWriteFactory->CreateTextLayout(
-      text.c_str(), text.length(), m_pD2D->pTextFormat.Get(), m_winSize.cx,
+      text.c_str(), text.length(), pTextFormat.Get(), m_winSize.cx,
       m_winSize.cy, pTextLayout.ReleaseAndGetAddressOf()));
   m_pD2D->dc->DrawTextLayout({(float)x, (float)y}, pTextLayout.Get(),
                              m_pD2D->m_pBrush.Get(),
@@ -173,7 +176,7 @@ void WeaselPanel::ResizeVertical() {
       const auto &comment = (cinfo.comments[i].str);
       size_t x = m_padding, y = winSize.cy + m_padding;
       size_t h = 0;
-      m_pD2D->GetTextSize(label, label.length(), m_pD2D->pTextFormat,
+      m_pD2D->GetTextSize(label, label.length(), m_pD2D->pLabelFormat,
                           &textSize);
       h = MAX((LONG)h, textSize.cy);
       x += textSize.cx + m_padding;
@@ -182,7 +185,7 @@ void WeaselPanel::ResizeVertical() {
       h = MAX((LONG)h, textSize.cy);
       if (!comment.empty()) {
         x += textSize.cx + m_padding;
-        m_pD2D->GetTextSize(comment, comment.length(), m_pD2D->pTextFormat,
+        m_pD2D->GetTextSize(comment, comment.length(), m_pD2D->pCommentFormat,
                             &textSize);
       }
       cand_width = MAX(cand_width, x + textSize.cx);
@@ -243,19 +246,19 @@ void WeaselPanel::DrawHorizontal() {
     const auto &preedit = (m_ctx.preedit.str);
     m_pD2D->GetTextSize(preedit, preedit.length(), m_pD2D->pTextFormat,
                         &textSize);
-    DrawTextAt(preedit, m_padding, m_padding);
+    DrawTextAt(preedit, m_padding, m_padding, m_pD2D->pTextFormat);
     winSize.cx = textSize.cx;
     winSize.cy = textSize.cy;
   } else if (!m_ctx.aux.empty()) {
     const auto &aux = (m_ctx.aux.str);
     m_pD2D->GetTextSize(aux, aux.length(), m_pD2D->pTextFormat, &textSize);
-    DrawTextAt(aux, m_padding, m_padding);
+    DrawTextAt(aux, m_padding, m_padding, m_pD2D->pTextFormat);
     winSize.cx = textSize.cx;
     winSize.cy = textSize.cy;
   }
   if (m_ctx.cinfo.candies.size()) {
     winSize.cy += m_padding;
-    DrawTextAt(m_text, m_padding, winSize.cy);
+    DrawTextAt(m_text, m_padding, winSize.cy, m_pD2D->pTextFormat);
   }
 }
 void WeaselPanel::DrawUIVertical() {
@@ -266,13 +269,13 @@ void WeaselPanel::DrawUIVertical() {
     m_pD2D->GetTextSize(preedit, preedit.length(), m_pD2D->pTextFormat,
                         &textSize);
     m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(m_style.text_color));
-    DrawTextAt(preedit, m_padding, m_padding);
+    DrawTextAt(preedit, m_padding, m_padding, m_pD2D->pTextFormat);
     winSize.cx += m_padding + textSize.cx;
     winSize.cy += m_padding + textSize.cy;
   } else if (!m_ctx.aux.empty()) {
     const auto &aux = (m_ctx.aux.str);
     m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(m_style.text_color));
-    DrawTextAt(aux, m_padding, m_padding);
+    DrawTextAt(aux, m_padding, m_padding, m_pD2D->pTextFormat);
     m_pD2D->GetTextSize(aux, aux.length(), m_pD2D->pTextFormat, &textSize);
     winSize.cx += m_padding + textSize.cx;
     winSize.cy += m_padding + textSize.cy;
@@ -288,7 +291,7 @@ void WeaselPanel::DrawUIVertical() {
       LONG xl, yl, xt, yt, xc, yc;
       size_t x = m_padding, y = winSize.cy + m_padding;
       size_t h = 0;
-      m_pD2D->GetTextSize(label, label.length(), m_pD2D->pTextFormat,
+      m_pD2D->GetTextSize(label, label.length(), m_pD2D->pLabelFormat,
                           &textSize);
       xl = x;
       yl = y;
@@ -303,7 +306,7 @@ void WeaselPanel::DrawUIVertical() {
 
       if (!comment.empty()) {
         x += textSize.cx + m_padding;
-        m_pD2D->GetTextSize(comment, comment.length(), m_pD2D->pTextFormat,
+        m_pD2D->GetTextSize(comment, comment.length(), m_pD2D->pCommentFormat,
                             &textSize);
         xc = x;
         yc = y;
@@ -324,16 +327,16 @@ void WeaselPanel::DrawUIVertical() {
       color =
           hilited ? m_style.hilited_label_text_color : m_style.label_text_color;
       m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(color));
-      DrawTextAt(label, xl, yl);
+      DrawTextAt(label, xl, yl, m_pD2D->pLabelFormat);
       color = hilited ? m_style.hilited_candidate_text_color
                       : m_style.candidate_text_color;
       m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(color));
-      DrawTextAt(candie, xt, yt);
+      DrawTextAt(candie, xt, yt, m_pD2D->pTextFormat);
       if (!comment.empty()) {
         color = hilited ? m_style.hilited_comment_text_color
                         : m_style.comment_text_color;
         m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(color));
-        DrawTextAt(comment, xc, yc);
+        DrawTextAt(comment, xc, yc, m_pD2D->pCommentFormat);
       }
       winSize.cy += h;
     }
@@ -506,49 +509,55 @@ void D2D::InitFontFormats() {
   DWRITE_FLOW_DIRECTION flow = m_style.vertical_text_left_to_right
                                    ? DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
                                    : DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT;
+  auto func = [&](const wstring &font_face, const int font_point,
+                  ComPtr<IDWriteTextFormat1> &_pTextFormat) {
+    HRESULT hResult = S_OK;
+    bool vertical_text = m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT;
+    std::vector<std::wstring> fontFaceStrVector;
 
-  HRESULT hResult = S_OK;
-  bool vertical_text = m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT;
-  std::vector<std::wstring> fontFaceStrVector;
+    // set main font a invalid font name, to make every font range customizable
+    const std::wstring _mainFontFace = L"_InvalidFontName_";
+    DWRITE_FONT_WEIGHT fontWeight = DWRITE_FONT_WEIGHT_NORMAL;
+    DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
+    // convert percentage to float
+    float linespacing =
+        m_dpiScaleFontPoint * ((float)m_style.linespacing / 100.0f);
+    float baseline = m_dpiScaleFontPoint * ((float)m_style.baseline / 100.0f);
+    if (vertical_text)
+      baseline = linespacing / 2;
 
-  // set main font a invalid font name, to make every font range customizable
-  const std::wstring _mainFontFace = L"_InvalidFontName_";
-  DWRITE_FONT_WEIGHT fontWeight = DWRITE_FONT_WEIGHT_NORMAL;
-  DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
-  // convert percentage to float
-  float linespacing =
-      m_dpiScaleFontPoint * ((float)m_style.linespacing / 100.0f);
-  float baseline = m_dpiScaleFontPoint * ((float)m_style.baseline / 100.0f);
-  if (vertical_text)
-    baseline = linespacing / 2;
-  _ParseFontFace(m_style.font_face, fontWeight, fontStyle);
-  // text font text format set up
-  fontFaceStrVector = ws_split(m_style.font_face, L",");
-  fontFaceStrVector[0] =
-      std::regex_replace(fontFaceStrVector[0],
-                         std::wregex(STYLEORWEIGHT, std::wregex::icase), L"");
-  HR(m_pWriteFactory->CreateTextFormat(
-      _mainFontFace.c_str(), NULL, DWRITE_FONT_WEIGHT_NORMAL,
-      DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-      m_style.font_point * (m_dpiY / 72.0f), L"",
-      reinterpret_cast<IDWriteTextFormat **>(
-          pTextFormat.ReleaseAndGetAddressOf())));
+    _ParseFontFace(font_face, fontWeight, fontStyle);
+    // text font text format set up
+    fontFaceStrVector = ws_split(font_face, L",");
+    fontFaceStrVector[0] =
+        std::regex_replace(fontFaceStrVector[0],
+                           std::wregex(STYLEORWEIGHT, std::wregex::icase), L"");
+    HR(m_pWriteFactory->CreateTextFormat(
+        _mainFontFace.c_str(), NULL, DWRITE_FONT_WEIGHT_NORMAL,
+        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
+        font_point * (m_dpiY / 72.0f), L"",
+        reinterpret_cast<IDWriteTextFormat **>(
+            _pTextFormat.ReleaseAndGetAddressOf())));
 
-  if (vertical_text) {
-    pTextFormat->SetFlowDirection(flow);
-    pTextFormat->SetReadingDirection(DWRITE_READING_DIRECTION_TOP_TO_BOTTOM);
-    pTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
-  } else
-    pTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+    if (vertical_text) {
+      _pTextFormat->SetFlowDirection(flow);
+      _pTextFormat->SetReadingDirection(DWRITE_READING_DIRECTION_TOP_TO_BOTTOM);
+      _pTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+    } else
+      _pTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
 
-  // pTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-  pTextFormat->SetWordWrapping(wrapping);
-  _SetFontFallback(pTextFormat, fontFaceStrVector);
-  if (m_style.linespacing && m_style.baseline)
-    pTextFormat->SetLineSpacing(DWRITE_LINE_SPACING_METHOD_UNIFORM,
-                                m_style.font_point * linespacing,
-                                m_style.font_point * baseline);
-  decltype(fontFaceStrVector)().swap(fontFaceStrVector);
+    // _pTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+    _pTextFormat->SetWordWrapping(wrapping);
+    _SetFontFallback(_pTextFormat, fontFaceStrVector);
+    if (m_style.linespacing && m_style.baseline)
+      _pTextFormat->SetLineSpacing(DWRITE_LINE_SPACING_METHOD_UNIFORM,
+                                   font_point * linespacing,
+                                   font_point * baseline);
+    decltype(fontFaceStrVector)().swap(fontFaceStrVector);
+  };
+  func(m_style.font_face, m_style.font_point, pTextFormat);
+  func(m_style.label_font_face, m_style.label_font_point, pLabelFormat);
+  func(m_style.comment_font_face, m_style.comment_font_point, pCommentFormat);
 }
 
 void D2D::InitDirectWriteResources() {
