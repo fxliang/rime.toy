@@ -4,12 +4,11 @@
 #include <map>
 #include <regex>
 #include <string>
+#include <utils.h>
 #include <vector>
 #include <wrl/client.h>
 
 using namespace weasel;
-
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 #define STYLEORWEIGHT (L":[^:]*[^a-f0-9:]+[^:]*")
 
@@ -61,8 +60,16 @@ void WeaselPanel::MoveTo(RECT rc) {
 }
 
 void WeaselPanel::Refresh() {
-  if (m_hWnd)
+  if (m_hWnd) {
+    if (m_ostyle != m_style) {
+      DEBUG << "style changed";
+      m_ostyle = m_style;
+      m_pD2D->m_style = m_style;
+      m_pD2D->InitDpiInfo();
+      m_pD2D->InitFontFormats();
+    }
     InvalidateRect(m_hWnd, NULL, TRUE); // 请求重绘
+  }
 }
 
 BOOL WeaselPanel::Create(HWND parent) {
@@ -79,6 +86,7 @@ BOOL WeaselPanel::Create(HWND parent) {
       GetModuleHandle(nullptr), this);
   if (m_hWnd) {
     m_pD2D.reset(new D2D(m_style, m_hWnd));
+    m_ostyle = m_style;
   }
   UpdateWindow(m_hWnd);
   return !!m_hWnd;
@@ -610,7 +618,7 @@ void D2D::InitDpiInfo() {
   HR(GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &x, &y));
   m_dpiX = static_cast<float>(x);
   m_dpiY = static_cast<float>(y);
-  if (m_dpiY) {
+  if (m_dpiY == 0) {
     m_dpiX = m_dpiY = 96.0;
     m_dpiScaleFontPoint = m_dpiY / 72.0f;
   }
