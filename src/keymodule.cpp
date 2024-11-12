@@ -298,9 +298,6 @@ void update_keystates(WPARAM wParam, LPARAM lParam) {
     } else if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP) {
       keyState[pKeyboard->vkCode] &= ~0x80; // 设置按键状态为松开
     }
-    keyState[VK_SHIFT] = (keyState[VK_LSHIFT] | keyState[VK_RSHIFT]);
-    keyState[VK_CONTROL] = (keyState[VK_LCONTROL] | keyState[VK_RCONTROL]);
-    keyState[VK_MENU] = (keyState[VK_LMENU] | keyState[VK_RMENU]);
   } else {
     if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
       keyState[pKeyboard->vkCode] |= 0x01; // 设置按键状态为按下
@@ -308,6 +305,20 @@ void update_keystates(WPARAM wParam, LPARAM lParam) {
       keyState[pKeyboard->vkCode] &= ~0x01; // 设置按键状态为松开
     }
   }
+  auto st = GetAsyncKeyState(VK_RWIN);
+  if (st & 0x8000)
+    keyState[VK_RWIN] |= 0x80;
+  else
+    keyState[VK_RWIN] &= ~0X80;
+  st = GetAsyncKeyState(VK_LWIN);
+  if (st & 0x8000)
+    keyState[VK_LWIN] |= 0x80;
+  else
+    keyState[VK_LWIN] &= ~0X80;
+
+  keyState[VK_SHIFT] = (keyState[VK_LSHIFT] | keyState[VK_RSHIFT]);
+  keyState[VK_CONTROL] = (keyState[VK_LCONTROL] | keyState[VK_RCONTROL]);
+  keyState[VK_MENU] = (keyState[VK_LMENU] | keyState[VK_RMENU]);
 }
 
 void send_input_to_window(HWND hwnd, const std::wstring &text) {
