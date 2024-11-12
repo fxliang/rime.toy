@@ -104,6 +104,8 @@ RimeWithToy::RimeWithToy(UI *ui, HINSTANCE hInstance) : m_ui(ui) {
   m_trayIcon->SetDeployFunc([&]() {
     DEBUG << L"Deploy Menu clicked";
     Initialize();
+    BOOL ascii = rime_api->get_option(m_session_id, "ascii_mode");
+    m_trayIcon->SetIcon(ascii ? m_ascii_icon : m_ime_icon);
   });
   m_trayIcon->SetSwichAsciiFunc([&]() { SwitchAsciiMode(); });
   m_trayIcon->SetIcon(m_ime_icon);
