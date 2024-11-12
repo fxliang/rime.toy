@@ -2,23 +2,12 @@
 #include <WeaselIPCData.h>
 #include <functional>
 #include <string>
+#include <utils.h>
 #include <windows.h>
 #include <wrl.h>
 
 namespace weasel {
 using namespace Microsoft::WRL;
-using wstring = std::wstring;
-using string = std::string;
-
-struct ComException {
-  HRESULT result;
-  ComException(HRESULT const value) : result(value) {}
-};
-inline void HR(HRESULT const result) {
-  if (S_OK != result) {
-    throw ComException(result);
-  }
-}
 
 class UIImpl;
 class UI {
