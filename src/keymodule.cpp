@@ -305,17 +305,17 @@ void update_keystates(WPARAM wParam, LPARAM lParam) {
       keyState[pKeyboard->vkCode] &= ~0x01; // 设置按键状态为松开
     }
   }
-  auto st = GetAsyncKeyState(VK_RWIN);
-  if (st & 0x8000)
-    keyState[VK_RWIN] |= 0x80;
-  else
-    keyState[VK_RWIN] &= ~0X80;
-  st = GetAsyncKeyState(VK_LWIN);
-  if (st & 0x8000)
-    keyState[VK_LWIN] |= 0x80;
-  else
-    keyState[VK_LWIN] &= ~0X80;
-
+  const auto update = [&](BYTE key) {
+    auto st = GetAsyncKeyState(key);
+    if (st & 0x8000)
+      keyState[key] |= 0x80;
+    else
+      keyState[key] &= ~0x80;
+  };
+  // avoid keyState[VK_LWIN] or keyState[VK_RWIN] not released after action that
+  // logout with win+l and re-login
+  update(VK_LWIN);
+  update(VK_RWIN);
   keyState[VK_SHIFT] = (keyState[VK_LSHIFT] | keyState[VK_RSHIFT]);
   keyState[VK_CONTROL] = (keyState[VK_LCONTROL] | keyState[VK_RCONTROL]);
   keyState[VK_MENU] = (keyState[VK_LMENU] | keyState[VK_RMENU]);
