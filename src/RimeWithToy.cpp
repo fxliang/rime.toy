@@ -1,4 +1,5 @@
 #include "RimeWithToy.h"
+#include "key_table.h"
 #include <filesystem>
 #include <map>
 
@@ -126,8 +127,10 @@ void RimeWithToy::SwitchAsciiMode() {
 }
 
 BOOL RimeWithToy::ProcessKeyEvent(KeyEvent keyEvent, wstring &commit_str) {
-  DEBUG << L"keyEvent.keycode = " << std::hex << keyEvent.keycode
-        << L", keyEvent.mask = " << std::hex << keyEvent.mask;
+  // DEBUG << L"keyEvent.keycode = " << std::hex << keyEvent.keycode
+  //       << L", keyEvent.mask = " << std::hex << keyEvent.mask;
+  auto reprstr = repr(keyEvent.keycode, expand_ibus_modifier(keyEvent.mask));
+  DEBUG << "RimeWithToy::ProcessKeyEvent " << reprstr;
   Bool handled = rime_api->process_key(m_session_id, keyEvent.keycode,
                                        expand_ibus_modifier(keyEvent.mask));
   RIME_STRUCT(RimeCommit, commit);
