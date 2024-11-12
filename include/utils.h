@@ -1,9 +1,29 @@
 ﻿#pragma once
 
 #include <memory>
+#include <regex>
 #include <sstream>
 #include <string>
+#include <vector>
 #include <windows.h>
+#include <wrl.h>
+
+namespace weasel {
+
+using namespace Microsoft::WRL;
+using wstring = std::wstring;
+using string = std::string;
+template <typename T> using vector = std::vector<T>;
+
+struct ComException {
+  HRESULT result;
+  ComException(HRESULT const value) : result(value) {}
+};
+inline void HR(HRESULT const result) {
+  if (S_OK != result) {
+    throw ComException(result);
+  }
+}
 
 // convert string to wstring, in code_page
 inline std::wstring string_to_wstring(const std::string &str,
@@ -67,3 +87,4 @@ private:
 };
 
 #define DEBUG (DebugStream() << __FILE__ << "@L" << __LINE__ << ": ")
+} // namespace weasel
