@@ -81,6 +81,11 @@ public:
     }
     return *this;
   }
+  DebugStream &operator<<(const string value) {
+    std::wstring wvalue(u8tow(value)); // utf-8
+    ss << wvalue;
+    return *this;
+  }
 
 private:
   std::wstringstream ss;
