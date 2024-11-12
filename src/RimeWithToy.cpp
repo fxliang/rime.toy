@@ -33,6 +33,12 @@ static fs::path data_path(string subdir) {
   return fs::path(_path).remove_filename().append(subdir);
 }
 
+static wstring GetLabelText(const wstring label, const wchar_t *format) {
+  wchar_t buffer[128];
+  swprintf_s<128>(buffer, format, label.c_str());
+  return std::wstring(buffer);
+}
+
 string RimeWithToy::m_message_type;
 string RimeWithToy::m_message_value;
 string RimeWithToy::m_message_label;
@@ -215,6 +221,7 @@ void RimeWithToy::GetCandidateInfo(CandidateInfo &cinfo, RimeContext &ctx) {
   cinfo.candies.resize(ctx.menu.num_candidates);
   cinfo.comments.resize(ctx.menu.num_candidates);
   cinfo.labels.resize(ctx.menu.num_candidates);
+  const wstring &label_text_format = m_ui->style().label_text_format;
   for (int i = 0; i < ctx.menu.num_candidates; ++i) {
     cinfo.candies[i].str = u8tow(ctx.menu.candidates[i].text);
     if (ctx.menu.candidates[i].comment) {
@@ -227,6 +234,8 @@ void RimeWithToy::GetCandidateInfo(CandidateInfo &cinfo, RimeContext &ctx) {
     } else {
       cinfo.labels[i].str = std::to_wstring((i + 1) % 10);
     }
+    cinfo.labels[i].str =
+        GetLabelText(cinfo.labels[i].str, label_text_format.c_str());
   }
   cinfo.highlighted = ctx.menu.highlighted_candidate_index;
   cinfo.currentPage = ctx.menu.page_no;
