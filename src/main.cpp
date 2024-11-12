@@ -103,14 +103,6 @@ skip:
   return CallNextHookEx(hHook, nCode, wParam, lParam);
 }
 
-void set_hook() {
-  hHook = SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
-  if (hHook == NULL) {
-    DEBUG << L"Failed to install hook!";
-    exit(1);
-  }
-}
-
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                     LPWSTR lpCmdLine, int nCmdShow) {
   wstring cmdLine(lpCmdLine), arg;
@@ -142,7 +134,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   trayIcon->SetIcon(ime_icon);
   trayIcon->Show();
   // --------------------------------------------------------------------------
-  set_hook();
+  hHook = SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
+  if (!hHook) {
+    DEBUG << L"Failed to install hook!";
+    exit(1);
+  }
   MSG msg;
   while (GetMessage(&msg, NULL, 0, 0)) {
     TranslateMessage(&msg);
