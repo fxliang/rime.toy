@@ -193,6 +193,7 @@ void WeaselPanel::ResizeVertical() {
         x += textSize.cx + m_padding;
         m_pD2D->GetTextSize(comment, comment.length(), m_pD2D->pCommentFormat,
                             &textSize);
+        h = MAX((LONG)h, textSize.cy);
       }
       cand_width = MAX(cand_width, x + textSize.cx);
       winSize.cy += h;
@@ -316,6 +317,7 @@ void WeaselPanel::DrawUIVertical() {
                             &textSize);
         xc = x;
         yc = y;
+        h = MAX((LONG)h, textSize.cy);
       } else {
         xc = xt + textSize.cx;
         yc = y;
