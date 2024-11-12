@@ -3,43 +3,23 @@
 #define _RIME_WITH_TOY
 
 #include "keymodule.h"
+#include "trayicon.h"
 #include <WeaselIPCData.h>
 #include <WeaselUI.h>
-#include <regex>
 #include <rime_api.h>
 #include <utils.h>
 
 namespace weasel {
 
-#define TRANSPARENT_COLOR 0x00000000
-#define ARGB2ABGR(value)                                                       \
-  ((value & 0xff000000) | ((value & 0x000000ff) << 16) |                       \
-   (value & 0x0000ff00) | ((value & 0x00ff0000) >> 16))
-#define RGBA2ABGR(value)                                                       \
-  (((value & 0xff) << 24) | ((value & 0xff000000) >> 24) |                     \
-   ((value & 0x00ff0000) >> 8) | ((value & 0x0000ff00) << 8))
-typedef enum { COLOR_ABGR = 0, COLOR_ARGB, COLOR_RGBA } ColorFormat;
-
-#ifdef USE_SHARP_COLOR_CODE
-#define HEX_REGEX std::regex("^(0x|#)[0-9a-f]+$", std::regex::icase)
-#define TRIMHEAD_REGEX std::regex("0x|#", std::regex::icase)
-#else
-#define HEX_REGEX std::regex("^0x[0-9a-f]+$", std::regex::icase)
-#define TRIMHEAD_REGEX std::regex("0x", std::regex::icase)
-#endif
-
 class RimeWithToy {
 public:
-  RimeWithToy(UI *ui);
+  RimeWithToy(UI *ui, HINSTANCE hInstance);
   void Initialize();
   void Finalize();
   BOOL ProcessKeyEvent(KeyEvent keyEvent, wstring &commit_str);
   void UpdateUI();
   void SwitchAsciiMode();
   RimeSessionId session_id() const { return m_session_id; }
-  void SetTrayIconCallBack(std::function<void(const Status &)> func) {
-    m_trayIconCallback = func;
-  }
 
 private:
   static void setup_rime();
@@ -57,6 +37,9 @@ private:
 
   std::function<void(const Status &)> m_trayIconCallback;
 
+  std::unique_ptr<TrayIcon> m_trayIcon;
+  HICON m_ime_icon;
+  HICON m_ascii_icon;
   RimeSessionId m_session_id;
   RimeApi *rime_api;
   UI *m_ui;

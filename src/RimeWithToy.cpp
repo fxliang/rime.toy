@@ -2,7 +2,25 @@
 #include "key_table.h"
 #include <filesystem>
 #include <map>
+#include <regex>
+#include <resource.h>
 
+#define TRANSPARENT_COLOR 0x00000000
+#define ARGB2ABGR(value)                                                       \
+  ((value & 0xff000000) | ((value & 0x000000ff) << 16) |                       \
+   (value & 0x0000ff00) | ((value & 0x00ff0000) >> 16))
+#define RGBA2ABGR(value)                                                       \
+  (((value & 0xff) << 24) | ((value & 0xff000000) >> 24) |                     \
+   ((value & 0x00ff0000) >> 8) | ((value & 0x0000ff00) << 8))
+typedef enum { COLOR_ABGR = 0, COLOR_ARGB, COLOR_RGBA } ColorFormat;
+
+#ifdef USE_SHARP_COLOR_CODE
+#define HEX_REGEX std::regex("^(0x|#)[0-9a-f]+$", std::regex::icase)
+#define TRIMHEAD_REGEX std::regex("0x|#", std::regex::icase)
+#else
+#define HEX_REGEX std::regex("^0x[0-9a-f]+$", std::regex::icase)
+#define TRIMHEAD_REGEX std::regex("0x", std::regex::icase)
+#endif
 namespace fs = std::filesystem;
 
 int expand_ibus_modifier(int m) { return (m & 0xff) | ((m & 0xff00) << 16); }
@@ -71,25 +89,23 @@ void RimeWithToy::on_message(void *context_object, RimeSessionId session_id,
   }
 }
 
-#if 0
-fs::path RimeWithToy::data_path(string subdir) {
-  wchar_t _path[MAX_PATH] = {0};
-  GetModuleFileNameW(NULL, _path, _countof(_path));
-  return fs::path(_path).remove_filename().append(subdir);
+RimeWithToy::RimeWithToy(UI *ui, HINSTANCE hInstance) : m_ui(ui) {
+  Initialize();
+  m_ime_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
+  m_ascii_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_ASCII));
+  const auto tooltip = L"rime.toy\n左键点击切换ASCII\n右键菜单可退出^_^";
+  m_trayIcon = std::make_unique<TrayIcon>(hInstance, tooltip);
+  m_trayIcon->SetDeployFunc([&]() {
+    DEBUG << L"Deploy Menu clicked";
+    Initialize();
+  });
+  m_trayIcon->SetSwichAsciiFunc([&]() { SwitchAsciiMode(); });
+  m_trayIcon->SetIcon(m_ime_icon);
+  m_trayIcon->Show();
+  m_trayIconCallback = [&](const Status &sta) {
+    m_trayIcon->SetIcon(sta.ascii_mode ? m_ascii_icon : m_ime_icon);
+  };
 }
-
-fs::path RimeWithToy::get_log_path() {
-  WCHAR _path[MAX_PATH] = {0};
-  ExpandEnvironmentStringsW(L"%TEMP%\\rime.toy", _path, _countof(_path));
-  fs::path path = fs::path(_path);
-  if (!fs::exists(path)) {
-    fs::create_directories(path);
-  }
-  return path;
-}
-#endif
-
-RimeWithToy::RimeWithToy(UI *ui) : m_ui(ui) { Initialize(); }
 
 void RimeWithToy::Initialize() {
   DEBUG << L"RimeWithToy::Initialize() called";

@@ -2,11 +2,9 @@
 // Distrobuted under GPLv3 https://www.gnu.org/licenses/gpl-3.0.en.html
 #include "RimeWithToy.h"
 #include "keymodule.h"
-#include "trayicon.h"
 #include <ShellScalingApi.h>
 #include <WeaselIPCData.h>
 #include <WeaselUI.h>
-#include <resource.h>
 #include <sstream>
 
 using namespace std;
@@ -88,6 +86,8 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
         commit_str.clear();
         if (!status.composing)
           m_ui->Hide();
+        else
+          m_toy->UpdateUI();
         committed = true;
       } else
         committed = false;
@@ -113,26 +113,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
       horizontal = true;
   }
   SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
-  HICON ime_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
-  HICON ascii_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_ASCII));
-  std::unique_ptr<TrayIcon> trayIcon;
   m_ui = std::make_unique<UI>();
-  m_toy = std::make_unique<RimeWithToy>(m_ui.get());
-  m_toy->SetTrayIconCallBack([&](const Status &sta) {
-    trayIcon->SetIcon(sta.ascii_mode ? ascii_icon : ime_icon);
-  });
+  m_toy = std::make_unique<RimeWithToy>(m_ui.get(), hInstance);
   m_ui->SetHorizontal(horizontal);
   m_ui->Create(nullptr);
-  // --------------------------------------------------------------------------
-  auto tooltip = L"rime.toy\n左键点击切换ASCII\n右键菜单可退出^_^";
-  trayIcon = std::make_unique<TrayIcon>(hInstance, tooltip);
-  trayIcon->SetDeployFunc([&]() {
-    DEBUG << L"Deploy Menu clicked";
-    m_toy->Initialize();
-  });
-  trayIcon->SetSwichAsciiFunc([&]() { m_toy->SwitchAsciiMode(); });
-  trayIcon->SetIcon(ime_icon);
-  trayIcon->Show();
   // --------------------------------------------------------------------------
   hHook = SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
   if (!hHook) {
