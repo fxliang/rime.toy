@@ -11,8 +11,8 @@
 using namespace weasel;
 
 WeaselPanel::WeaselPanel(UI &ui)
-    : m_hWnd(nullptr), m_horizontal(ui.horizontal()), m_ctx(ui.ctx()),
-      m_status(ui.status()), m_style(ui.style()), m_ostyle(ui.ostyle()) {
+    : m_hWnd(nullptr), m_ctx(ui.ctx()), m_status(ui.status()),
+      m_style(ui.style()), m_ostyle(ui.ostyle()) {
   Create(nullptr);
 }
 
@@ -137,7 +137,7 @@ void WeaselPanel::Render() {
   FillRoundRect({0, 0, m_winSize.cx, m_winSize.cy},
                 (float)m_style.round_corner_ex, m_style.border,
                 m_style.back_color, m_style.border_color);
-  if (m_horizontal) {
+  if (m_style.layout_type == UIStyle::LAYOUT_HORIZONTAL) {
     DrawHorizontal();
   } else {
     DrawUIVertical();
@@ -355,7 +355,7 @@ void WeaselPanel::DrawUIVertical() {
 }
 
 void WeaselPanel::OnPaint() {
-  if (m_horizontal) {
+  if (m_style.layout_type == UIStyle::LAYOUT_HORIZONTAL) {
     ResizeHorizontal();
   } else {
     ResizeVertical();
