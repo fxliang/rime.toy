@@ -5,6 +5,7 @@ lib/*.pdb
 lib64/*.dll
 lib64/*.lib
 lib64/*.pdb
+log/*
 *.exe
 *.dll
 compile_commands.json
