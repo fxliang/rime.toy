@@ -5,7 +5,6 @@
 #include <ShellScalingApi.h>
 #include <WeaselIPCData.h>
 #include <WeaselUI.h>
-#include <sstream>
 
 using namespace std;
 using namespace weasel;
@@ -87,17 +86,9 @@ skip:
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                     LPWSTR lpCmdLine, int nCmdShow) {
-  wstring cmdLine(lpCmdLine), arg;
-  wistringstream wiss(cmdLine);
-  bool horizontal = false;
-  while (wiss >> arg) {
-    if (arg == L"/h")
-      horizontal = true;
-  }
   SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
   m_ui = std::make_unique<UI>();
   m_toy = std::make_unique<RimeWithToy>(m_ui.get(), hInstance);
-  m_ui->SetHorizontal(horizontal);
   m_ui->Create(nullptr);
   // --------------------------------------------------------------------------
   hHook = SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);

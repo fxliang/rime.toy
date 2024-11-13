@@ -116,12 +116,6 @@ void UI::Destroy(bool full) {
     }
   }
 }
-void UI::SetText(const wstring &text) {
-  ctx_.clear();
-  ctx_.aux.str = text;
-  Refresh();
-}
-void UI::SetHorizontal(bool hor) { m_horizontal = hor; }
 bool UI::Create(HWND parent) {
   if (pimpl_) {
     return pimpl_->panel.Create(parent);
