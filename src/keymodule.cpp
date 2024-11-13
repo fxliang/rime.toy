@@ -1,7 +1,7 @@
 #include "keymodule.h"
 namespace weasel {
 
-static BYTE keyState[256] = {0};
+BYTE keyState[256] = {0};
 // ----------------------------------------------------------------------------
 ibus::Keycode TranslateKeycode(UINT vkey, KeyInfo kinfo) {
   switch (vkey) {
