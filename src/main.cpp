@@ -13,11 +13,23 @@ using namespace weasel;
 HHOOK hHook = NULL;
 std::unique_ptr<UI> m_ui;
 std::unique_ptr<RimeWithToy> m_toy;
+
+void update_position(HWND hwnd) {
+  POINT pt;
+  if (GetCursorPos(&pt)) {
+    m_ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
+  } else {
+    RECT rect;
+    if (hwnd)
+      GetWindowRect(hwnd, &rect);
+    pt.x = rect.left + (rect.right - rect.left) / 2 - 150;
+    pt.y = rect.bottom - (rect.bottom - rect.top) / 2 - 100;
+    m_ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
+  }
+};
+
 // ----------------------------------------------------------------------------
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
-  static KeyEvent prevKeyEvent;
-  static BOOL prevfEaten = FALSE;
-  static int keyCountToSimulate = 0;
   static HWND hwnd_previous = nullptr;
   static Status status;
   static bool committed = true;
@@ -39,61 +51,31 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     KeyEvent ke;
     if (ConvertKeyEvent(pKeyboard, ki, ke)) {
       bool eat = false;
-      if (!keyCountToSimulate)
-        eat = m_toy->ProcessKeyEvent(ke, commit_str);
-      // make capslock bindable for rime
-      if (ke.keycode == ibus::Caps_Lock) {
-        if (prevKeyEvent.keycode == ibus::Caps_Lock && prevfEaten == TRUE &&
-            (ke.mask & ibus::RELEASE_MASK) && (!keyCountToSimulate)) {
-          if (GetKeyState(VK_CAPITAL) & 0x01) {
-            if (committed || (!eat && status.composing)) {
-              keyCountToSimulate = 2;
-              INPUT inputs[2];
-              inputs[0].type = INPUT_KEYBOARD;
-              inputs[0].ki = {VK_CAPITAL, 0, 0, 0, 0};
-              inputs[1].type = INPUT_KEYBOARD;
-              inputs[1].ki = {VK_CAPITAL, 0, KEYEVENTF_KEYUP, 0, 0};
-              ::SendInput(sizeof(inputs) / sizeof(INPUT), inputs,
-                          sizeof(INPUT));
-            }
-          }
-          eat = TRUE;
-        }
-        if (keyCountToSimulate)
-          keyCountToSimulate--;
-      }
-      // make capslock bindable for rime ends
-      prevfEaten = eat;
-      prevKeyEvent = ke;
+      eat = m_toy->ProcessKeyEvent(ke, commit_str);
 
       m_toy->UpdateUI();
       status = m_ui->status();
-
-      // update position
-      POINT pt;
-      if (GetCursorPos(&pt)) {
-        m_ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
-      } else {
-        RECT rect;
-        if (hwnd)
-          GetWindowRect(hwnd, &rect);
-        pt.x = rect.left + (rect.right - rect.left) / 2 - 150;
-        pt.y = rect.bottom - (rect.bottom - rect.top) / 2 - 100;
-        m_ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
-      }
+      update_position(hwnd);
+      committed = !commit_str.empty();
       if (!commit_str.empty()) {
         send_input_to_window(hwnd, commit_str);
         commit_str.clear();
         if (!status.composing)
           m_ui->Hide();
-        else
+        else {
           m_toy->UpdateUI();
-        committed = true;
-      } else
-        committed = false;
-      if ((ke.keycode == ibus::Caps_Lock && keyCountToSimulate) ||
-          status.ascii_mode) {
-        goto skip;
+          update_position(hwnd);
+        }
+      }
+
+      if (ke.keycode == ibus::Caps_Lock && eat) {
+        if (keyState[VK_CAPITAL] & 0x01) {
+          keyState[VK_CAPITAL] = 0;
+          SetKeyboardState(keyState);
+          if (committed || status.composing)
+            return 1;
+          goto skip;
+        }
       }
       if (eat)
         return 1;
