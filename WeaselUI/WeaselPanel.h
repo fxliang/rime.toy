@@ -44,7 +44,6 @@ private:
   UIStyle &m_style;
   UIStyle &m_ostyle;
   UINT m_padding = 10;
-  BOOL &m_horizontal;
   // ------------------------------------------------------------
   std::shared_ptr<D2D> m_pD2D;
 };
