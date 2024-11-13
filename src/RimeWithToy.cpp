@@ -205,7 +205,7 @@ BOOL RimeWithToy::ShowMessage(Context &ctx, Status &status) {
   } else if (m_message_type == "option") {
     if (!m_message_label.empty())
       tips = string_to_wstring(m_message_label, CP_UTF8);
-    if (m_message_value == "!ascii_mode") {
+    else if (m_message_value == "!ascii_mode") {
       tips = L"中文";
     } else if (m_message_value == "ascii_mode") {
       tips = L"英文";
