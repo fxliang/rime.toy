@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include <chrono>
+#include <iomanip>
 #include <memory>
 #include <regex>
 #include <sstream>
@@ -90,6 +92,25 @@ public:
 private:
   std::wstringstream ss;
 };
-
-#define DEBUG (DebugStream() << __FILE__ << "@L" << __LINE__ << ": ")
+inline std::string current_time() {
+  using namespace std::chrono;
+  // 获取当前时间
+  auto now = system_clock::now();
+  // 转换为系统时间（time_point）
+  auto time_point = system_clock::to_time_t(now);
+  // 获取时间戳的纳秒部分，先转换为微秒
+  auto ns = duration_cast<microseconds>(now.time_since_epoch()); // 转换为微秒
+  // 转换为本地时间
+  std::tm tm = *std::localtime(&time_point);
+  // 构造时间字符串
+  std::ostringstream oss;
+  oss << std::put_time(&tm,
+                       "%Y%m%d %H:%M:%S"); // 日期时间格式：20241113 08:54:34
+  oss << "." << std::setw(6) << std::setfill('0')
+      << ns.count() % 1000000; // 微秒部分
+  return oss.str();
+}
+#define DEBUG                                                                  \
+  (DebugStream() << "[" << current_time() << " " << __FILE__ << ":"            \
+                 << __LINE__ << "] ")
 } // namespace weasel
