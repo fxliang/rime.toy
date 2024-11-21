@@ -80,7 +80,7 @@ BOOL WeaselPanel::Create(HWND parent) {
   m_hWnd = CreateWindowEx(
       WS_EX_NOACTIVATE | WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOPMOST,
       L"PopupWindowClass", L"PopupWindowPanel", WS_POPUP | WS_VISIBLE,
-      CW_USEDEFAULT, CW_USEDEFAULT, 1920, 1920, parent, nullptr,
+      CW_USEDEFAULT, CW_USEDEFAULT, 10, 10, parent, nullptr,
       GetModuleHandle(nullptr), this);
   if (m_hWnd) {
     m_pD2D.reset(new D2D(m_style, m_hWnd));
@@ -206,6 +206,7 @@ void WeaselPanel::ResizeVertical() {
 
   SetWindowPos(m_hWnd, HWND_TOPMOST, 0, 0, m_winSize.cx, m_winSize.cy,
                SWP_NOMOVE | SWP_NOACTIVATE);
+  m_pD2D->OnResize(m_winSize.cx, m_winSize.cy);
   D2D1_SIZE_U oPixelSize = {(UINT32)m_winSize.cx, (UINT32)m_winSize.cy};
 }
 void WeaselPanel::ResizeHorizontal() {
@@ -244,6 +245,7 @@ void WeaselPanel::ResizeHorizontal() {
 
   SetWindowPos(m_hWnd, HWND_TOPMOST, 0, 0, m_winSize.cx, m_winSize.cy,
                SWP_NOMOVE | SWP_NOACTIVATE);
+  m_pD2D->OnResize(m_winSize.cx, m_winSize.cy);
   D2D1_SIZE_U oPixelSize = {(UINT32)m_winSize.cx, (UINT32)m_winSize.cy};
 }
 void WeaselPanel::DrawHorizontal() {

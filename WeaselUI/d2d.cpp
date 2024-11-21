@@ -88,6 +88,38 @@ void D2D::InitDirect2D() {
   HR(dc->CreateSolidColorBrush(brushColor, brush.ReleaseAndGetAddressOf()));
 }
 
+void D2D::OnResize(UINT width, UINT height) {
+  // Release Direct2D resources
+  dc->SetTarget(nullptr);
+  bitmap.Reset();
+  surface.Reset();
+  // Resize the swap chain
+  HR(swapChain->ResizeBuffers(2, // Buffer count
+                              width, height,
+                              DXGI_FORMAT_B8G8R8A8_UNORM, // New format
+                              0                           // Swap chain flags
+                              ));
+  // Retrieve the new swap chain's back buffer
+  HR(swapChain->GetBuffer(
+      0, // index
+      __uuidof(surface.Get()),
+      reinterpret_cast<void **>(surface.ReleaseAndGetAddressOf())));
+  // Create a new Direct2D bitmap pointing to the new swap chain surface
+  D2D1_BITMAP_PROPERTIES1 properties = {};
+  properties.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
+  properties.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+  properties.bitmapOptions =
+      D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW;
+  HR(dc->CreateBitmapFromDxgiSurface(surface.Get(), properties,
+                                     bitmap.ReleaseAndGetAddressOf()));
+  // Point the device context to the new bitmap for rendering
+  dc->SetTarget(bitmap.Get());
+  // Update DirectComposition target and visual
+  HR(visual->SetContent(swapChain.Get()));
+  HR(target->SetRoot(visual.Get()));
+  HR(dcompDevice->Commit());
+}
+
 std::vector<std::wstring> ws_split(const std::wstring &in,
                                    const std::wstring &delim) {
   std::wregex re{delim};

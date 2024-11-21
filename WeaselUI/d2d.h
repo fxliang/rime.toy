@@ -22,6 +22,7 @@ struct D2D {
   void InitDirectWriteResources();
   void InitDpiInfo();
   void InitFontFormats();
+  void OnResize(UINT width, UINT height);
   void GetTextSize(const wstring &text, size_t nCount,
                    ComPtr<IDWriteTextFormat1> pTextFormat, LPSIZE lpSize);
   void _SetFontFallback(ComPtr<IDWriteTextFormat1> textFormat,
