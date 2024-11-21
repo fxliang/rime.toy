@@ -22,6 +22,12 @@ void WeaselPanel::ShowWindow(int nCmdShow) { ::ShowWindow(m_hWnd, nCmdShow); }
 
 void WeaselPanel::DestroyWindow() { ::DestroyWindow(m_hWnd); }
 
+const GUID CLSID_D2D1GaussianBlur = {
+    0x1feb6d69,
+    0x2fe6,
+    0x4ac9,
+    {0x8c, 0x58, 0x1d, 0x7f, 0x93, 0xe7, 0xa6, 0xa5}};
+
 void WeaselPanel::MoveTo(RECT rc) {
   if (m_hWnd) {
     m_inputPos = rc;
@@ -80,7 +86,7 @@ BOOL WeaselPanel::Create(HWND parent) {
   m_hWnd = CreateWindowEx(
       WS_EX_NOACTIVATE | WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOPMOST,
       L"PopupWindowClass", L"PopupWindowPanel", WS_POPUP | WS_VISIBLE,
-      CW_USEDEFAULT, CW_USEDEFAULT, 10, 10, parent, nullptr,
+      CW_USEDEFAULT, CW_USEDEFAULT, 1920, 1920, parent, nullptr,
       GetModuleHandle(nullptr), this);
   if (m_hWnd) {
     m_pD2D.reset(new D2D(m_style, m_hWnd));
@@ -90,37 +96,20 @@ BOOL WeaselPanel::Create(HWND parent) {
   return !!m_hWnd;
 }
 
-void WeaselPanel::FillRoundRect(const RECT &rect, float radius, uint32_t border,
-                                uint32_t color, uint32_t border_color) {
-  float a = ((color >> 24) & 0xFF) / 255.0f;
-  float b = ((color >> 16) & 0xFF) / 255.0f;
-  float g = ((color >> 8) & 0xFF) / 255.0f;
-  float r = (color & 0xFF) / 255.0f;
-  // Define a rounded rectangle
-  ComPtr<ID2D1RoundedRectangleGeometry> roundedRectGeometry;
-  D2D1_ROUNDED_RECT roundedRect = D2D1::RoundedRect(
+D2D1_ROUNDED_RECT RoundedRectFromRect(const RECT &rect, uint32_t radius) {
+  return D2D1::RoundedRect(
       D2D1::RectF(static_cast<float>(rect.left), static_cast<float>(rect.top),
                   static_cast<float>(rect.right),
                   static_cast<float>(rect.bottom)),
       radius, // radiusX
       radius  // radiusY
   );
-  HR(m_pD2D->d2Factory->CreateRoundedRectangleGeometry(roundedRect,
-                                                       &roundedRectGeometry));
-  ComPtr<ID2D1SolidColorBrush> brush;
-  HR(m_pD2D->dc->CreateSolidColorBrush(D2D1::ColorF(r, g, b, a), &brush));
-  m_pD2D->dc->FillGeometry(roundedRectGeometry.Get(), brush.Get());
-  float hb = (float)border / 2;
-  D2D1_ROUNDED_RECT borderRect =
-      D2D1::RoundedRect(D2D1::RectF(static_cast<float>(rect.left) + hb,
-                                    static_cast<float>(rect.top) + hb,
-                                    static_cast<float>(rect.right) - hb,
-                                    static_cast<float>(rect.bottom) - hb),
-                        radius - hb, // radiusX
-                        radius - hb  // radiusY
-      );
-  brush->SetColor(D2d1ColorFromColorRef(border_color));
-  m_pD2D->dc->DrawRoundedRectangle(&borderRect, brush.Get(), m_style.border);
+}
+RECT OffsetRect(RECT rc, int x, int y) {
+  return RECT{rc.left + x, rc.top + y, rc.right + x, rc.bottom + y};
+}
+RECT InfalteRect(RECT rc, int x, int y) {
+  return RECT{rc.left - x, rc.top - y, rc.right + x, rc.bottom + y};
 }
 
 D2D1::ColorF WeaselPanel::D2d1ColorFromColorRef(uint32_t color) {
@@ -134,9 +123,12 @@ D2D1::ColorF WeaselPanel::D2d1ColorFromColorRef(uint32_t color) {
 void WeaselPanel::Render() {
   m_pD2D->dc->BeginDraw();
   m_pD2D->dc->Clear(D2D1::ColorF({0.0f, 0.0f, 0.0f, 0.0f}));
-  FillRoundRect({0, 0, m_winSize.cx, m_winSize.cy},
-                (float)m_style.round_corner_ex, m_style.border,
-                m_style.back_color, m_style.border_color);
+  // FillRoundRect({0, 0, m_winSize.cx, m_winSize.cy},
+  //               (float)m_style.round_corner_ex, m_style.border,
+  //               m_style.back_color, m_style.border_color);
+  RECT rc = {0, 0, m_winSize.cx, m_winSize.cy};
+  HighlightRect(rc, m_style.round_corner_ex, m_style.border, m_style.back_color,
+                0, m_style.border_color);
   if (m_style.layout_type == UIStyle::LAYOUT_HORIZONTAL) {
     DrawHorizontal();
   } else {
@@ -206,9 +198,64 @@ void WeaselPanel::ResizeVertical() {
 
   SetWindowPos(m_hWnd, HWND_TOPMOST, 0, 0, m_winSize.cx, m_winSize.cy,
                SWP_NOMOVE | SWP_NOACTIVATE);
-  m_pD2D->OnResize(m_winSize.cx, m_winSize.cy);
   D2D1_SIZE_U oPixelSize = {(UINT32)m_winSize.cx, (UINT32)m_winSize.cy};
 }
+
+void WeaselPanel::HighlightRect(const RECT &rect, float radius, uint32_t border,
+                                uint32_t back_color, uint32_t shadow_color,
+                                uint32_t border_color) {
+  // draw shadow
+  if ((shadow_color & 0xff000000) && m_style.shadow_radius) {
+    auto rc =
+        OffsetRect(rect, m_style.shadow_offset_x, m_style.shadow_offset_y);
+    // Define a rounded rectangle
+    ComPtr<ID2D1RoundedRectangleGeometry> roundedRectGeometry;
+    D2D1_ROUNDED_RECT roundedRect = RoundedRectFromRect(rc, radius);
+    HR(m_pD2D->d2Factory->CreateRoundedRectangleGeometry(roundedRect,
+                                                         &roundedRectGeometry));
+    // Create a compatible render target
+    ComPtr<ID2D1BitmapRenderTarget> bitmapRenderTarget;
+    HR(m_pD2D->dc->CreateCompatibleRenderTarget(&bitmapRenderTarget));
+
+    // Draw the rounded rectangle onto the bitmap render target
+    m_pD2D->brush->SetColor(D2d1ColorFromColorRef(shadow_color));
+    bitmapRenderTarget->BeginDraw();
+    bitmapRenderTarget->FillGeometry(roundedRectGeometry.Get(),
+                                     m_pD2D->brush.Get());
+    bitmapRenderTarget->EndDraw();
+    // Get the bitmap from the bitmap render target
+    ComPtr<ID2D1Bitmap> bitmap;
+    HR(bitmapRenderTarget->GetBitmap(&bitmap));
+    //// Create a Gaussian blur effect
+    ComPtr<ID2D1Effect> blurEffect;
+    HR(m_pD2D->dc->CreateEffect(CLSID_D2D1GaussianBlur, &blurEffect));
+    blurEffect->SetInput(0, bitmap.Get());
+    blurEffect->SetValue(
+        D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION,
+        (float)m_style.shadow_radius); // Adjust blur radius as needed
+    // Draw the blurred rounded rectangle onto the main render target
+    m_pD2D->dc->DrawImage(blurEffect.Get());
+  }
+  // draw back color
+  if (back_color & 0xff000000) {
+    // Define a rounded rectangle
+    ComPtr<ID2D1RoundedRectangleGeometry> roundedRectGeometry;
+    D2D1_ROUNDED_RECT roundedRect = RoundedRectFromRect(rect, radius);
+    HR(m_pD2D->d2Factory->CreateRoundedRectangleGeometry(roundedRect,
+                                                         &roundedRectGeometry));
+    m_pD2D->brush->SetColor(D2d1ColorFromColorRef(back_color));
+    m_pD2D->dc->FillGeometry(roundedRectGeometry.Get(), m_pD2D->brush.Get());
+  }
+  // draw border
+  if ((border_color & 0xff000000) && border) {
+    float hb = -(float)border / 2;
+    D2D1_ROUNDED_RECT borderRect =
+        RoundedRectFromRect(InfalteRect(rect, hb, hb), radius + hb);
+    m_pD2D->brush->SetColor(D2d1ColorFromColorRef(border_color));
+    m_pD2D->dc->DrawRoundedRectangle(&borderRect, m_pD2D->brush.Get(), border);
+  }
+}
+
 void WeaselPanel::ResizeHorizontal() {
   SIZE textSize{0, 0};
   SIZE winSize{0, 0};
@@ -245,7 +292,6 @@ void WeaselPanel::ResizeHorizontal() {
 
   SetWindowPos(m_hWnd, HWND_TOPMOST, 0, 0, m_winSize.cx, m_winSize.cy,
                SWP_NOMOVE | SWP_NOACTIVATE);
-  m_pD2D->OnResize(m_winSize.cx, m_winSize.cy);
   D2D1_SIZE_U oPixelSize = {(UINT32)m_winSize.cx, (UINT32)m_winSize.cy};
 }
 void WeaselPanel::DrawHorizontal() {
@@ -329,10 +375,12 @@ void WeaselPanel::DrawUIVertical() {
       RECT rc = {xl, yl, xl + (LONG)cand_width, yl + (LONG)h};
       auto color = hilited ? m_style.hilited_candidate_back_color
                            : m_style.candidate_back_color;
+      auto shadow_color = hilited ? m_style.hilited_candidate_shadow_color
+                                  : m_style.candidate_shadow_color;
       auto border_color = hilited ? m_style.hilited_candidate_border_color
                                   : m_style.candidate_border_color;
-      FillRoundRect(rc, m_style.round_corner, m_style.border, color,
-                    border_color);
+      HighlightRect(rc, m_style.round_corner, m_style.border, color,
+                    shadow_color, border_color);
 
       color =
           hilited ? m_style.hilited_label_text_color : m_style.label_text_color;
