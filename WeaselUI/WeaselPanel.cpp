@@ -86,7 +86,7 @@ BOOL WeaselPanel::Create(HWND parent) {
   m_hWnd = CreateWindowEx(
       WS_EX_NOACTIVATE | WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOPMOST,
       L"PopupWindowClass", L"PopupWindowPanel", WS_POPUP | WS_VISIBLE,
-      CW_USEDEFAULT, CW_USEDEFAULT, 1920, 1920, parent, nullptr,
+      CW_USEDEFAULT, CW_USEDEFAULT, 10, 10, parent, nullptr,
       GetModuleHandle(nullptr), this);
   if (m_hWnd) {
     m_pD2D.reset(new D2D(m_style, m_hWnd));
@@ -410,6 +410,7 @@ void WeaselPanel::OnPaint() {
   } else {
     ResizeVertical();
   }
+  m_pD2D->OnResize(m_winSize.cx, m_winSize.cy);
   Render();
 }
 

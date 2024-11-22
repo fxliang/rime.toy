@@ -307,17 +307,14 @@ void D2D::_SetFontFallback(ComPtr<IDWriteTextFormat1> textFormat,
       firstWstr = L"0";
       lastWstr = L"10ffff";
     }
-    UINT first = 0, last = 0x10ffff;
-    try {
-      first = std::stoi(firstWstr.c_str(), 0, 16);
-    } catch (...) {
-      first = 0;
-    }
-    try {
-      last = std::stoi(lastWstr.c_str(), 0, 16);
-    } catch (...) {
-      last = 0x10ffff;
-    }
+    const auto func = [](wstring wstr, UINT fallback) -> UINT {
+      try {
+        return std::stoul(wstr.c_str(), 0, 16);
+      } catch (...) {
+        return fallback;
+      }
+    };
+    UINT first = func(firstWstr, 0), last = func(lastWstr, 0x10ffff);
     DWRITE_UNICODE_RANGE range = {first, last};
     const WCHAR *familys = {_fontFaceWstr.c_str()};
     HR(pFontFallbackBuilder->AddMapping(&range, 1, &familys, 1));
