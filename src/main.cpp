@@ -87,6 +87,7 @@ skip:
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                     LPWSTR lpCmdLine, int nCmdShow) {
   SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
+  HR(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED));
   m_ui = std::make_unique<UI>();
   m_toy = std::make_unique<RimeWithToy>(m_ui.get(), hInstance);
   m_ui->Create(nullptr);
@@ -103,5 +104,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   }
   m_toy->Finalize();
   UnhookWindowsHookEx(hHook);
+  CoUninitialize();
   return 0;
 }
