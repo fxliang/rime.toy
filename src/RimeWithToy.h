@@ -27,7 +27,7 @@ private:
                          const char *message_type, const char *message_value);
   void GetStatus(Status &stat);
   void GetCandidateInfo(CandidateInfo &cinfo, RimeContext &ctx);
-  void GetContext(Context &context);
+  void GetContext(Context &context, const Status &status);
   BOOL ShowMessage(Context &ctx, Status &status);
 
   static std::string m_message_type;

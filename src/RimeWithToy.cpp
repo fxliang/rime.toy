@@ -174,7 +174,7 @@ void RimeWithToy::UpdateUI() {
   Status &status = m_ui->status();
   Context ctx;
   GetStatus(status);
-  GetContext(ctx);
+  GetContext(ctx, status);
   if (status.composing) {
     m_ui->Update(ctx, status);
     m_ui->Show();
@@ -257,18 +257,44 @@ void RimeWithToy::GetStatus(Status &status) {
   }
 }
 
-void RimeWithToy::GetContext(Context &context) {
+void RimeWithToy::GetContext(Context &context, const Status &status) {
   RIME_STRUCT(RimeContext, ctx);
   if (rime_api->get_context(m_session_id, &ctx)) {
-    if (ctx.composition.length > 0) {
-      context.preedit.str = u8tow(ctx.composition.preedit);
-      if (ctx.composition.sel_start < ctx.composition.sel_end) {
-        TextAttribute attr;
-        attr.type = HIGHLIGHTED;
-        attr.range.start = ctx.composition.sel_start;
-        attr.range.end = ctx.composition.sel_end;
-        attr.range.cursor = ctx.composition.cursor_pos;
-        context.preedit.attributes.push_back(attr);
+    if (status.composing) {
+      switch (m_ui->style().preedit_type) {
+      case UIStyle::PreeditType::PREVIEW: {
+        if (ctx.commit_text_preview) {
+          string text = ctx.commit_text_preview;
+          context.preedit.str = u8tow(text);
+          TextAttribute attr;
+          attr.range.start = 0;
+          attr.range.end = utf8towcslen(text.c_str(), (int)text.size());
+          attr.range.cursor = utf8towcslen(text.c_str(), (int)text.size());
+          context.preedit.attributes.push_back(attr);
+        }
+        break;
+      }
+      case UIStyle::PreeditType::COMPOSITION: {
+        auto text = string(ctx.composition.preedit);
+        context.preedit.str = u8tow(text);
+        if (ctx.composition.sel_start <= ctx.composition.sel_end) {
+          TextAttribute attr;
+          auto start =
+              utf8towcslen(ctx.composition.preedit, ctx.composition.sel_start);
+          auto end =
+              utf8towcslen(ctx.composition.preedit, ctx.composition.sel_end);
+          auto cursor =
+              utf8towcslen(ctx.composition.preedit, ctx.composition.cursor_pos);
+          attr.range.start = start;
+          attr.range.end = end;
+          attr.range.cursor = cursor;
+          attr.type = HIGHLIGHTED;
+          context.preedit.attributes.push_back(attr);
+        }
+        break;
+      }
+      default:
+        break;
       }
     }
     if (ctx.menu.num_candidates) {

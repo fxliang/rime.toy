@@ -9,6 +9,13 @@
 namespace weasel {
 using namespace Microsoft::WRL;
 
+template <typename T> using an = std::shared_ptr<T>;
+template <typename T> using the = std::unique_ptr<T>;
+
+enum ClientCapabilities {
+  INLINE_PREEDIT_CAPABLE = 1,
+};
+
 class UIImpl;
 class UI {
 public:

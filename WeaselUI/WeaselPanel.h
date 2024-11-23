@@ -1,5 +1,6 @@
 #include <WeaselUI.h>
 
+#include "Layout.h"
 #include "d2d.h"
 #include <utils.h>
 
@@ -20,19 +21,20 @@ public:
   HWND m_hWnd;
 
 private:
+  void _CreateLayout();
+  bool _DrawPreedit(const Text &text, CRect &rc);
+  bool _DrawCandidates(bool back);
+  void _ResizeWindow();
+  void _TextOut(CRect &rc, const wstring &text, size_t cch, uint32_t color,
+                ComPtr<IDWriteTextFormat1> &pTextFormat);
   void HighlightRect(const RECT &rect, float radius, uint32_t border,
                      uint32_t back_color, uint32_t shadow_color,
                      uint32_t border_color);
 
   D2D1::ColorF D2d1ColorFromColorRef(uint32_t color);
   void Render();
-  void DrawTextAt(const wstring &text, size_t x, size_t y,
-                  ComPtr<IDWriteTextFormat1> &pTextFormat);
-  void ResizeVertical();
-  void ResizeHorizontal();
-  void DrawHorizontal();
-  void DrawUIVertical();
   void OnPaint();
+
   static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
                                      LPARAM lParam);
 
@@ -42,11 +44,16 @@ private:
   float m_dpiScale = 96.0f / 72.0f;
 
   Context &m_ctx;
+  Context &m_octx;
   Status &m_status;
   UIStyle &m_style;
   UIStyle &m_ostyle;
-  UINT m_padding = 10;
+
+  int m_candidateCount;
+  int m_hoverIndex = -1;
+  bool hide_candidates;
   // ------------------------------------------------------------
-  std::shared_ptr<D2D> m_pD2D;
+  an<D2D> m_pD2D;
+  Layout *m_layout;
 };
 } // namespace weasel

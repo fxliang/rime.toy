@@ -1,4 +1,7 @@
 #include "WeaselPanel.h"
+#include "HorizontalLayout.h"
+#include "StandardLayout.h"
+#include "base.h"
 #include <DWrite.h>
 #include <dwrite_2.h>
 #include <map>
@@ -10,9 +13,22 @@
 
 using namespace weasel;
 
+#define DPI_SCALE(t) (int)(t * m_pD2D->m_dpiScaleLayout)
+#define COLORTRANSPARENT(color) ((color & 0xff000000) == 0)
+#define COLORNOTTRANSPARENT(color) ((color & 0xff000000) != 0)
+#define TRANS_COLOR 0x00000000
+#define HALF_ALPHA_COLOR(color)                                                \
+  ((((color & 0xff000000) >> 25) & 0xff) << 24) | (color & 0x00ffffff)
+
+const GUID CLSID_D2D1GaussianBlur = {
+    0x1feb6d69,
+    0x2fe6,
+    0x4ac9,
+    {0x8c, 0x58, 0x1d, 0x7f, 0x93, 0xe7, 0xa6, 0xa5}};
+
 WeaselPanel::WeaselPanel(UI &ui)
-    : m_hWnd(nullptr), m_ctx(ui.ctx()), m_status(ui.status()),
-      m_style(ui.style()), m_ostyle(ui.ostyle()) {
+    : m_hWnd(nullptr), m_ctx(ui.ctx()), m_octx(ui.octx()),
+      m_status(ui.status()), m_style(ui.style()), m_ostyle(ui.ostyle()) {
   Create(nullptr);
 }
 
@@ -21,12 +37,6 @@ BOOL WeaselPanel::IsWindow() const { return ::IsWindow(m_hWnd); }
 void WeaselPanel::ShowWindow(int nCmdShow) { ::ShowWindow(m_hWnd, nCmdShow); }
 
 void WeaselPanel::DestroyWindow() { ::DestroyWindow(m_hWnd); }
-
-const GUID CLSID_D2D1GaussianBlur = {
-    0x1feb6d69,
-    0x2fe6,
-    0x4ac9,
-    {0x8c, 0x58, 0x1d, 0x7f, 0x93, 0xe7, 0xa6, 0xa5}};
 
 void WeaselPanel::MoveTo(RECT rc) {
   if (m_hWnd) {
@@ -63,6 +73,32 @@ void WeaselPanel::MoveTo(RECT rc) {
   }
 }
 
+void WeaselPanel::_ResizeWindow() {
+  CSize size = m_layout->GetContentSize();
+  SetWindowPos(m_hWnd, 0, 0, 0, size.cx, size.cy,
+               SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOREDRAW);
+  m_pD2D->OnResize(size.cx, size.cy);
+}
+
+void WeaselPanel::_CreateLayout() {
+  if (m_layout)
+    delete m_layout;
+
+  Layout *layout;
+  if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
+    layout = new HorizontalLayout(m_style, m_ctx, m_status, m_pD2D);
+  } else {
+    if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL ||
+        m_style.layout_type == UIStyle::LAYOUT_VERTICAL_FULLSCREEN) {
+      layout = new HorizontalLayout(m_style, m_ctx, m_status, m_pD2D);
+    } else if (m_style.layout_type == UIStyle::LAYOUT_HORIZONTAL ||
+               m_style.layout_type == UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN) {
+      layout = new HorizontalLayout(m_style, m_ctx, m_status, m_pD2D);
+    }
+  }
+  m_layout = layout;
+}
+
 void WeaselPanel::Refresh() {
   if (m_hWnd) {
     if (m_ostyle != m_style) {
@@ -72,6 +108,46 @@ void WeaselPanel::Refresh() {
       m_pD2D->InitDpiInfo();
       m_pD2D->InitFontFormats();
     }
+#if 0
+    bool should_show_icon =
+        (m_status.ascii_mode || !m_status.composing || !m_ctx.aux.empty());
+    m_candidateCount = (BYTE)m_ctx.cinfo.candies.size();
+    // check if to hide candidates window
+    // show tips status, two kind of situation: 1) only aux strings, don't care
+    // icon status; 2)only icon(ascii mode switching)
+    bool show_tips =
+        (!m_ctx.aux.empty() && m_ctx.cinfo.empty() && m_ctx.preedit.empty()) ||
+        (m_ctx.empty() && should_show_icon);
+    // show schema menu status: schema_id == L".default"
+    bool show_schema_menu = m_status.schema_id == L".default";
+    bool margin_negative =
+        (DPI_SCALE(m_style.margin_x) < 0 || DPI_SCALE(m_style.margin_y) < 0);
+    // when to hide_cadidates?
+    // 1. margin_negative, and not in show tips mode( ascii switching /
+    // half-full switching / simp-trad switching / error tips), and not in
+    // schema menu
+    // 2. inline preedit without candidates
+    bool inline_no_candidates =
+        (m_style.inline_preedit && m_candidateCount == 0) && !show_tips;
+    hide_candidates = inline_no_candidates ||
+                      (margin_negative && !show_tips && !show_schema_menu);
+    // only RedrawWindow if no need to hide candidates window, or
+    // inline_no_candidates
+    if (!hide_candidates || inline_no_candidates) {
+      //_InitFontRes();
+      _CreateLayout();
+
+      m_layout->DoLayout();
+      CSize size = m_layout->GetContentSize();
+      DEBUG << "size : (" << size.cx << ", " << size.cy << ")";
+      //_ResizeWindow();
+      //_RepositionWindow();
+      if (m_ctx != m_octx) {
+        m_octx = m_ctx;
+        //InvalidateRect(m_hWnd, NULL, TRUE); // 请求重绘
+      }
+    }
+#endif
     InvalidateRect(m_hWnd, NULL, TRUE); // 请求重绘
   }
 }
@@ -105,12 +181,6 @@ D2D1_ROUNDED_RECT RoundedRectFromRect(const RECT &rect, uint32_t radius) {
       radius  // radiusY
   );
 }
-RECT OffsetRect(RECT rc, int x, int y) {
-  return RECT{rc.left + x, rc.top + y, rc.right + x, rc.bottom + y};
-}
-RECT InfalteRect(RECT rc, int x, int y) {
-  return RECT{rc.left - x, rc.top - y, rc.right + x, rc.bottom + y};
-}
 
 D2D1::ColorF WeaselPanel::D2d1ColorFromColorRef(uint32_t color) {
   float a = ((color >> 24) & 0xFF) / 255.0f;
@@ -123,82 +193,248 @@ D2D1::ColorF WeaselPanel::D2d1ColorFromColorRef(uint32_t color) {
 void WeaselPanel::Render() {
   m_pD2D->dc->BeginDraw();
   m_pD2D->dc->Clear(D2D1::ColorF({0.0f, 0.0f, 0.0f, 0.0f}));
-  // FillRoundRect({0, 0, m_winSize.cx, m_winSize.cy},
-  //               (float)m_style.round_corner_ex, m_style.border,
-  //               m_style.back_color, m_style.border_color);
-  RECT rc = {0, 0, m_winSize.cx, m_winSize.cy};
-  HighlightRect(rc, m_style.round_corner_ex, m_style.border, m_style.back_color,
-                0, m_style.border_color);
-  if (m_style.layout_type == UIStyle::LAYOUT_HORIZONTAL) {
-    DrawHorizontal();
-  } else {
-    DrawUIVertical();
+  if (m_status.composing) {
+    auto rc = m_layout->GetContentRect();
+    HighlightRect(rc, DPI_SCALE(m_style.round_corner_ex),
+                  DPI_SCALE(m_style.border), m_style.back_color,
+                  m_style.shadow_color, m_style.border_color);
+    if (!m_ctx.preedit.empty()) {
+      auto prc = m_layout->GetPreeditRect();
+      _DrawPreedit(m_ctx.preedit, prc);
+    }
+    if (!m_ctx.aux.empty()) {
+      auto arc = m_layout->GetAuxiliaryRect();
+      _DrawPreedit(m_ctx.aux, arc);
+    }
+    if (m_ctx.cinfo.candies.size()) {
+      _DrawCandidates(true);
+    }
   }
   HR(m_pD2D->dc->EndDraw());
   // Make the swap chain available to the composition engine
   HR(m_pD2D->swapChain->Present(1, 0)); // sync
 }
 
-void WeaselPanel::DrawTextAt(const wstring &text, size_t x, size_t y,
-                             ComPtr<IDWriteTextFormat1> &pTextFormat) {
-  ComPtr<IDWriteTextLayout> pTextLayout = nullptr;
-  HR(m_pD2D->m_pWriteFactory->CreateTextLayout(
-      text.c_str(), text.length(), pTextFormat.Get(), m_winSize.cx,
-      m_winSize.cy, pTextLayout.ReleaseAndGetAddressOf()));
-  m_pD2D->dc->DrawTextLayout({(float)x, (float)y}, pTextLayout.Get(),
+bool WeaselPanel::_DrawPreedit(const Text &text, CRect &rc) {
+  bool drawn = false;
+  wstring const &t = text.str;
+  ComPtr<IDWriteTextFormat1> &pTextFormat = m_pD2D->pPreeditFormat;
+
+  if (!t.empty()) {
+    TextRange range = m_layout->GetPreeditRange();
+    if (range.start < range.end) {
+      auto before_str = t.substr(0, range.start);
+      auto hilited_str = t.substr(range.start, range.end - range.start);
+      auto after_str = t.substr(range.end);
+      auto beforeSz = m_layout->GetBeforeSize();
+      auto hilitedSz = m_layout->GetHiliteSize();
+      auto afterSz = m_layout->GetAfterSize();
+      int x = rc.left, y = rc.top;
+      if (range.start > 0) {
+        CRect rc_before;
+        if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+          rc_before = CRect(rc.left, y, rc.right, y + beforeSz.cy);
+        else
+          rc_before = CRect(x, rc.top, rc.left + beforeSz.cx, rc.bottom);
+        _TextOut(rc_before, before_str, before_str.length(), m_style.text_color,
+                 pTextFormat);
+        if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+          y += beforeSz.cy + DPI_SCALE(m_style.hilite_spacing);
+        else
+          x += beforeSz.cx + DPI_SCALE(m_style.hilite_spacing);
+      }
+      {
+        // zzz[yyy]
+        CRect rc_hi;
+        if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+          rc_hi = CRect(rc.left, y, rc.right, y + hilitedSz.cy);
+        else
+          rc_hi = CRect(x, rc.top, x + hilitedSz.cx, rc.bottom);
+        CRect rc_hib = rc_hi;
+        rc_hib.Inflate(DPI_SCALE(m_style.hilite_padding_x),
+                       DPI_SCALE(m_style.hilite_padding_y));
+        HighlightRect(rc_hib, DPI_SCALE(m_style.round_corner),
+                      DPI_SCALE(m_style.border), m_style.hilited_back_color,
+                      m_style.hilited_shadow_color, 0);
+        _TextOut(rc_hi, hilited_str, hilited_str.length(),
+                 m_style.hilited_text_color, pTextFormat);
+        if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+          y += rc_hi.Height() + DPI_SCALE(m_style.hilite_spacing);
+        else
+          x += rc_hi.Width() + DPI_SCALE(m_style.hilite_spacing);
+      }
+      if (range.end < static_cast<int>(t.length())) {
+        // zzz[yyy]xxx
+        CRect rc_after;
+        if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+          rc_after = CRect(rc.left, y, rc.right, y + afterSz.cy);
+        else
+          rc_after = CRect(x, rc.top, x + afterSz.cx, rc.bottom);
+        _TextOut(rc_after, after_str, after_str.length(), m_style.text_color,
+                 pTextFormat);
+      }
+    } else {
+      CRect rcText(rc.left, rc.top, rc.right, rc.bottom);
+      _TextOut(rcText, t.c_str(), t.length(), m_style.text_color, pTextFormat);
+    }
+    if (m_candidateCount && !m_style.inline_preedit &&
+        COLORNOTTRANSPARENT(m_style.prevpage_color) &&
+        COLORNOTTRANSPARENT(m_style.nextpage_color)) {
+      const std::wstring pre = L"<";
+      const std::wstring next = L">";
+      CRect prc = m_layout->GetPrepageRect();
+      // clickable color / disabled color
+      int color =
+          m_ctx.cinfo.currentPage ? m_style.prevpage_color : m_style.text_color;
+      _TextOut(prc, pre.c_str(), pre.length(), color, pTextFormat);
+
+      CRect nrc = m_layout->GetNextpageRect();
+      // clickable color / disabled color
+      color = m_ctx.cinfo.is_last_page ? m_style.text_color
+                                       : m_style.nextpage_color;
+      _TextOut(nrc, next.c_str(), next.length(), color, pTextFormat);
+    }
+    drawn = true;
+  }
+  return drawn;
+}
+
+bool WeaselPanel::_DrawCandidates(bool back = false) {
+  bool drawn = false;
+  const vector<Text> &candidates(m_ctx.cinfo.candies);
+  const vector<Text> &comments(m_ctx.cinfo.comments);
+  const vector<Text> &labels(m_ctx.cinfo.labels);
+  ComPtr<IDWriteTextFormat1> &txtFormat = m_pD2D->pTextFormat;
+  ComPtr<IDWriteTextFormat1> &labeltxtFormat = m_pD2D->pTextFormat;
+  ComPtr<IDWriteTextFormat1> &commenttxtFormat = m_pD2D->pTextFormat;
+
+  if (back) {
+    if (COLORNOTTRANSPARENT(m_style.candidate_shadow_color)) {
+      for (auto i = 0; i < m_candidateCount; i++) {
+        if (i == m_ctx.cinfo.highlighted || i == m_hoverIndex)
+          continue;
+        auto rect = m_layout->GetCandidateRect(i);
+        rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
+                         DPI_SCALE(m_style.hilite_padding_y));
+        HighlightRect(rect, m_style.round_corner, 0, 0,
+                      m_style.candidate_shadow_color, 0);
+        drawn = true;
+      }
+    }
+    // if (COLORNOTTRANSPARENT(m_style.candidate_back_color) ||
+    // COLORNOTTRANSPARENT(m_style.candidate_border_color)) {
+    int label_text_color = m_style.label_text_color;
+    int candidate_text_color = m_style.candidate_text_color;
+    int comment_text_color = m_style.comment_text_color;
+    for (auto i = 0; i < candidates.size(); i++) {
+      if (i == m_ctx.cinfo.highlighted || i == m_hoverIndex)
+        continue;
+
+      auto rect = m_layout->GetCandidateRect(i);
+      rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
+                       DPI_SCALE(m_style.hilite_padding_y));
+      HighlightRect(rect, DPI_SCALE(m_style.round_corner), 0,
+                    m_style.candidate_back_color, 0,
+                    m_style.candidate_border_color);
+
+      wstring label = m_layout->GetLabelText(labels, (int)i,
+                                             m_style.label_text_format.c_str());
+      if (!label.empty()) {
+        rect = m_layout->GetCandidateLabelRect(i);
+        _TextOut(rect, label, label.length(), label_text_color, labeltxtFormat);
+      }
+      auto &text = candidates.at(i).str;
+      if (!text.empty()) {
+        rect = m_layout->GetCandidateTextRect(i);
+        _TextOut(rect, text, text.length(), candidate_text_color, txtFormat);
+      }
+      auto &comment = comments.at(i).str;
+      if (!comment.empty() && COLORNOTTRANSPARENT(m_style.comment_text_color)) {
+        rect = m_layout->GetCandidateCommentRect(i);
+        _TextOut(rect, comment, comment.length(), comment_text_color,
+                 commenttxtFormat);
+      }
+
+      drawn = true;
+    }
+    //}
+
+    // draw highlighted background and shadow
+    {
+      int label_text_color = m_style.hilited_label_text_color;
+      int candidate_text_color = m_style.hilited_candidate_text_color;
+      int comment_text_color = m_style.hilited_comment_text_color;
+      auto rect = m_layout->GetHighlightRect();
+      rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
+                       DPI_SCALE(m_style.hilite_padding_y));
+      HighlightRect(rect, DPI_SCALE(m_style.round_corner),
+                    DPI_SCALE(m_style.border),
+                    m_style.hilited_candidate_back_color,
+                    m_style.hilited_candidate_shadow_color,
+                    m_style.hilited_candidate_border_color);
+      auto i = m_ctx.cinfo.highlighted;
+      wstring label = m_layout->GetLabelText(labels, (int)i,
+                                             m_style.label_text_format.c_str());
+      if (!label.empty()) {
+        rect = m_layout->GetCandidateLabelRect(i);
+        _TextOut(rect, label, label.length(), label_text_color, labeltxtFormat);
+      }
+      auto &text = candidates.at(i).str;
+      if (!text.empty()) {
+        rect = m_layout->GetCandidateTextRect(i);
+        _TextOut(rect, text, text.length(), candidate_text_color, txtFormat);
+      }
+      auto &comment = comments.at(i).str;
+      if (!comment.empty() && COLORNOTTRANSPARENT(m_style.comment_text_color)) {
+        rect = m_layout->GetCandidateCommentRect(i);
+        _TextOut(rect, comment, comment.length(), comment_text_color,
+                 commenttxtFormat);
+      }
+      if (m_style.mark_text.empty() &&
+          COLORNOTTRANSPARENT(m_style.hilited_mark_color)) {
+        int height =
+            min(rect.Height() - DPI_SCALE(m_style.hilite_padding_y) * 2,
+                rect.Height() - DPI_SCALE(m_style.round_corner) * 2);
+        int width = min(rect.Width() - DPI_SCALE(m_style.hilite_padding_x) * 2,
+                        rect.Width() - DPI_SCALE(m_style.round_corner) * 2);
+        width = min(width, static_cast<int>(rect.Width() * 0.618));
+        height = min(height, static_cast<int>(rect.Height() * 0.618));
+      }
+      drawn = true;
+    }
+  }
+  return drawn;
+}
+
+void WeaselPanel::_TextOut(CRect &rc, const wstring &text, size_t cch,
+                           uint32_t color,
+                           ComPtr<IDWriteTextFormat1> &pTextFormat) {
+  if (!pTextFormat.Get())
+    return;
+  if (m_pD2D->m_pBrush == nullptr) {
+  } else {
+    m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(color));
+  }
+
+  ComPtr<IDWriteTextLayout> pTextLayout;
+  m_pD2D->m_pWriteFactory->CreateTextLayout(
+      text.c_str(), cch, pTextFormat.Get(), rc.Width(), rc.Height(),
+      reinterpret_cast<IDWriteTextLayout **>(pTextLayout.GetAddressOf()));
+  if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
+  }
+  float offsetx = (float)rc.left;
+  float offsety = (float)rc.top;
+
+  DWRITE_OVERHANG_METRICS omt;
+  pTextLayout->GetOverhangMetrics(&omt);
+  if (m_style.layout_type != UIStyle::LAYOUT_VERTICAL_TEXT && omt.left > 0)
+    offsetx += omt.left;
+  if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT && omt.top > 0)
+    offsety += omt.top;
+
+  m_pD2D->dc->DrawTextLayout({offsetx, offsety}, pTextLayout.Get(),
                              m_pD2D->m_pBrush.Get(),
                              D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
-}
-// todo: seperate layout and drawing
-void WeaselPanel::ResizeVertical() {
-  SIZE textSize{0, 0};
-  SIZE winSize{0, 0};
-  if (!m_ctx.preedit.empty()) {
-    const auto &preedit = (m_ctx.preedit.str);
-    m_pD2D->GetTextSize(preedit, preedit.length(), m_pD2D->pTextFormat,
-                        &textSize);
-    winSize.cx += m_padding + textSize.cx;
-    winSize.cy += m_padding + textSize.cy;
-  } else if (!m_ctx.aux.empty()) {
-    const auto &aux = (m_ctx.aux.str);
-    m_pD2D->GetTextSize(aux, aux.length(), m_pD2D->pTextFormat, &textSize);
-    winSize.cx += m_padding + textSize.cx;
-    winSize.cy += m_padding + textSize.cy;
-  }
-  size_t cand_width = MAX(winSize.cx, 0L);
-  if (m_ctx.cinfo.candies.size()) {
-    const auto &cinfo = m_ctx.cinfo;
-    for (auto i = 0; i < cinfo.candies.size(); i++) {
-      const auto &label = (cinfo.labels[i].str);
-      const auto &candie = (cinfo.candies[i].str);
-      const auto &comment = (cinfo.comments[i].str);
-      size_t x = m_padding, y = winSize.cy + m_padding;
-      size_t h = 0;
-      m_pD2D->GetTextSize(label, label.length(), m_pD2D->pLabelFormat,
-                          &textSize);
-      h = MAX((LONG)h, textSize.cy);
-      x += textSize.cx + m_padding;
-      m_pD2D->GetTextSize(candie, candie.length(), m_pD2D->pTextFormat,
-                          &textSize);
-      h = MAX((LONG)h, textSize.cy);
-      if (!comment.empty()) {
-        x += textSize.cx + m_padding;
-        m_pD2D->GetTextSize(comment, comment.length(), m_pD2D->pCommentFormat,
-                            &textSize);
-        h = MAX((LONG)h, textSize.cy);
-      }
-      cand_width = MAX(cand_width, x + textSize.cx);
-      winSize.cy += h;
-    }
-    winSize.cy += m_padding;
-  }
-  winSize.cx = MAX(winSize.cx, (LONG)cand_width);
-  m_winSize.cx = cand_width + m_padding * 2;
-  m_winSize.cy = winSize.cy + m_padding;
-
-  SetWindowPos(m_hWnd, HWND_TOPMOST, 0, 0, m_winSize.cx, m_winSize.cy,
-               SWP_NOMOVE | SWP_NOACTIVATE);
-  D2D1_SIZE_U oPixelSize = {(UINT32)m_winSize.cx, (UINT32)m_winSize.cy};
 }
 
 void WeaselPanel::HighlightRect(const RECT &rect, float radius, uint32_t border,
@@ -206,8 +442,9 @@ void WeaselPanel::HighlightRect(const RECT &rect, float radius, uint32_t border,
                                 uint32_t border_color) {
   // draw shadow
   if ((shadow_color & 0xff000000) && m_style.shadow_radius) {
-    auto rc =
-        OffsetRect(rect, m_style.shadow_offset_x, m_style.shadow_offset_y);
+    CRect rc = rect;
+    rc.OffsetRect(DPI_SCALE(m_style.shadow_offset_x),
+                  DPI_SCALE(m_style.shadow_offset_y));
     // Define a rounded rectangle
     ComPtr<ID2D1RoundedRectangleGeometry> roundedRectGeometry;
     D2D1_ROUNDED_RECT roundedRect = RoundedRectFromRect(rc, radius);
@@ -249,168 +486,18 @@ void WeaselPanel::HighlightRect(const RECT &rect, float radius, uint32_t border,
   // draw border
   if ((border_color & 0xff000000) && border) {
     float hb = -(float)border / 2;
-    D2D1_ROUNDED_RECT borderRect =
-        RoundedRectFromRect(InfalteRect(rect, hb, hb), radius + hb);
+    CRect rc = rect;
+    rc.InflateRect(hb, hb);
+    D2D1_ROUNDED_RECT borderRect = RoundedRectFromRect(rc, radius + hb);
     m_pD2D->brush->SetColor(D2d1ColorFromColorRef(border_color));
     m_pD2D->dc->DrawRoundedRectangle(&borderRect, m_pD2D->brush.Get(), border);
   }
 }
 
-void WeaselPanel::ResizeHorizontal() {
-  SIZE textSize{0, 0};
-  SIZE winSize{0, 0};
-  if (!m_ctx.preedit.empty()) {
-    const auto &preedit = (m_ctx.preedit.str);
-    m_pD2D->GetTextSize(preedit, preedit.length(), m_pD2D->pTextFormat,
-                        &textSize);
-    winSize.cx = textSize.cx;
-    winSize.cy = textSize.cy;
-  } else if (!m_ctx.aux.empty()) {
-    const auto &aux = (m_ctx.aux.str);
-    m_pD2D->GetTextSize(aux, aux.length(), m_pD2D->pTextFormat, &textSize);
-    winSize.cx = textSize.cx;
-    winSize.cy = textSize.cy;
-  }
-  if (m_ctx.cinfo.candies.size()) {
-    m_text.clear();
-    winSize.cy += m_padding;
-    const auto &cinfo = m_ctx.cinfo;
-    for (auto i = 0; i < cinfo.candies.size(); i++) {
-      bool highlighted = i == cinfo.highlighted;
-      m_text += highlighted ? L"[" : L"";
-      m_text += (cinfo.labels[i].str) + L". " + (cinfo.candies[i].str) + L" " +
-                (cinfo.comments[i].str);
-      m_text += highlighted ? L"] " : L" ";
-    }
-    m_pD2D->GetTextSize(m_text, m_text.length(), m_pD2D->pTextFormat,
-                        &textSize);
-    winSize.cx = MAX(winSize.cx, textSize.cx);
-    winSize.cy += textSize.cy;
-  }
-  m_winSize.cx = winSize.cx + m_padding * 2;
-  m_winSize.cy = winSize.cy + m_padding * 2;
-
-  SetWindowPos(m_hWnd, HWND_TOPMOST, 0, 0, m_winSize.cx, m_winSize.cy,
-               SWP_NOMOVE | SWP_NOACTIVATE);
-  D2D1_SIZE_U oPixelSize = {(UINT32)m_winSize.cx, (UINT32)m_winSize.cy};
-}
-void WeaselPanel::DrawHorizontal() {
-  SIZE textSize{0, 0};
-  SIZE winSize{0, 0};
-  if (!m_ctx.preedit.empty()) {
-    const auto &preedit = (m_ctx.preedit.str);
-    m_pD2D->GetTextSize(preedit, preedit.length(), m_pD2D->pTextFormat,
-                        &textSize);
-    DrawTextAt(preedit, m_padding, m_padding, m_pD2D->pTextFormat);
-    winSize.cx = textSize.cx;
-    winSize.cy = textSize.cy;
-  } else if (!m_ctx.aux.empty()) {
-    const auto &aux = (m_ctx.aux.str);
-    m_pD2D->GetTextSize(aux, aux.length(), m_pD2D->pTextFormat, &textSize);
-    DrawTextAt(aux, m_padding, m_padding, m_pD2D->pTextFormat);
-    winSize.cx = textSize.cx;
-    winSize.cy = textSize.cy;
-  }
-  if (m_ctx.cinfo.candies.size()) {
-    winSize.cy += m_padding;
-    DrawTextAt(m_text, m_padding, winSize.cy, m_pD2D->pTextFormat);
-  }
-}
-void WeaselPanel::DrawUIVertical() {
-  SIZE textSize{0, 0};
-  SIZE winSize{0, 0};
-  if (!m_ctx.preedit.empty()) {
-    const auto &preedit = (m_ctx.preedit.str);
-    m_pD2D->GetTextSize(preedit, preedit.length(), m_pD2D->pTextFormat,
-                        &textSize);
-    m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(m_style.text_color));
-    DrawTextAt(preedit, m_padding, m_padding, m_pD2D->pTextFormat);
-    winSize.cx += m_padding + textSize.cx;
-    winSize.cy += m_padding + textSize.cy;
-  } else if (!m_ctx.aux.empty()) {
-    const auto &aux = (m_ctx.aux.str);
-    m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(m_style.text_color));
-    DrawTextAt(aux, m_padding, m_padding, m_pD2D->pTextFormat);
-    m_pD2D->GetTextSize(aux, aux.length(), m_pD2D->pTextFormat, &textSize);
-    winSize.cx += m_padding + textSize.cx;
-    winSize.cy += m_padding + textSize.cy;
-  }
-  size_t cand_width = 0;
-  if (m_ctx.cinfo.candies.size()) {
-    const auto &cinfo = m_ctx.cinfo;
-    for (auto i = 0; i < cinfo.candies.size(); i++) {
-      const auto &label = (cinfo.labels[i].str);
-      const auto &candie = (cinfo.candies[i].str);
-      const auto &comment = (cinfo.comments[i].str);
-      bool hilited = (i == cinfo.highlighted);
-      LONG xl, yl, xt, yt, xc, yc;
-      size_t x = m_padding, y = winSize.cy + m_padding;
-      size_t h = 0;
-      m_pD2D->GetTextSize(label, label.length(), m_pD2D->pLabelFormat,
-                          &textSize);
-      xl = x;
-      yl = y;
-      h = MAX((LONG)h, textSize.cy);
-      x += textSize.cx + m_padding;
-
-      m_pD2D->GetTextSize(candie, candie.length(), m_pD2D->pTextFormat,
-                          &textSize);
-      h = MAX((LONG)h, textSize.cy);
-      xt = x;
-      yt = y;
-
-      if (!comment.empty()) {
-        x += textSize.cx + m_padding;
-        m_pD2D->GetTextSize(comment, comment.length(), m_pD2D->pCommentFormat,
-                            &textSize);
-        xc = x;
-        yc = y;
-        h = MAX((LONG)h, textSize.cy);
-      } else {
-        xc = xt + textSize.cx;
-        yc = y;
-      }
-      cand_width = MAX(cand_width, x + textSize.cx);
-
-      RECT rc = {xl, yl, xl + (LONG)cand_width, yl + (LONG)h};
-      auto color = hilited ? m_style.hilited_candidate_back_color
-                           : m_style.candidate_back_color;
-      auto shadow_color = hilited ? m_style.hilited_candidate_shadow_color
-                                  : m_style.candidate_shadow_color;
-      auto border_color = hilited ? m_style.hilited_candidate_border_color
-                                  : m_style.candidate_border_color;
-      HighlightRect(rc, m_style.round_corner, m_style.border, color,
-                    shadow_color, border_color);
-
-      color =
-          hilited ? m_style.hilited_label_text_color : m_style.label_text_color;
-      m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(color));
-      DrawTextAt(label, xl, yl, m_pD2D->pLabelFormat);
-      color = hilited ? m_style.hilited_candidate_text_color
-                      : m_style.candidate_text_color;
-      m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(color));
-      DrawTextAt(candie, xt, yt, m_pD2D->pTextFormat);
-      if (!comment.empty()) {
-        color = hilited ? m_style.hilited_comment_text_color
-                        : m_style.comment_text_color;
-        m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(color));
-        DrawTextAt(comment, xc, yc, m_pD2D->pCommentFormat);
-      }
-      winSize.cy += h;
-    }
-    winSize.cy += m_padding;
-    m_winSize.cx = cand_width;
-    m_winSize.cy = winSize.cy;
-  }
-}
-
 void WeaselPanel::OnPaint() {
-  if (m_style.layout_type == UIStyle::LAYOUT_HORIZONTAL) {
-    ResizeHorizontal();
-  } else {
-    ResizeVertical();
-  }
-  m_pD2D->OnResize(m_winSize.cx, m_winSize.cy);
+  _CreateLayout();
+  m_layout->DoLayout();
+  _ResizeWindow();
   Render();
 }
 

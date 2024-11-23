@@ -24,7 +24,7 @@ struct D2D {
   void InitFontFormats();
   void OnResize(UINT width, UINT height);
   void GetTextSize(const wstring &text, size_t nCount,
-                   ComPtr<IDWriteTextFormat1> pTextFormat, LPSIZE lpSize);
+                   ComPtr<IDWriteTextFormat1> &pTextFormat, LPSIZE lpSize);
   void _SetFontFallback(ComPtr<IDWriteTextFormat1> textFormat,
                         const std::vector<std::wstring> &fontVector);
   void _ParseFontFace(const std::wstring &fontFaceStr,
@@ -43,6 +43,7 @@ struct D2D {
   ComPtr<IDCompositionTarget> target;
   ComPtr<IDCompositionVisual> visual;
   ComPtr<ID2D1SolidColorBrush> brush;
+  ComPtr<IDWriteTextFormat1> pPreeditFormat;
   ComPtr<IDWriteTextFormat1> pTextFormat;
   ComPtr<IDWriteTextFormat1> pLabelFormat;
   ComPtr<IDWriteTextFormat1> pCommentFormat;
@@ -53,6 +54,7 @@ struct D2D {
   float m_dpiX;
   float m_dpiY;
   float m_dpiScaleFontPoint;
+  float m_dpiScaleLayout;
 };
 } // namespace weasel
 #endif

@@ -62,6 +62,10 @@ inline std::string wstring_to_string(const std::wstring &wstr,
   return std::string(buffer.get());
 }
 
+inline int utf8towcslen(const char *utf8_str, int utf8_len) {
+  return MultiByteToWideChar(CP_UTF8, 0, utf8_str, utf8_len, NULL, 0);
+}
+
 #define wtou8(x) wstring_to_string(x, CP_UTF8)
 #define wtoacp(x) wstring_to_string(x)
 #define u8tow(x) string_to_wstring(x, CP_UTF8)

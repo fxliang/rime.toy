@@ -212,6 +212,7 @@ void D2D::InitFontFormats() {
                                    font_point * baseline);
     decltype(fontFaceStrVector)().swap(fontFaceStrVector);
   };
+  func(m_style.font_face, m_style.font_point, pPreeditFormat);
   func(m_style.font_face, m_style.font_point, pTextFormat);
   func(m_style.label_font_face, m_style.label_font_point, pLabelFormat);
   func(m_style.comment_font_face, m_style.comment_font_point, pCommentFormat);
@@ -269,8 +270,9 @@ void D2D::InitDpiInfo() {
   m_dpiY = static_cast<float>(y);
   if (m_dpiY == 0) {
     m_dpiX = m_dpiY = 96.0;
-    m_dpiScaleFontPoint = m_dpiY / 72.0f;
   }
+  m_dpiScaleFontPoint = m_dpiY / 72.0f;
+  m_dpiScaleLayout = m_dpiY / 96.0;
 }
 
 void D2D::_SetFontFallback(ComPtr<IDWriteTextFormat1> textFormat,
@@ -368,7 +370,7 @@ void D2D::_ParseFontFace(const std::wstring &fontFaceStr,
 }
 
 void D2D::GetTextSize(const wstring &text, size_t nCount,
-                      ComPtr<IDWriteTextFormat1> pTextFormat, LPSIZE lpSize) {
+                      ComPtr<IDWriteTextFormat1> &pTextFormat, LPSIZE lpSize) {
 
   D2D1_SIZE_F sz;
 
