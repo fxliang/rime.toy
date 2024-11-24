@@ -109,46 +109,6 @@ void WeaselPanel::Refresh() {
       m_pD2D->InitDpiInfo();
       m_pD2D->InitFontFormats();
     }
-#if 0
-    bool should_show_icon =
-        (m_status.ascii_mode || !m_status.composing || !m_ctx.aux.empty());
-    m_candidateCount = (BYTE)m_ctx.cinfo.candies.size();
-    // check if to hide candidates window
-    // show tips status, two kind of situation: 1) only aux strings, don't care
-    // icon status; 2)only icon(ascii mode switching)
-    bool show_tips =
-        (!m_ctx.aux.empty() && m_ctx.cinfo.empty() && m_ctx.preedit.empty()) ||
-        (m_ctx.empty() && should_show_icon);
-    // show schema menu status: schema_id == L".default"
-    bool show_schema_menu = m_status.schema_id == L".default";
-    bool margin_negative =
-        (DPI_SCALE(m_style.margin_x) < 0 || DPI_SCALE(m_style.margin_y) < 0);
-    // when to hide_cadidates?
-    // 1. margin_negative, and not in show tips mode( ascii switching /
-    // half-full switching / simp-trad switching / error tips), and not in
-    // schema menu
-    // 2. inline preedit without candidates
-    bool inline_no_candidates =
-        (m_style.inline_preedit && m_candidateCount == 0) && !show_tips;
-    hide_candidates = inline_no_candidates ||
-                      (margin_negative && !show_tips && !show_schema_menu);
-    // only RedrawWindow if no need to hide candidates window, or
-    // inline_no_candidates
-    if (!hide_candidates || inline_no_candidates) {
-      //_InitFontRes();
-      _CreateLayout();
-
-      m_layout->DoLayout();
-      CSize size = m_layout->GetContentSize();
-      DEBUG << "size : (" << size.cx << ", " << size.cy << ")";
-      //_ResizeWindow();
-      //_RepositionWindow();
-      if (m_ctx != m_octx) {
-        m_octx = m_ctx;
-        //InvalidateRect(m_hWnd, NULL, TRUE); // 请求重绘
-      }
-    }
-#endif
     InvalidateRect(m_hWnd, NULL, TRUE); // 请求重绘
   }
 }
@@ -494,6 +454,9 @@ void WeaselPanel::HighlightRect(const RECT &rect, float radius, uint32_t border,
 }
 
 void WeaselPanel::OnPaint() {
+  // ignore if d2d resources not ready
+  if (!m_pD2D)
+    return;
   _CreateLayout();
   m_layout->DoLayout();
   _ResizeWindow();
