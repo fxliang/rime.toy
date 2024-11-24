@@ -47,8 +47,6 @@ void HorizontalLayout::DoLayout() {
 
   /* Preedit */
   if (!IsInlinePreedit() && !_context.preedit.str.empty()) {
-    // size = GetPreeditSize(dc, _context.preedit, pDWR->pPreeditTextFormat,
-    // pDWR);
     size = GetPreeditSize(_context.preedit, _pD2D->pPreeditFormat);
     int szx = pgw, szy = MAX(size.cy, pgh);
     // icon size higher then preedit text

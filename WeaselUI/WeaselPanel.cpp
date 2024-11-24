@@ -1,6 +1,6 @@
 #include "WeaselPanel.h"
 #include "HorizontalLayout.h"
-#include "StandardLayout.h"
+#include "VerticalLayout.h"
 #include "base.h"
 #include <DWrite.h>
 #include <dwrite_2.h>
@@ -90,7 +90,7 @@ void WeaselPanel::_CreateLayout() {
   } else {
     if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL ||
         m_style.layout_type == UIStyle::LAYOUT_VERTICAL_FULLSCREEN) {
-      layout = new HorizontalLayout(m_style, m_ctx, m_status, m_pD2D);
+      layout = new VerticalLayout(m_style, m_ctx, m_status, m_pD2D);
     } else if (m_style.layout_type == UIStyle::LAYOUT_HORIZONTAL ||
                m_style.layout_type == UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN) {
       layout = new HorizontalLayout(m_style, m_ctx, m_status, m_pD2D);
@@ -393,12 +393,12 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
       if (m_style.mark_text.empty() &&
           COLORNOTTRANSPARENT(m_style.hilited_mark_color)) {
         int height =
-            min(rect.Height() - DPI_SCALE(m_style.hilite_padding_y) * 2,
+            MIN(rect.Height() - DPI_SCALE(m_style.hilite_padding_y) * 2,
                 rect.Height() - DPI_SCALE(m_style.round_corner) * 2);
-        int width = min(rect.Width() - DPI_SCALE(m_style.hilite_padding_x) * 2,
+        int width = MIN(rect.Width() - DPI_SCALE(m_style.hilite_padding_x) * 2,
                         rect.Width() - DPI_SCALE(m_style.round_corner) * 2);
-        width = min(width, static_cast<int>(rect.Width() * 0.618));
-        height = min(height, static_cast<int>(rect.Height() * 0.618));
+        width = MIN(width, static_cast<int>(rect.Width() * 0.618));
+        height = MIN(height, static_cast<int>(rect.Height() * 0.618));
       }
       drawn = true;
     }

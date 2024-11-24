@@ -71,6 +71,7 @@ inline int utf8towcslen(const char *utf8_str, int utf8_len) {
 #define u8tow(x) string_to_wstring(x, CP_UTF8)
 #define acptow(x) string_to_wstring(x, CP_ACP)
 #define MAX(x, y) ((x > y) ? x : y)
+#define MIN(x, y) ((x < y) ? x : y)
 
 class DebugStream {
 public:
