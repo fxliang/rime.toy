@@ -52,12 +52,10 @@ void WeaselPanel::MoveTo(RECT rc) {
         rcWorkArea = info.rcWork;
       }
     }
-    RECT rcWindow;
+    CRect rcWindow;
     GetWindowRect(m_hWnd, &rcWindow);
-    int width = (rcWindow.right - rcWindow.left);
-    int height = (rcWindow.bottom - rcWindow.top);
-    rcWorkArea.right -= width;
-    rcWorkArea.bottom -= height;
+    rcWorkArea.right -= rcWindow.Width();
+    rcWorkArea.bottom -= rcWindow.Height();
     int x = m_inputPos.left;
     int y = m_inputPos.bottom;
     if (x > rcWorkArea.right)
@@ -68,6 +66,9 @@ void WeaselPanel::MoveTo(RECT rc) {
       y = rcWorkArea.bottom;
     if (y < rcWorkArea.top)
       y = rcWorkArea.top;
+    if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT &&
+        !m_style.vertical_text_left_to_right)
+      x -= rcWindow.Width();
     m_inputPos.bottom = y;
 
     SetWindowPos(m_hWnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
@@ -110,26 +111,27 @@ void WeaselPanel::Refresh() {
       m_pD2D->InitFontFormats();
     }
     bool should_show_icon =
-      (m_status.ascii_mode || !m_status.composing || !m_ctx.aux.empty());
+        (m_status.ascii_mode || !m_status.composing || !m_ctx.aux.empty());
     m_candidateCount = (BYTE)m_ctx.cinfo.candies.size();
     // check if to hide candidates window
     // show tips status, two kind of situation: 1) only aux strings, don't care
     // icon status; 2)only icon(ascii mode switching)
     bool show_tips =
-      (!m_ctx.aux.empty() && m_ctx.cinfo.empty() && m_ctx.preedit.empty()) ||
-      (m_ctx.empty() && should_show_icon);
+        (!m_ctx.aux.empty() && m_ctx.cinfo.empty() && m_ctx.preedit.empty()) ||
+        (m_ctx.empty() && should_show_icon);
     // show schema menu status: schema_id == L".default"
     bool show_schema_menu = m_status.schema_id == L".default";
     bool margin_negative =
-      (DPI_SCALE(m_style.margin_x) < 0 || DPI_SCALE(m_style.margin_y) < 0);
+        (DPI_SCALE(m_style.margin_x) < 0 || DPI_SCALE(m_style.margin_y) < 0);
     // when to hide_cadidates?
-    // 1. margin_negative, and not in show tips mode( ascii switching / half-full
-    // switching / simp-trad switching / error tips), and not in schema menu
+    // 1. margin_negative, and not in show tips mode( ascii switching /
+    // half-full switching / simp-trad switching / error tips), and not in
+    // schema menu
     // 2. inline preedit without candidates
     inline_no_candidates =
-      (m_style.inline_preedit && m_candidateCount == 0) && !show_tips;
+        (m_style.inline_preedit && m_candidateCount == 0) && !show_tips;
     hide_candidates = inline_no_candidates ||
-      (margin_negative && !show_tips && !show_schema_menu);
+                      (margin_negative && !show_tips && !show_schema_menu);
     InvalidateRect(m_hWnd, NULL, TRUE); // 请求重绘
   }
 }
