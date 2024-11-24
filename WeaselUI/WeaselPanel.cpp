@@ -1,5 +1,6 @@
 #include "WeaselPanel.h"
 #include "HorizontalLayout.h"
+#include "VHorizontalLayout.h"
 #include "VerticalLayout.h"
 #include "base.h"
 #include <DWrite.h>
@@ -86,7 +87,7 @@ void WeaselPanel::_CreateLayout() {
 
   Layout *layout;
   if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
-    layout = new HorizontalLayout(m_style, m_ctx, m_status, m_pD2D);
+    layout = new VHorizontalLayout(m_style, m_ctx, m_status, m_pD2D);
   } else {
     if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL ||
         m_style.layout_type == UIStyle::LAYOUT_VERTICAL_FULLSCREEN) {
