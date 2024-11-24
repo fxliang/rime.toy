@@ -202,6 +202,7 @@ void D2D::InitFontFormats() {
       _pTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
     } else
       _pTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+    _pTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
     // _pTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
     _pTextFormat->SetWordWrapping(wrapping);
