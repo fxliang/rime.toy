@@ -50,6 +50,7 @@ private:
   UIStyle &m_ostyle;
 
   int m_candidateCount;
+  bool inline_no_candidates;
   int m_hoverIndex = -1;
   bool hide_candidates;
   // ------------------------------------------------------------

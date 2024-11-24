@@ -109,6 +109,27 @@ void WeaselPanel::Refresh() {
       m_pD2D->InitDpiInfo();
       m_pD2D->InitFontFormats();
     }
+    bool should_show_icon =
+      (m_status.ascii_mode || !m_status.composing || !m_ctx.aux.empty());
+    m_candidateCount = (BYTE)m_ctx.cinfo.candies.size();
+    // check if to hide candidates window
+    // show tips status, two kind of situation: 1) only aux strings, don't care
+    // icon status; 2)only icon(ascii mode switching)
+    bool show_tips =
+      (!m_ctx.aux.empty() && m_ctx.cinfo.empty() && m_ctx.preedit.empty()) ||
+      (m_ctx.empty() && should_show_icon);
+    // show schema menu status: schema_id == L".default"
+    bool show_schema_menu = m_status.schema_id == L".default";
+    bool margin_negative =
+      (DPI_SCALE(m_style.margin_x) < 0 || DPI_SCALE(m_style.margin_y) < 0);
+    // when to hide_cadidates?
+    // 1. margin_negative, and not in show tips mode( ascii switching / half-full
+    // switching / simp-trad switching / error tips), and not in schema menu
+    // 2. inline preedit without candidates
+    inline_no_candidates =
+      (m_style.inline_preedit && m_candidateCount == 0) && !show_tips;
+    hide_candidates = inline_no_candidates ||
+      (margin_negative && !show_tips && !show_schema_menu);
     InvalidateRect(m_hWnd, NULL, TRUE); // 请求重绘
   }
 }
@@ -154,7 +175,7 @@ D2D1::ColorF WeaselPanel::D2d1ColorFromColorRef(uint32_t color) {
 void WeaselPanel::Render() {
   m_pD2D->dc->BeginDraw();
   m_pD2D->dc->Clear(D2D1::ColorF({0.0f, 0.0f, 0.0f, 0.0f}));
-  if (m_status.composing) {
+  if (!hide_candidates || inline_no_candidates) {
     auto rc = m_layout->GetContentRect();
     HighlightRect(rc, DPI_SCALE(m_style.round_corner_ex),
                   DPI_SCALE(m_style.border), m_style.back_color,
@@ -167,7 +188,7 @@ void WeaselPanel::Render() {
       auto arc = m_layout->GetAuxiliaryRect();
       _DrawPreedit(m_ctx.aux, arc);
     }
-    if (m_ctx.cinfo.candies.size()) {
+    if (m_candidateCount) {
       _DrawCandidates(true);
     }
   }
@@ -266,8 +287,8 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
   const vector<Text> &comments(m_ctx.cinfo.comments);
   const vector<Text> &labels(m_ctx.cinfo.labels);
   ComPtr<IDWriteTextFormat1> &txtFormat = m_pD2D->pTextFormat;
-  ComPtr<IDWriteTextFormat1> &labeltxtFormat = m_pD2D->pTextFormat;
-  ComPtr<IDWriteTextFormat1> &commenttxtFormat = m_pD2D->pTextFormat;
+  ComPtr<IDWriteTextFormat1> &labeltxtFormat = m_pD2D->pLabelFormat;
+  ComPtr<IDWriteTextFormat1> &commenttxtFormat = m_pD2D->pCommentFormat;
 
   if (back) {
     if (COLORNOTTRANSPARENT(m_style.candidate_shadow_color)) {

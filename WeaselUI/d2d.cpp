@@ -167,7 +167,7 @@ void D2D::InitFontFormats() {
                                    ? DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
                                    : DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT;
   auto func = [&](const wstring &font_face, const int font_point,
-                  ComPtr<IDWriteTextFormat1> &_pTextFormat) {
+                  ComPtr<IDWriteTextFormat1> &_pTextFormat, DWRITE_WORD_WRAPPING wrap) {
     HRESULT hResult = S_OK;
     bool vertical_text = m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT;
     std::vector<std::wstring> fontFaceStrVector;
@@ -205,7 +205,7 @@ void D2D::InitFontFormats() {
     _pTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
     // _pTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-    _pTextFormat->SetWordWrapping(wrapping);
+    _pTextFormat->SetWordWrapping(wrap);
     _SetFontFallback(_pTextFormat, fontFaceStrVector);
     if (m_style.linespacing && m_style.baseline)
       _pTextFormat->SetLineSpacing(DWRITE_LINE_SPACING_METHOD_UNIFORM,
@@ -213,10 +213,10 @@ void D2D::InitFontFormats() {
                                    font_point * baseline);
     decltype(fontFaceStrVector)().swap(fontFaceStrVector);
   };
-  func(m_style.font_face, m_style.font_point, pPreeditFormat);
-  func(m_style.font_face, m_style.font_point, pTextFormat);
-  func(m_style.label_font_face, m_style.label_font_point, pLabelFormat);
-  func(m_style.comment_font_face, m_style.comment_font_point, pCommentFormat);
+  func(m_style.font_face, m_style.font_point, pPreeditFormat, wrapping_preedit);
+  func(m_style.font_face, m_style.font_point, pTextFormat, wrapping);
+  func(m_style.label_font_face, m_style.label_font_point, pLabelFormat, wrapping);
+  func(m_style.comment_font_face, m_style.comment_font_point, pCommentFormat, wrapping);
 }
 
 void D2D::InitDirectWriteResources() {
