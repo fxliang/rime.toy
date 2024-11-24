@@ -86,8 +86,7 @@ void VHorizontalLayout::DoLayout() {
       int wid = 0;
       h = offsetY + real_margin_y + base_offset;
       /* Label */
-      std::wstring label =
-          GetLabelText(labels, i, _style.label_text_format.c_str());
+      auto &label = labels.at(i).str;
       _pD2D->GetTextSize(label, label.length(), _pD2D->pLabelFormat, &size);
       _candidateLabelRects[i].SetRect(w, h, w + size.cx * labelFontValid,
                                       h + size.cy);
@@ -338,8 +337,7 @@ void VHorizontalLayout::DoLayoutWithWrap() {
       if (id == i)
         h += base_offset;
       /* Label */
-      std::wstring label =
-          GetLabelText(labels, i, _style.label_text_format.c_str());
+      auto &label = labels.at(i).str;
       _pD2D->GetTextSize(label, label.length(), _pD2D->pLabelFormat, &size);
       _candidateLabelRects[i].SetRect(width, h, width + size.cx,
                                       h + size.cy * labelFontValid);

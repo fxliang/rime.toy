@@ -88,8 +88,7 @@ void weasel::VerticalLayout::DoLayout() {
     int w = real_margin_x + base_offset, max_height_curren_candidate = 0;
     int candidate_width = base_offset, comment_width = 0;
     /* Label */
-    std::wstring label =
-        GetLabelText(labels, i, _style.label_text_format.c_str());
+    auto &label = labels.at(i).str;
     _pD2D->GetTextSize(label, label.length(), _pD2D->pLabelFormat, &size);
     _candidateLabelRects[i].SetRect(w, height, w + size.cx * labelFontValid,
                                     height + size.cy);

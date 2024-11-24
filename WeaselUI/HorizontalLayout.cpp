@@ -89,8 +89,7 @@ void HorizontalLayout::DoLayout() {
       if (id == i)
         w += base_offset;
       /* Label */
-      std::wstring label =
-          GetLabelText(labels, i, _style.label_text_format.c_str());
+      auto &label = labels.at(i).str;
       _pD2D->GetTextSize(label, label.length(), _pD2D->pLabelFormat, &size);
       _candidateLabelRects[i].SetRect(w, height, w + size.cx * labelFontValid,
                                       height + size.cy);

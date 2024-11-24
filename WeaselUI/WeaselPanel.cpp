@@ -338,8 +338,7 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
                     m_style.candidate_back_color, 0,
                     m_style.candidate_border_color);
 
-      wstring label = m_layout->GetLabelText(labels, (int)i,
-                                             m_style.label_text_format.c_str());
+      auto &label = labels.at(i).str;
       if (!label.empty()) {
         rect = m_layout->GetCandidateLabelRect(i);
         _TextOut(rect, label, label.length(), label_text_color, labeltxtFormat);
@@ -374,8 +373,7 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
                     m_style.hilited_candidate_shadow_color,
                     m_style.hilited_candidate_border_color);
       auto i = m_ctx.cinfo.highlighted;
-      wstring label = m_layout->GetLabelText(labels, (int)i,
-                                             m_style.label_text_format.c_str());
+      auto &label = labels.at(i).str;
       if (!label.empty()) {
         rect = m_layout->GetCandidateLabelRect(i);
         _TextOut(rect, label, label.length(), label_text_color, labeltxtFormat);
