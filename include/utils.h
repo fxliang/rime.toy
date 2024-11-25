@@ -116,6 +116,6 @@ inline std::string current_time() {
   return oss.str();
 }
 #define DEBUG                                                                  \
-  (DebugStream() << "[" << current_time() << " " << __FILE__ << ":"            \
-                 << __LINE__ << "] ")
+  (weasel::DebugStream() << "[" << weasel::current_time() << " " << __FILE__   \
+                         << ":" << __LINE__ << "] ")
 } // namespace weasel

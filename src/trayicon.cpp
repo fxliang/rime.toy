@@ -1,13 +1,14 @@
 #include "trayicon.h"
 #include <resource.h>
 #include <shellapi.h>
+#include <utils.h>
 
 TrayIcon::TrayIcon(HINSTANCE hInstance, const std::wstring &tooltip)
     : hInst(hInstance), hMenu(NULL), deploy_func(nullptr),
-      switch_ascii(nullptr) {
+      switch_ascii(nullptr), enable_debug(false) {
   CreateHwnd();
   nid.cbSize = sizeof(NOTIFYICONDATA);
-  nid.hWnd = hwnd;
+  nid.hWnd = m_hWnd;
   nid.uID = 1;
   nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
   nid.uCallbackMessage = WM_USER + 1;
@@ -17,7 +18,7 @@ TrayIcon::TrayIcon(HINSTANCE hInstance, const std::wstring &tooltip)
 
 TrayIcon::~TrayIcon() {
   Hide();
-  DestroyWindow(hwnd);
+  DestroyWindow(m_hWnd);
 }
 
 void TrayIcon::Show() { Shell_NotifyIcon(NIM_ADD, &nid); }
@@ -32,10 +33,10 @@ void TrayIcon::CreateHwnd() {
   wc.hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_ICON_MAIN));
   wc.hCursor = LoadCursor(NULL, IDC_ARROW);
   ::RegisterClass(&wc);
-  hwnd =
+  m_hWnd =
       CreateWindow(L"TrayIcon", L"TrayIcon", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT,
                    CW_USEDEFAULT, 0, 0, NULL, NULL, hInst, this);
-  ShowWindow(hwnd, SW_HIDE);
+  ShowWindow(m_hWnd, SW_HIDE);
 }
 
 void TrayIcon::SetIcon(HICON hIcon) {
@@ -53,6 +54,8 @@ void TrayIcon::SetTooltip(const std::wstring &tooltip) {
 void TrayIcon::CreateContextMenu() {
   if (hMenu == NULL) {
     hMenu = CreatePopupMenu();
+    AppendMenu(hMenu, MF_STRING | (enable_debug ? MF_CHECKED : MFS_UNCHECKED),
+               1004, L"调试信息");
     AppendMenu(hMenu, MF_STRING, 1003, L"重新部署");
     AppendMenu(hMenu, MF_STRING, 1002, L"退出");
   }
@@ -81,6 +84,16 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
     } else if (LOWORD(wParam) == 1003) {
       if (deploy_func)
         deploy_func();
+    } else if (LOWORD(wParam) == 1004) {
+      enable_debug = !enable_debug;
+
+      if (hMenu) {
+        DEBUG << "yes";
+        CheckMenuItem(hMenu, 1004, enable_debug ? MF_CHECKED : MF_UNCHECKED);
+      } else {
+        DEBUG << "No";
+      }
+      InvalidateRect(hwnd, NULL, true);
     }
     break;
   }

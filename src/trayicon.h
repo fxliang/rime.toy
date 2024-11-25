@@ -18,14 +18,16 @@ public:
   void SetSwichAsciiFunc(const std::function<void(void)> func) {
     switch_ascii = func;
   }
+  bool debug() { return enable_debug; }
 
 private:
   HINSTANCE hInst;
   NOTIFYICONDATA nid;
   HMENU hMenu;
-  HWND hwnd;
+  HWND m_hWnd;
   std::function<void(void)> deploy_func;
   std::function<void(void)> switch_ascii;
+  bool enable_debug;
 
   void CreateContextMenu();
   void CreateHwnd();
