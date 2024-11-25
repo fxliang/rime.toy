@@ -17,16 +17,6 @@ using wstring = std::wstring;
 using string = std::string;
 template <typename T> using vector = std::vector<T>;
 
-struct ComException {
-  HRESULT result;
-  ComException(HRESULT const value) : result(value) {}
-};
-inline void HR(HRESULT const result) {
-  if (S_OK != result) {
-    throw ComException(result);
-  }
-}
-
 // convert string to wstring, in code_page
 inline std::wstring string_to_wstring(const std::string &str,
                                       int code_page = CP_ACP) {
@@ -118,4 +108,27 @@ inline std::string current_time() {
 #define DEBUG                                                                  \
   (weasel::DebugStream() << "[" << weasel::current_time() << " " << __FILE__   \
                          << ":" << __LINE__ << "] ")
+
+inline wstring HRESULTToWString(HRESULT hr) {
+  wchar_t buffer[1024] = {0};
+  if (FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                     NULL, hr, 0, buffer, sizeof(buffer) / sizeof(wchar_t),
+                     NULL)) {
+    return std::wstring(buffer);
+  } else {
+    std::wostringstream oss;
+    oss << L"Unknown error: 0x" << std::hex << hr;
+    return oss.str();
+  }
+}
+struct ComException {
+  HRESULT result;
+  ComException(HRESULT const value) : result(value) {}
+};
+inline void HR(HRESULT const result) {
+  if (S_OK != result) {
+    DEBUG << HRESULTToWString(result);
+    throw ComException(result);
+  }
+}
 } // namespace weasel

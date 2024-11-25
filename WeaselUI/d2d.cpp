@@ -169,7 +169,6 @@ void D2D::InitFontFormats() {
   auto func = [&](const wstring &font_face, const int font_point,
                   ComPtr<IDWriteTextFormat1> &_pTextFormat,
                   DWRITE_WORD_WRAPPING wrap) {
-    HRESULT hResult = S_OK;
     bool vertical_text = m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT;
     std::vector<std::wstring> fontFaceStrVector;
 
