@@ -40,9 +40,11 @@ private:
   std::unique_ptr<TrayIcon> m_trayIcon;
   HICON m_ime_icon;
   HICON m_ascii_icon;
+  HINSTANCE m_hInstance;
   RimeSessionId m_session_id;
   RimeApi *rime_api;
   UI *m_ui;
+  wstring m_last_schema_id;
 };
 
 void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize);

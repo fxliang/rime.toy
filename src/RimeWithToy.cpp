@@ -27,6 +27,11 @@ int expand_ibus_modifier(int m) { return (m & 0xff) | ((m & 0xff00) << 16); }
 
 namespace weasel {
 
+wstring _LoadIconSettingFromSchema(RimeConfig &config, const char *key,
+                                   const char *backup,
+                                   const std::filesystem::path &user_dir,
+                                   const std::filesystem::path &shared_dir);
+
 static fs::path data_path(string subdir) {
   wchar_t _path[MAX_PATH] = {0};
   GetModuleFileNameW(NULL, _path, _countof(_path));
@@ -95,10 +100,9 @@ void RimeWithToy::on_message(void *context_object, RimeSessionId session_id,
   }
 }
 
-RimeWithToy::RimeWithToy(UI *ui, HINSTANCE hInstance) : m_ui(ui) {
+RimeWithToy::RimeWithToy(UI *ui, HINSTANCE hInstance)
+    : m_ui(ui), m_hInstance(hInstance) {
   Initialize();
-  m_ime_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
-  m_ascii_icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON_ASCII));
   const auto tooltip = L"rime.toy\n左键点击切换ASCII\n右键菜单可退出^_^";
   m_trayIcon = std::make_unique<TrayIcon>(hInstance, tooltip);
   m_trayIcon->SetDeployFunc([&]() {
@@ -130,6 +134,8 @@ void RimeWithToy::Initialize() {
     rime_api->config_close(&config);
   } else
     DEBUG << L"open weasel config failed";
+  Status &status = m_ui->status();
+  GetStatus(status);
   rime_api->set_option(m_session_id, "soft_cursor",
                        Bool(!m_ui->style().inline_preedit));
 }
@@ -255,6 +261,35 @@ void RimeWithToy::GetStatus(Status &status) {
     status.schema_name = u8tow(status_.schema_name);
     rime_api->free_status(&status_);
   }
+  if (status.schema_id != m_last_schema_id) {
+    RimeConfig config = {NULL};
+    if (rime_api->schema_open(wtou8(status.schema_id).c_str(), &config)) {
+      const auto shared_dir = data_path("shared");
+      const auto user_dir = data_path("usr");
+      UIStyle &style = m_ui->style();
+      style.current_zhung_icon = _LoadIconSettingFromSchema(
+          config, "schema/icon", "schema/zhung_icon", user_dir, shared_dir);
+      style.current_ascii_icon = _LoadIconSettingFromSchema(
+          config, "schema/ascii_icon", nullptr, user_dir, shared_dir);
+      const int STATUS_ICON_SIZE = GetSystemMetrics(SM_CXICON);
+      if (!style.current_zhung_icon.empty()) {
+        m_ime_icon = (HICON)LoadImage(NULL, style.current_zhung_icon.c_str(),
+                                      IMAGE_ICON, STATUS_ICON_SIZE,
+                                      STATUS_ICON_SIZE, LR_LOADFROMFILE);
+      } else {
+        m_ime_icon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
+      }
+      if (!style.current_ascii_icon.empty()) {
+        m_ascii_icon = (HICON)LoadImage(NULL, style.current_ascii_icon.c_str(),
+                                        IMAGE_ICON, STATUS_ICON_SIZE,
+                                        STATUS_ICON_SIZE, LR_LOADFROMFILE);
+      } else {
+        m_ascii_icon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ICON_ASCII));
+      }
+      rime_api->config_close(&config);
+    }
+    m_last_schema_id = status.schema_id;
+  }
 }
 
 void RimeWithToy::GetContext(Context &context, const Status &status) {
@@ -306,6 +341,30 @@ void RimeWithToy::GetContext(Context &context, const Status &status) {
 }
 
 // ----------------------------------------------------------------------------
+
+wstring _LoadIconSettingFromSchema(RimeConfig &config, const char *key,
+                                   const char *backup, const fs::path &user_dir,
+                                   const fs::path &shared_dir) {
+  RimeApi *rime_api = rime_get_api();
+  const int BUF_SIZE = 255;
+  char buffer[BUF_SIZE + 1] = {0};
+  if (rime_api->config_get_string(&config, key, buffer, BUF_SIZE) ||
+      (backup != NULL &&
+       rime_api->config_get_string(&config, backup, buffer, BUF_SIZE))) {
+    std::wstring resource = string_to_wstring(buffer, CP_UTF8);
+    DWORD dwAttrib = GetFileAttributes((user_dir / resource).c_str());
+    if (INVALID_FILE_ATTRIBUTES != dwAttrib &&
+        0 == (dwAttrib & FILE_ATTRIBUTE_DIRECTORY)) {
+      return (user_dir / resource).wstring();
+    }
+    dwAttrib = GetFileAttributes((shared_dir / resource).c_str());
+    if (INVALID_FILE_ATTRIBUTES != dwAttrib &&
+        0 == (dwAttrib & FILE_ATTRIBUTE_DIRECTORY)) {
+      return (shared_dir / resource).wstring();
+    }
+  }
+  return L"";
+}
 
 static inline COLORREF blend_colors(COLORREF fcolor, COLORREF bcolor) {
   return RGB((GetRValue(fcolor) * 2 + GetRValue(bcolor)) / 3,
