@@ -85,7 +85,7 @@ void D2D::InitDirect2D() {
                                                0.55f,  // green
                                                0.34f,  // blue
                                                0.75f); // alpha
-  HR(dc->CreateSolidColorBrush(brushColor, brush.ReleaseAndGetAddressOf()));
+  HR(dc->CreateSolidColorBrush(brushColor, m_pBrush.ReleaseAndGetAddressOf()));
 }
 
 void D2D::OnResize(UINT width, UINT height) {
@@ -230,6 +230,15 @@ void D2D::InitDirectWriteResources() {
   InitFontFormats();
   HR(dc->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black),
                                m_pBrush.ReleaseAndGetAddressOf()));
+}
+
+void D2D::SetBrushColor(uint32_t color) {
+  float a = ((color >> 24) & 0xFF) / 255.0f;
+  float b = ((color >> 16) & 0xFF) / 255.0f;
+  float g = ((color >> 8) & 0xFF) / 255.0f;
+  float r = (color & 0xFF) / 255.0f;
+  auto colorf = D2D1::ColorF(r, g, b, a);
+  m_pBrush->SetColor(colorf);
 }
 
 inline BOOL GetVersionEx2(LPOSVERSIONINFOW lpVersionInformation) {

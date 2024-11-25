@@ -31,7 +31,6 @@ private:
                      uint32_t back_color, uint32_t shadow_color,
                      uint32_t border_color);
 
-  D2D1::ColorF D2d1ColorFromColorRef(uint32_t color);
   void Render();
   void OnPaint();
 

@@ -23,6 +23,7 @@ struct D2D {
   void InitDpiInfo();
   void InitFontFormats();
   void OnResize(UINT width, UINT height);
+  void SetBrushColor(uint32_t color);
   void GetTextSize(const wstring &text, size_t nCount,
                    ComPtr<IDWriteTextFormat1> &pTextFormat, LPSIZE lpSize);
   void _SetFontFallback(ComPtr<IDWriteTextFormat1> textFormat,
@@ -42,7 +43,6 @@ struct D2D {
   ComPtr<IDCompositionDevice> dcompDevice;
   ComPtr<IDCompositionTarget> target;
   ComPtr<IDCompositionVisual> visual;
-  ComPtr<ID2D1SolidColorBrush> brush;
   ComPtr<IDWriteTextFormat1> pPreeditFormat;
   ComPtr<IDWriteTextFormat1> pTextFormat;
   ComPtr<IDWriteTextFormat1> pLabelFormat;

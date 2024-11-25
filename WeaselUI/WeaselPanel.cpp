@@ -166,14 +166,6 @@ D2D1_ROUNDED_RECT RoundedRectFromRect(const RECT &rect, uint32_t radius) {
   );
 }
 
-D2D1::ColorF WeaselPanel::D2d1ColorFromColorRef(uint32_t color) {
-  float a = ((color >> 24) & 0xFF) / 255.0f;
-  float b = ((color >> 16) & 0xFF) / 255.0f;
-  float g = ((color >> 8) & 0xFF) / 255.0f;
-  float r = (color & 0xFF) / 255.0f;
-  return D2D1::ColorF(r, g, b, a);
-}
-
 void WeaselPanel::Render() {
   m_pD2D->dc->BeginDraw();
   m_pD2D->dc->Clear(D2D1::ColorF({0.0f, 0.0f, 0.0f, 0.0f}));
@@ -395,7 +387,7 @@ void WeaselPanel::_TextOut(CRect &rc, const wstring &text, size_t cch,
     return;
   if (m_pD2D->m_pBrush == nullptr) {
   } else {
-    m_pD2D->m_pBrush->SetColor(D2d1ColorFromColorRef(color));
+    m_pD2D->SetBrushColor(color);
   }
 
   ComPtr<IDWriteTextLayout> pTextLayout;
@@ -437,10 +429,10 @@ void WeaselPanel::HighlightRect(const RECT &rect, float radius, uint32_t border,
     HR(m_pD2D->dc->CreateCompatibleRenderTarget(&bitmapRenderTarget));
 
     // Draw the rounded rectangle onto the bitmap render target
-    m_pD2D->brush->SetColor(D2d1ColorFromColorRef(shadow_color));
+    m_pD2D->SetBrushColor(shadow_color);
     bitmapRenderTarget->BeginDraw();
     bitmapRenderTarget->FillGeometry(roundedRectGeometry.Get(),
-                                     m_pD2D->brush.Get());
+                                     m_pD2D->m_pBrush.Get());
     bitmapRenderTarget->EndDraw();
     // Get the bitmap from the bitmap render target
     ComPtr<ID2D1Bitmap> bitmap;
@@ -462,8 +454,8 @@ void WeaselPanel::HighlightRect(const RECT &rect, float radius, uint32_t border,
     D2D1_ROUNDED_RECT roundedRect = RoundedRectFromRect(rect, radius);
     HR(m_pD2D->d2Factory->CreateRoundedRectangleGeometry(roundedRect,
                                                          &roundedRectGeometry));
-    m_pD2D->brush->SetColor(D2d1ColorFromColorRef(back_color));
-    m_pD2D->dc->FillGeometry(roundedRectGeometry.Get(), m_pD2D->brush.Get());
+    m_pD2D->SetBrushColor(back_color);
+    m_pD2D->dc->FillGeometry(roundedRectGeometry.Get(), m_pD2D->m_pBrush.Get());
   }
   // draw border
   if ((border_color & 0xff000000) && border) {
@@ -471,8 +463,9 @@ void WeaselPanel::HighlightRect(const RECT &rect, float radius, uint32_t border,
     CRect rc = rect;
     rc.InflateRect(hb, hb);
     D2D1_ROUNDED_RECT borderRect = RoundedRectFromRect(rc, radius + hb);
-    m_pD2D->brush->SetColor(D2d1ColorFromColorRef(border_color));
-    m_pD2D->dc->DrawRoundedRectangle(&borderRect, m_pD2D->brush.Get(), border);
+    m_pD2D->SetBrushColor(border_color);
+    m_pD2D->dc->DrawRoundedRectangle(&borderRect, m_pD2D->m_pBrush.Get(),
+                                     border);
   }
 }
 
