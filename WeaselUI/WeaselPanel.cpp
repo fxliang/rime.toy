@@ -29,9 +29,7 @@ const GUID CLSID_D2D1GaussianBlur = {
 
 WeaselPanel::WeaselPanel(UI &ui)
     : m_hWnd(nullptr), m_ctx(ui.ctx()), m_octx(ui.octx()),
-      m_status(ui.status()), m_style(ui.style()), m_ostyle(ui.ostyle()) {
-  Create(nullptr);
-}
+      m_status(ui.status()), m_style(ui.style()), m_ostyle(ui.ostyle()) {}
 
 BOOL WeaselPanel::IsWindow() const { return ::IsWindow(m_hWnd); }
 
@@ -137,6 +135,8 @@ void WeaselPanel::Refresh() {
 }
 
 BOOL WeaselPanel::Create(HWND parent) {
+  if (m_hWnd)
+    return !!m_hWnd;
   WNDCLASS wc = {};
   wc.lpfnWndProc = WindowProc;
   wc.hInstance = GetModuleHandle(nullptr);
@@ -152,7 +152,6 @@ BOOL WeaselPanel::Create(HWND parent) {
     m_pD2D.reset(new D2D(m_style, m_hWnd));
     m_ostyle = m_style;
   }
-  UpdateWindow(m_hWnd);
   return !!m_hWnd;
 }
 
@@ -494,7 +493,6 @@ LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
   case WM_PAINT:
     if (self) {
       self->OnPaint();
-      ValidateRect(hwnd, nullptr);
     }
     break;
   case WM_DESTROY:
