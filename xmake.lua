@@ -36,7 +36,7 @@ target(project_name)
 
   after_build(function(target)
     os.cp(path.join(target:targetdir(), project_name .. ".exe"), "$(projectdir)")
-    if is_mode("debug") then
+    if is_mode("debug") and is_plat('windows') then
       os.cp(path.join(target:targetdir(), project_name .. ".pdb"), "$(projectdir)")
     end
     if is_arch("x86") then

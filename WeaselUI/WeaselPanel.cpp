@@ -28,8 +28,9 @@ const GUID CLSID_D2D1GaussianBlur = {
     {0x8c, 0x58, 0x1d, 0x7f, 0x93, 0xe7, 0xa6, 0xa5}};
 
 WeaselPanel::WeaselPanel(UI &ui)
-    : m_hWnd(nullptr), m_ctx(ui.ctx()), m_octx(ui.octx()),
-      m_status(ui.status()), m_style(ui.style()), m_ostyle(ui.ostyle()) {}
+    : m_hWnd(nullptr), m_ctx(ui.ctx()), m_octx(ui.octx()), m_layout(nullptr),
+      m_pD2D(nullptr), m_status(ui.status()), m_style(ui.style()),
+      m_ostyle(ui.ostyle()), m_candidateCount(0), hide_candidates(true) {}
 
 BOOL WeaselPanel::IsWindow() const { return ::IsWindow(m_hWnd); }
 
@@ -126,7 +127,7 @@ void WeaselPanel::Refresh() {
     // half-full switching / simp-trad switching / error tips), and not in
     // schema menu
     // 2. inline preedit without candidates
-    inline_no_candidates =
+    bool inline_no_candidates =
         (m_style.inline_preedit && m_candidateCount == 0) && !show_tips;
     hide_candidates = inline_no_candidates ||
                       (margin_negative && !show_tips && !show_schema_menu);
@@ -168,7 +169,7 @@ D2D1_ROUNDED_RECT RoundedRectFromRect(const RECT &rect, uint32_t radius) {
 void WeaselPanel::Render() {
   m_pD2D->dc->BeginDraw();
   m_pD2D->dc->Clear(D2D1::ColorF({0.0f, 0.0f, 0.0f, 0.0f}));
-  if (!hide_candidates || inline_no_candidates) {
+  if (!hide_candidates) {
     auto rc = m_layout->GetContentRect();
     HighlightRect(rc, DPI_SCALE(m_style.round_corner_ex),
                   DPI_SCALE(m_style.border), m_style.back_color,

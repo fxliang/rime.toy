@@ -37,10 +37,7 @@ private:
   static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
                                      LPARAM lParam);
 
-  wstring m_text;
-  SIZE m_winSize{0, 0};
   RECT m_inputPos{0, 0, 0, 0};
-  float m_dpiScale = 96.0f / 72.0f;
 
   Context &m_ctx;
   Context &m_octx;
@@ -49,7 +46,6 @@ private:
   UIStyle &m_ostyle;
 
   int m_candidateCount;
-  bool inline_no_candidates;
   int m_hoverIndex = -1;
   bool hide_candidates;
   // ------------------------------------------------------------
