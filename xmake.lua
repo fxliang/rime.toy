@@ -15,12 +15,15 @@ target(project_name)
   set_languages("c++17")
   add_files("src/*.cpp", "src/*.rc")
   add_includedirs("./include")
-  add_links("user32", "Shlwapi", "shcore", "rime", "gdi32", "Shell32", "d2d1", "dwrite", 'dxgi', 'd3d11', 'dcomp', "oleaut32", "uiautomationcore", "ole32", "oleacc")
+  add_links("user32", "Shlwapi", "shcore", "rime", "gdi32", "Shell32", "d2d1",
+	"dwrite", 'dxgi', 'd3d11', 'dcomp', "oleaut32", "uiautomationcore", "ole32", "oleacc")
   add_deps('WeaselUI')
   if is_plat('windows') then
     add_cxflags("/utf-8")
     if is_mode("debug") then
       add_cxflags("/Zi")
+      add_cxflags("-Fd$(buildir)/$(targetname).pdb")
+      add_cxflags("/FS")
       add_ldflags("/DEBUG", {force = true})
     end
     add_ldflags("/SUBSYSTEM:WINDOWS")
@@ -49,8 +52,8 @@ target(project_name)
   -- generate src/app.rc before build
   before_build(function (target)
     import("core.base.text")
-    local rc_template = path.join(os.projectdir(), "src/app.rc.in")
-    local rc_output = path.join(os.projectdir(), "src/app.rc")
+    local rc_template = path.join(os.projectdir(), "src/rime.toy.rc.in")
+    local rc_output = path.join(os.projectdir(), "src/rime.toy.rc")
     local content = io.readfile(rc_template)
     content = content:gsub("${VERSION_MAJOR}", version_major)
     content = content:gsub("${VERSION_MINOR}", version_minor)

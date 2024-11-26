@@ -131,4 +131,5 @@ inline void HR(HRESULT const result) {
     throw ComException(result);
   }
 }
+
 } // namespace weasel

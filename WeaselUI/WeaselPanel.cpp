@@ -5,12 +5,16 @@
 #include "base.h"
 #include <DWrite.h>
 #include <dwrite_2.h>
+#include <filesystem>
 #include <map>
 #include <regex>
+#include <resource.h>
 #include <string>
 #include <utils.h>
 #include <vector>
 #include <wrl/client.h>
+
+namespace fs = std::filesystem;
 
 using namespace weasel;
 
@@ -27,10 +31,34 @@ const GUID CLSID_D2D1GaussianBlur = {
     0x4ac9,
     {0x8c, 0x58, 0x1d, 0x7f, 0x93, 0xe7, 0xa6, 0xa5}};
 
+void LoadIconIfNeed(wstring &oicofile, const wstring &icofile, HICON &hIcon,
+                    UINT id) {
+  if (oicofile == icofile)
+    return;
+  oicofile = icofile;
+  const int STATUS_ICON_SIZE = GetSystemMetrics(SM_CXICON);
+  HINSTANCE hInstance = GetModuleHandle(NULL);
+  if (!icofile.empty() && fs::exists(fs::path(icofile)))
+    hIcon =
+        (HICON)LoadImage(hInstance, icofile.c_str(), IMAGE_ICON,
+                         STATUS_ICON_SIZE, STATUS_ICON_SIZE, LR_LOADFROMFILE);
+  else
+    hIcon =
+        (HICON)LoadImage(hInstance, MAKEINTRESOURCE(id), IMAGE_ICON,
+                         STATUS_ICON_SIZE, STATUS_ICON_SIZE, LR_DEFAULTCOLOR);
+}
+
 WeaselPanel::WeaselPanel(UI &ui)
     : m_hWnd(nullptr), m_ctx(ui.ctx()), m_octx(ui.octx()), m_layout(nullptr),
       m_pD2D(nullptr), m_status(ui.status()), m_style(ui.style()),
-      m_ostyle(ui.ostyle()), m_candidateCount(0), hide_candidates(true) {}
+      m_ostyle(ui.ostyle()), m_candidateCount(0), hide_candidates(true) {
+  auto hInstance = GetModuleHandle(nullptr);
+  m_iconAlpha = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_EN));
+  m_iconEnabled = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ZH));
+  m_iconFull = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_FULL_SHAPE));
+  m_iconHalf = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_HALF_SHAPE));
+  m_iconDisabled = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_RELOAD));
+}
 
 BOOL WeaselPanel::IsWindow() const { return ::IsWindow(m_hWnd); }
 
@@ -172,8 +200,8 @@ void WeaselPanel::Render() {
   if (!hide_candidates) {
     auto rc = m_layout->GetContentRect();
     _HighlightRect(rc, DPI_SCALE(m_style.round_corner_ex),
-                  DPI_SCALE(m_style.border), m_style.back_color,
-                  m_style.shadow_color, m_style.border_color);
+                   DPI_SCALE(m_style.border), m_style.back_color,
+                   m_style.shadow_color, m_style.border_color);
     if (!m_ctx.preedit.empty()) {
       auto prc = m_layout->GetPreeditRect();
       _DrawPreedit(m_ctx.preedit, prc);
@@ -185,7 +213,33 @@ void WeaselPanel::Render() {
     if (m_candidateCount) {
       _DrawCandidates(true);
     }
+    if (m_layout->ShouldDisplayStatusIcon()) {
+      ComPtr<ID2D1Bitmap1> pBitmap;
+      LoadIconIfNeed(m_current_ascii_icon, m_style.current_ascii_icon,
+                     m_iconAlpha, IDI_EN);
+      LoadIconIfNeed(m_current_zhung_icon, m_style.current_zhung_icon,
+                     m_iconEnabled, IDI_ZH);
+      LoadIconIfNeed(m_current_full_icon, m_style.current_full_icon, m_iconFull,
+                     IDI_FULL_SHAPE);
+      LoadIconIfNeed(m_current_half_icon, m_style.current_half_icon, m_iconHalf,
+                     IDI_HALF_SHAPE);
+
+      HICON &ico =
+          m_status.disabled ? m_iconDisabled
+          : m_status.ascii_mode
+              ? m_iconAlpha
+              : (m_status.type == SCHEMA
+                     ? m_iconEnabled
+                     : (m_status.full_shape ? m_iconFull : m_iconHalf));
+      m_pD2D->GetBmpFromIcon(ico, pBitmap);
+      // Draw the bitmap
+      auto iconRect = m_layout->GetStatusIconRect();
+      D2D1_RECT_F iconRectf = D2D1::RectF(iconRect.left, iconRect.top,
+                                          iconRect.right, iconRect.bottom);
+      m_pD2D->dc->DrawBitmap(pBitmap.Get(), iconRectf);
+    }
   }
+
   HR(m_pD2D->dc->EndDraw());
   // Make the swap chain available to the composition engine
   HR(m_pD2D->swapChain->Present(1, 0)); // sync
@@ -230,8 +284,8 @@ bool WeaselPanel::_DrawPreedit(const Text &text, CRect &rc) {
         rc_hib.Inflate(DPI_SCALE(m_style.hilite_padding_x),
                        DPI_SCALE(m_style.hilite_padding_y));
         _HighlightRect(rc_hib, DPI_SCALE(m_style.round_corner),
-                      DPI_SCALE(m_style.border), m_style.hilited_back_color,
-                      m_style.hilited_shadow_color, 0);
+                       DPI_SCALE(m_style.border), m_style.hilited_back_color,
+                       m_style.hilited_shadow_color, 0);
         _TextOut(rc_hi, hilited_str, hilited_str.length(),
                  m_style.hilited_text_color, pTextFormat);
         if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
@@ -293,7 +347,7 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
         rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
                          DPI_SCALE(m_style.hilite_padding_y));
         _HighlightRect(rect, m_style.round_corner, 0, 0,
-                      m_style.candidate_shadow_color, 0);
+                       m_style.candidate_shadow_color, 0);
         drawn = true;
       }
     }
@@ -310,8 +364,8 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
       rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
                        DPI_SCALE(m_style.hilite_padding_y));
       _HighlightRect(rect, DPI_SCALE(m_style.round_corner), 0,
-                    m_style.candidate_back_color, 0,
-                    m_style.candidate_border_color);
+                     m_style.candidate_back_color, 0,
+                     m_style.candidate_border_color);
 
       auto &label = labels.at(i).str;
       if (!label.empty()) {
@@ -343,10 +397,10 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
       rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
                        DPI_SCALE(m_style.hilite_padding_y));
       _HighlightRect(rect, DPI_SCALE(m_style.round_corner),
-                    DPI_SCALE(m_style.border),
-                    m_style.hilited_candidate_back_color,
-                    m_style.hilited_candidate_shadow_color,
-                    m_style.hilited_candidate_border_color);
+                     DPI_SCALE(m_style.border),
+                     m_style.hilited_candidate_back_color,
+                     m_style.hilited_candidate_shadow_color,
+                     m_style.hilited_candidate_border_color);
       auto i = m_ctx.cinfo.highlighted;
       auto &label = labels.at(i).str;
       if (!label.empty()) {

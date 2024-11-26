@@ -31,6 +31,9 @@ struct D2D {
   void _ParseFontFace(const std::wstring &fontFaceStr,
                       DWRITE_FONT_WEIGHT &fontWeight,
                       DWRITE_FONT_STYLE &fontStyle);
+  HRESULT GetBmpFromIcon(HICON hIcon, ComPtr<ID2D1Bitmap1> &pBitmap);
+  HRESULT GetIconFromFile(const wstring &iconPath,
+                          ComPtr<ID2D1Bitmap1> &pD2DBitmap);
   ComPtr<ID3D11Device> direct3dDevice;
   ComPtr<IDXGIDevice> dxgiDevice;
   ComPtr<IDXGIFactory2> dxFactory;

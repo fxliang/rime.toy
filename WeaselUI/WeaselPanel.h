@@ -51,5 +51,14 @@ private:
   // ------------------------------------------------------------
   an<D2D> m_pD2D;
   Layout *m_layout;
+  HICON m_iconAlpha;
+  HICON m_iconEnabled;
+  HICON m_iconFull;
+  HICON m_iconHalf;
+  HICON m_iconDisabled;
+  wstring m_current_zhung_icon;
+  wstring m_current_ascii_icon;
+  wstring m_current_half_icon;
+  wstring m_current_full_icon;
 };
 } // namespace weasel

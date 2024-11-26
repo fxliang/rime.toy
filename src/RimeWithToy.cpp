@@ -216,6 +216,10 @@ BOOL RimeWithToy::ShowMessage(Context &ctx, Status &status) {
     } else if (m_message_value == "ascii_mode") {
       tips = L"英文";
     }
+    if (m_message_value == "full_shape" || m_message_value == "!full_shape")
+      status.type = FULL_SHAPE;
+    else
+      status.type = SCHEMA;
   }
 
   if (tips.empty())

@@ -1,8 +1,13 @@
 #include "resource.h"
 #include "winver.h"
 // 定义应用程序图标
-IDI_ICON_MAIN ICON "rime.toy.ico"
-IDI_ICON_ASCII ICON "ascii.ico"
+IDI_ICON_MAIN ICON "../resource/rime.toy.ico"
+IDI_ICON_ASCII ICON "../resource/en.ico"
+IDI_RELOAD ICON "../resource/reload.ico"
+IDI_ZH ICON "../resource/zh.ico"
+IDI_EN ICON "../resource/en.ico"
+IDI_FULL_SHAPE ICON "../resource/full.ico"
+IDI_HALF_SHAPE ICON "../resource/half.ico"
 
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION ${VERSION_MAJOR},${VERSION_MINOR},${VERSION_PATCH},0
