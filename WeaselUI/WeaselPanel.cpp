@@ -167,13 +167,12 @@ BOOL WeaselPanel::Create(HWND parent) {
   wc.lpfnWndProc = WindowProc;
   wc.hInstance = GetModuleHandle(nullptr);
   wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-  wc.lpszClassName = L"PopupWindowClass";
+  wc.lpszClassName = L"WeaselPanel";
   RegisterClass(&wc);
   m_hWnd = CreateWindowEx(
       WS_EX_NOACTIVATE | WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOPMOST,
-      L"PopupWindowClass", L"PopupWindowPanel", WS_POPUP | WS_VISIBLE,
-      CW_USEDEFAULT, CW_USEDEFAULT, 10, 10, parent, nullptr,
-      GetModuleHandle(nullptr), this);
+      L"WeaselPanel", L"WeaselPanel", WS_POPUP | WS_VISIBLE, CW_USEDEFAULT,
+      CW_USEDEFAULT, 10, 10, parent, nullptr, GetModuleHandle(nullptr), this);
   if (m_hWnd) {
     m_pD2D.reset(new D2D(m_style, m_hWnd));
     m_ostyle = m_style;
