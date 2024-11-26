@@ -171,7 +171,7 @@ void WeaselPanel::Render() {
   m_pD2D->dc->Clear(D2D1::ColorF({0.0f, 0.0f, 0.0f, 0.0f}));
   if (!hide_candidates) {
     auto rc = m_layout->GetContentRect();
-    HighlightRect(rc, DPI_SCALE(m_style.round_corner_ex),
+    _HighlightRect(rc, DPI_SCALE(m_style.round_corner_ex),
                   DPI_SCALE(m_style.border), m_style.back_color,
                   m_style.shadow_color, m_style.border_color);
     if (!m_ctx.preedit.empty()) {
@@ -229,7 +229,7 @@ bool WeaselPanel::_DrawPreedit(const Text &text, CRect &rc) {
         CRect rc_hib = rc_hi;
         rc_hib.Inflate(DPI_SCALE(m_style.hilite_padding_x),
                        DPI_SCALE(m_style.hilite_padding_y));
-        HighlightRect(rc_hib, DPI_SCALE(m_style.round_corner),
+        _HighlightRect(rc_hib, DPI_SCALE(m_style.round_corner),
                       DPI_SCALE(m_style.border), m_style.hilited_back_color,
                       m_style.hilited_shadow_color, 0);
         _TextOut(rc_hi, hilited_str, hilited_str.length(),
@@ -292,7 +292,7 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
         auto rect = m_layout->GetCandidateRect(i);
         rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
                          DPI_SCALE(m_style.hilite_padding_y));
-        HighlightRect(rect, m_style.round_corner, 0, 0,
+        _HighlightRect(rect, m_style.round_corner, 0, 0,
                       m_style.candidate_shadow_color, 0);
         drawn = true;
       }
@@ -309,7 +309,7 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
       auto rect = m_layout->GetCandidateRect(i);
       rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
                        DPI_SCALE(m_style.hilite_padding_y));
-      HighlightRect(rect, DPI_SCALE(m_style.round_corner), 0,
+      _HighlightRect(rect, DPI_SCALE(m_style.round_corner), 0,
                     m_style.candidate_back_color, 0,
                     m_style.candidate_border_color);
 
@@ -342,7 +342,7 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
       auto rect = m_layout->GetHighlightRect();
       rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
                        DPI_SCALE(m_style.hilite_padding_y));
-      HighlightRect(rect, DPI_SCALE(m_style.round_corner),
+      _HighlightRect(rect, DPI_SCALE(m_style.round_corner),
                     DPI_SCALE(m_style.border),
                     m_style.hilited_candidate_back_color,
                     m_style.hilited_candidate_shadow_color,
@@ -411,9 +411,9 @@ void WeaselPanel::_TextOut(CRect &rc, const wstring &text, size_t cch,
                              D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
 }
 
-void WeaselPanel::HighlightRect(const RECT &rect, float radius, uint32_t border,
-                                uint32_t back_color, uint32_t shadow_color,
-                                uint32_t border_color) {
+void WeaselPanel::_HighlightRect(const RECT &rect, float radius,
+                                 uint32_t border, uint32_t back_color,
+                                 uint32_t shadow_color, uint32_t border_color) {
   // draw shadow
   if ((shadow_color & 0xff000000) && m_style.shadow_radius) {
     CRect rc = rect;

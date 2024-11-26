@@ -27,9 +27,9 @@ private:
   void _ResizeWindow();
   void _TextOut(CRect &rc, const wstring &text, size_t cch, uint32_t color,
                 ComPtr<IDWriteTextFormat1> &pTextFormat);
-  void HighlightRect(const RECT &rect, float radius, uint32_t border,
-                     uint32_t back_color, uint32_t shadow_color,
-                     uint32_t border_color);
+  void _HighlightRect(const RECT &rect, float radius, uint32_t border,
+                      uint32_t back_color, uint32_t shadow_color,
+                      uint32_t border_color);
 
   void Render();
   void OnPaint();
