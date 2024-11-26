@@ -73,17 +73,17 @@ void RimeWithToy::setup_rime() {
   traits.app_name = "rime.toy";
   RimeApi *rime_api = rime_get_api();
   rime_api->setup(&traits);
-  rime_api->set_notification_handler(&on_message, nullptr);
+  rime_api->set_notification_handler(&on_message, this);
 }
 
 void RimeWithToy::on_message(void *context_object, RimeSessionId session_id,
                              const char *message_type,
                              const char *message_value) {
   // may be running in a thread when deploying rime
-  // RimeWithToy* self =
-  //    reinterpret_cast<RimeWithToy*>(context_object);
-  // if (!self || !message_type || !message_value)
-  //  return;
+  RimeWithToy* self =
+     reinterpret_cast<RimeWithToy*>(context_object);
+  if (!self || !message_type || !message_value)
+   return;
   m_message_type = message_type;
   m_message_value = message_value;
   RimeApi *rime_api = rime_get_api();

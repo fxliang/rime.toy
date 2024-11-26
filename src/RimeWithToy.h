@@ -22,7 +22,7 @@ public:
   RimeSessionId session_id() const { return m_session_id; }
 
 private:
-  static void setup_rime();
+  void setup_rime();
   static void on_message(void *context_object, RimeSessionId session_id,
                          const char *message_type, const char *message_value);
   void GetStatus(Status &stat);

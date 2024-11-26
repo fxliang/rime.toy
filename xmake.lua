@@ -21,7 +21,6 @@ target(project_name)
     add_ldflags('-static-libgcc -static-libstdc++ -static', {force=true})
   end
 
-  add_defines("_WIN32_WINNT=0x0603") -- 添加宏定义
   if is_plat('mingw') then
     add_ldflags("-municode -mwindows", {force = true})
   else
