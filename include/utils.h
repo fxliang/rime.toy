@@ -125,9 +125,12 @@ struct ComException {
   HRESULT result;
   ComException(HRESULT const value) : result(value) {}
 };
-inline void HR(HRESULT const result) {
+#define HR(result) HR_Impl(result, __FILE__, __LINE__)
+
+inline void HR_Impl(HRESULT const result, const char *file, int line) {
   if (S_OK != result) {
-    DEBUG << HRESULTToWString(result);
+    weasel::DebugStream() << "[" << weasel::current_time() << " " << file << ":"
+                          << line << "] " << weasel::HRESULTToWString(result);
     throw ComException(result);
   }
 }
