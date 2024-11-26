@@ -5,6 +5,8 @@
 #include <regex>
 #include <resource.h>
 
+#define VERSION_STRING(x) #x
+
 #define TRANSPARENT_COLOR 0x00000000
 #define ARGB2ABGR(value)                                                       \
   ((value & 0xff000000) | ((value & 0x000000ff) << 16) |                       \
@@ -69,7 +71,7 @@ void RimeWithToy::setup_rime() {
   traits.prebuilt_data_dir = traits.shared_data_dir;
   traits.distribution_name = "rime.toy";
   traits.distribution_code_name = "rime.toy";
-  traits.distribution_version = "0.0.2.0";
+  traits.distribution_version = VERSION_STRING(VERSION_INFO);
   traits.app_name = "rime.toy";
   RimeApi *rime_api = rime_get_api();
   rime_api->setup(&traits);
@@ -80,10 +82,9 @@ void RimeWithToy::on_message(void *context_object, RimeSessionId session_id,
                              const char *message_type,
                              const char *message_value) {
   // may be running in a thread when deploying rime
-  RimeWithToy* self =
-     reinterpret_cast<RimeWithToy*>(context_object);
+  RimeWithToy *self = reinterpret_cast<RimeWithToy *>(context_object);
   if (!self || !message_type || !message_value)
-   return;
+    return;
   m_message_type = message_type;
   m_message_value = message_value;
   RimeApi *rime_api = rime_get_api();
