@@ -110,9 +110,6 @@ void WeaselPanel::_ResizeWindow() {
 }
 
 void WeaselPanel::_CreateLayout() {
-  if (m_layout)
-    delete m_layout;
-
   Layout *layout;
   if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
     layout = new VHorizontalLayout(m_style, m_ctx, m_status, m_pD2D);
@@ -125,7 +122,7 @@ void WeaselPanel::_CreateLayout() {
       layout = new HorizontalLayout(m_style, m_ctx, m_status, m_pD2D);
     }
   }
-  m_layout = layout;
+  m_layout.reset(layout);
 }
 
 void WeaselPanel::Refresh() {

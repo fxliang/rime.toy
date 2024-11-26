@@ -50,7 +50,7 @@ private:
   bool hide_candidates;
   // ------------------------------------------------------------
   an<D2D> m_pD2D;
-  Layout *m_layout;
+  an<Layout> m_layout;
   HICON m_iconAlpha;
   HICON m_iconEnabled;
   HICON m_iconFull;
