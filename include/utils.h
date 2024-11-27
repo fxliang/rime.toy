@@ -88,6 +88,7 @@ public:
 private:
   std::wstringstream ss;
 };
+// get current time string
 inline std::string current_time() {
   using namespace std::chrono;
   // 获取当前时间
@@ -106,14 +107,17 @@ inline std::string current_time() {
       << ns.count() % 1000000; // 微秒部分
   return oss.str();
 }
+// output debug string
 #define DEBUG                                                                  \
   (weasel::DebugStream() << "[" << weasel::current_time() << " " << __FILE__   \
                          << ":" << __LINE__ << "] ")
 
+// DEBUG info with condition
 #define DEBUGIF(x)                                                             \
   if (x)                                                                       \
   DEBUG
 
+// HRESULT to wstring info
 inline wstring HRESULTToWString(HRESULT hr) {
   wchar_t buffer[1024] = {0};
   if (FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
@@ -126,12 +130,17 @@ inline wstring HRESULTToWString(HRESULT hr) {
     return oss.str();
   }
 }
+
 struct ComException {
   HRESULT result;
   ComException(HRESULT const value) : result(value) {}
 };
+
+// check result, if FAILED(result) then OutputDebugString result and throw
+// exception
 #define HR(result) HR_Impl(result, __FILE__, __LINE__)
 
+// if FAILED(result) OutputDebugString result info and return result
 #define FR(result)                                                             \
   if (FAILED(result)) {                                                        \
     weasel::DebugStream() << "[" << weasel::current_time() << " " << __FILE__  \
@@ -148,12 +157,14 @@ inline void HR_Impl(HRESULT const result, const char *file, int line) {
   }
 }
 
+// release a ComPtr
 template <typename T> void SafeRelease(ComPtr<T> &t) {
   if (t) {
     t->Release();
     t = nullptr;
   }
 }
+// release a group of ComPtrs
 template <typename... Ts> void SafeReleaseAll(Ts &&...args) {
   (SafeRelease(std::forward<Ts>(args)), ...);
 }
