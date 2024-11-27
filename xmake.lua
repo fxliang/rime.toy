@@ -49,15 +49,23 @@ target(project_name)
       os.cp("$(projectdir)/lib64/rime.dll", "$(projectdir)")
     end
   end)
-  -- generate src/app.rc before build
+  -- generate src/rime.toy.rc before build if needed
   before_build(function (target)
     import("core.base.text")
     local rc_template = path.join(os.projectdir(), "src/rime.toy.rc.in")
     local rc_output = path.join(os.projectdir(), "src/rime.toy.rc")
-    local content = io.readfile(rc_template)
-    content = content:gsub("${VERSION_MAJOR}", version_major)
-    content = content:gsub("${VERSION_MINOR}", version_minor)
-    content = content:gsub("${VERSION_PATCH}", version_patch)
-    io.writefile(rc_output, content)
-    target:add("files", rc_output)
+    local xmake_file = path.join(os.projectdir(), "xmake.lua")
+
+    local rc_template_mtime = os.mtime(rc_template) or 0
+    local xmake_file_mtime = os.mtime(xmake_file) or 0
+    local rc_output_mtime = os.mtime(rc_output) or 0
+
+    -- generate rc file when template updated or current xmake.lua updated
+    if rc_template_mtime > rc_output_mtime or xmake_file_mtime > rc_output_mtime then
+      local content = io.readfile(rc_template)
+      content = content:gsub("${VERSION_MAJOR}", version_major)
+      content = content:gsub("${VERSION_MINOR}", version_minor)
+      content = content:gsub("${VERSION_PATCH}", version_patch)
+      io.writefile(rc_output, content)
+    end
   end)
