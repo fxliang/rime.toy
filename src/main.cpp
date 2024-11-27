@@ -50,6 +50,13 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     KeyEvent ke;
     if (ConvertKeyEvent(pKeyboard, ki, ke)) {
       bool eat = false;
+      // reverse up / down when is to reposition
+      if (m_ui->GetIsReposition()) {
+        if (ke.keycode == ibus::Up)
+          ke.keycode = ibus::Down;
+        else if (ke.keycode == ibus::Down)
+          ke.keycode = ibus::Up;
+      }
       eat = m_toy->ProcessKeyEvent(ke, commit_str);
 
       m_toy->UpdateUI();

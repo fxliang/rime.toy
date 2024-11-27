@@ -45,7 +45,7 @@ public:
   Status &status() { return status_; }
   UIStyle &style() { return style_; }
   UIStyle &ostyle() { return ostyle_; }
-  // bool GetIsReposition();
+  bool GetIsReposition();
 
 private:
   UIImpl *pimpl_;

@@ -90,8 +90,13 @@ void WeaselPanel::MoveTo(RECT rc) {
       x = rcWorkArea.right;
     if (x < rcWorkArea.left)
       x = rcWorkArea.right;
-    if (y > rcWorkArea.bottom)
+    bool m_istorepos_buffer = m_istorepos;
+    if (y > rcWorkArea.bottom || m_sticky) {
+      m_sticky = true;
+      m_istorepos = (m_style.vertical_auto_reverse &&
+                     m_style.layout_type == UIStyle::LAYOUT_VERTICAL);
       y = rcWorkArea.bottom;
+    }
     if (y < rcWorkArea.top)
       y = rcWorkArea.top;
     if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT &&
@@ -100,6 +105,8 @@ void WeaselPanel::MoveTo(RECT rc) {
     m_inputPos.bottom = y;
 
     SetWindowPos(m_hWnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+    if (m_istorepos_buffer != m_istorepos)
+      Render();
   }
 }
 
@@ -203,12 +210,51 @@ void WeaselPanel::Render() {
     _HighlightRect(rc, DPI_SCALE(m_style.round_corner_ex),
                    DPI_SCALE(m_style.border), m_style.back_color,
                    m_style.shadow_color, m_style.border_color);
+    auto prc = m_layout->GetPreeditRect();
+    auto arc = m_layout->GetAuxiliaryRect();
+    // if vertical auto reverse triggered
+    if (m_istorepos) {
+      CRect *rects = new CRect[m_candidateCount];
+      int *btmys = new int[m_candidateCount];
+      for (auto i = 0; i < m_candidateCount && i < MAX_CANDIDATES_COUNT; ++i) {
+        rects[i] = m_layout->GetCandidateRect(i);
+        btmys[i] = rects[i].bottom;
+      }
+      if (m_candidateCount) {
+        if (!m_layout->IsInlinePreedit() && !m_ctx.preedit.str.empty())
+          m_offsety_preedit = rects[m_candidateCount - 1].bottom - prc.bottom;
+        if (!m_ctx.aux.str.empty())
+          m_offsety_aux = rects[m_candidateCount - 1].bottom - arc.bottom;
+      } else {
+        m_offsety_preedit = 0;
+        m_offsety_aux = 0;
+      }
+      int base_gap = 0;
+      if (!m_ctx.aux.str.empty())
+        base_gap = arc.Height() + m_style.spacing;
+      else if (!m_layout->IsInlinePreedit() && !m_ctx.preedit.str.empty())
+        base_gap = prc.Height() + m_style.spacing;
+
+      for (auto i = 0; i < m_candidateCount && i < MAX_CANDIDATES_COUNT; ++i) {
+        if (i == 0)
+          m_offsetys[i] =
+              btmys[m_candidateCount - i - 1] - base_gap - rects[i].bottom;
+        else
+          m_offsetys[i] = (rects[i - 1].top + m_offsetys[i - 1] -
+                           DPI_SCALE(m_style.candidate_spacing)) -
+                          rects[i].bottom;
+      }
+      delete[] rects;
+      delete[] btmys;
+    }
     if (!m_ctx.preedit.empty()) {
-      auto prc = m_layout->GetPreeditRect();
+      if (m_istorepos)
+        prc.OffsetRect(0, m_offsety_preedit);
       _DrawPreedit(m_ctx.preedit, prc);
     }
     if (!m_ctx.aux.empty()) {
-      auto arc = m_layout->GetAuxiliaryRect();
+      if (m_istorepos)
+        arc.OffsetRect(0, m_offsety_aux);
       _DrawPreedit(m_ctx.aux, arc);
     }
     if (m_candidateCount) {
@@ -345,6 +391,8 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
         if (i == m_ctx.cinfo.highlighted || i == m_hoverIndex)
           continue;
         auto rect = m_layout->GetCandidateRect(i);
+        if (m_istorepos)
+          rect.OffsetRect(0, m_offsetys[i]);
         rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
                          DPI_SCALE(m_style.hilite_padding_y));
         _HighlightRect(rect, m_style.round_corner, 0, 0,
@@ -362,6 +410,8 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
         continue;
 
       auto rect = m_layout->GetCandidateRect(i);
+      if (m_istorepos)
+        rect.OffsetRect(0, m_offsetys[i]);
       rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
                        DPI_SCALE(m_style.hilite_padding_y));
       _HighlightRect(rect, DPI_SCALE(m_style.round_corner), 0,
@@ -371,16 +421,22 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
       auto &label = labels.at(i).str;
       if (!label.empty()) {
         rect = m_layout->GetCandidateLabelRect(i);
+        if (m_istorepos)
+          rect.OffsetRect(0, m_offsetys[i]);
         _TextOut(rect, label, label.length(), label_text_color, labeltxtFormat);
       }
       auto &text = candidates.at(i).str;
       if (!text.empty()) {
         rect = m_layout->GetCandidateTextRect(i);
+        if (m_istorepos)
+          rect.OffsetRect(0, m_offsetys[i]);
         _TextOut(rect, text, text.length(), candidate_text_color, txtFormat);
       }
       auto &comment = comments.at(i).str;
       if (!comment.empty() && COLORNOTTRANSPARENT(m_style.comment_text_color)) {
         rect = m_layout->GetCandidateCommentRect(i);
+        if (m_istorepos)
+          rect.OffsetRect(0, m_offsetys[i]);
         _TextOut(rect, comment, comment.length(), comment_text_color,
                  commenttxtFormat);
       }
@@ -395,6 +451,8 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
       int candidate_text_color = m_style.hilited_candidate_text_color;
       int comment_text_color = m_style.hilited_comment_text_color;
       auto rect = m_layout->GetHighlightRect();
+      if (m_istorepos)
+        rect.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
       rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
                        DPI_SCALE(m_style.hilite_padding_y));
       _HighlightRect(rect, DPI_SCALE(m_style.round_corner),
@@ -406,16 +464,22 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
       auto &label = labels.at(i).str;
       if (!label.empty()) {
         rect = m_layout->GetCandidateLabelRect(i);
+        if (m_istorepos)
+          rect.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
         _TextOut(rect, label, label.length(), label_text_color, labeltxtFormat);
       }
       auto &text = candidates.at(i).str;
       if (!text.empty()) {
         rect = m_layout->GetCandidateTextRect(i);
+        if (m_istorepos)
+          rect.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
         _TextOut(rect, text, text.length(), candidate_text_color, txtFormat);
       }
       auto &comment = comments.at(i).str;
       if (!comment.empty() && COLORNOTTRANSPARENT(m_style.comment_text_color)) {
         rect = m_layout->GetCandidateCommentRect(i);
+        if (m_istorepos)
+          rect.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
         _TextOut(rect, comment, comment.length(), comment_text_color,
                  commenttxtFormat);
       }
@@ -534,6 +598,11 @@ void WeaselPanel::OnPaint() {
   Render();
 }
 
+void WeaselPanel::OnDestroy() {
+  m_layout.reset();
+  m_sticky = false;
+}
+
 LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
                                          LPARAM lParam) {
   WeaselPanel *self;
@@ -552,7 +621,10 @@ LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
     }
     break;
   case WM_DESTROY:
-    return 0;
+    if (self) {
+      self->OnDestroy();
+    }
+    break;
   case WM_LBUTTONUP: {
     return 0;
   }

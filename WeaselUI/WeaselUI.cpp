@@ -125,5 +125,5 @@ bool UI::Create(HWND parent) {
     return false;
   return pimpl_->panel.Create(parent);
 }
-
+bool UI::GetIsReposition() { return pimpl_->panel.GetIsReposition(); }
 } // namespace weasel
