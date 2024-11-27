@@ -23,6 +23,10 @@ struct D2D {
   void InitDirectWriteResources();
   void InitDpiInfo();
   void InitFontFormats();
+  void InitFontFormats(const wstring &label_font_face,
+                       const int label_font_point, const wstring &font_face,
+                       const int font_point, const wstring &comment_font_face,
+                       const int comment_font_point);
   void OnResize(UINT width, UINT height);
   void SetBrushColor(uint32_t color);
   void GetTextSize(const wstring &text, size_t nCount,

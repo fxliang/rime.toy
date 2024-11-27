@@ -157,6 +157,16 @@ static std::wstring _MatchWordsOutLowerCaseTrim1st(const std::wstring &wstr,
 }
 
 void D2D::InitFontFormats() {
+  InitFontFormats(m_style.label_font_face, m_style.label_font_point,
+                  m_style.font_face, m_style.font_point,
+                  m_style.comment_font_face, m_style.comment_font_point);
+}
+
+void D2D::InitFontFormats(const wstring &label_font_face,
+                          const int label_font_point, const wstring &font_face,
+                          const int font_point,
+                          const wstring &comment_font_face,
+                          const int comment_font_point) {
   DWRITE_WORD_WRAPPING wrapping =
       ((m_style.max_width == 0 &&
         m_style.layout_type != UIStyle::LAYOUT_VERTICAL_TEXT) ||
@@ -221,14 +231,11 @@ void D2D::InitFontFormats() {
                                    font_point * baseline);
     decltype(fontFaceStrVector)().swap(fontFaceStrVector);
   };
-  func(m_style.font_face, m_style.font_point, pPreeditFormat, wrapping_preedit);
-  func(m_style.font_face, m_style.font_point, pTextFormat, wrapping);
-  func(m_style.label_font_face, m_style.label_font_point, pLabelFormat,
-       wrapping);
-  func(m_style.comment_font_face, m_style.comment_font_point, pCommentFormat,
-       wrapping);
+  func(font_face, font_point, pPreeditFormat, wrapping_preedit);
+  func(font_face, font_point, pTextFormat, wrapping);
+  func(label_font_face, label_font_point, pLabelFormat, wrapping);
+  func(comment_font_face, comment_font_point, pCommentFormat, wrapping);
 }
-
 void D2D::InitDirectWriteResources() {
   // create dwrite objs
   HR(DWriteCreateFactory(

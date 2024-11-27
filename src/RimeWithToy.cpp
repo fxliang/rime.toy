@@ -731,10 +731,6 @@ void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize) {
                           "style/layout/hilite_padding", _abs);
   _RimeGetIntWithFallback(config, "style/layout/shadow_radius",
                           &style.shadow_radius, NULL, _abs);
-  // disable shadow for fullscreen layout
-  style.shadow_radius *=
-      (!(style.layout_type == UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN ||
-         style.layout_type == UIStyle::LAYOUT_VERTICAL_FULLSCREEN));
   _RimeGetIntWithFallback(config, "style/layout/shadow_offset_x",
                           &style.shadow_offset_x);
   _RimeGetIntWithFallback(config, "style/layout/shadow_offset_y",

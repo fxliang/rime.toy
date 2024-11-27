@@ -1,4 +1,5 @@
 #include "WeaselPanel.h"
+#include "FullScreenLayout.h"
 #include "HorizontalLayout.h"
 #include "VHorizontalLayout.h"
 #include "VerticalLayout.h"
@@ -121,6 +122,10 @@ void WeaselPanel::_CreateLayout() {
                m_style.layout_type == UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN) {
       layout = new HorizontalLayout(m_style, m_ctx, m_status, m_pD2D);
     }
+  }
+  if (IS_FULLSCREENLAYOUT(m_style)) {
+    layout = new FullScreenLayout(m_style, m_ctx, m_status, m_inputPos, layout,
+                                  m_pD2D);
   }
   m_layout.reset(layout);
 }
