@@ -15,6 +15,13 @@ D2D::D2D(UIStyle &style, HWND hwnd)
   InitDirectWriteResources();
 }
 
+D2D::~D2D() {
+  SafeReleaseAll(direct3dDevice, dxgiDevice, dxFactory, swapChain, d2Factory,
+                 d2Device, dc, surface, bitmap, dcompDevice, target, visual,
+                 pPreeditFormat, pLabelFormat, pTextFormat, pCommentFormat,
+                 m_pWriteFactory, m_pBrush);
+}
+
 void D2D::InitDirect2D() {
   HR(D3D11CreateDevice(nullptr, // Adapter
                        D3D_DRIVER_TYPE_HARDWARE,

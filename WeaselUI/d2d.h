@@ -18,6 +18,7 @@ namespace weasel {
 struct D2D {
 
   D2D(UIStyle &style, HWND hwnd);
+  ~D2D();
   void InitDirect2D();
   void InitDirectWriteResources();
   void InitDpiInfo();

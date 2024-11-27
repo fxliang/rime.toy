@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <windows.h>
+#include <winerror.h>
 #include <wrl.h>
 
 namespace weasel {
@@ -127,12 +128,30 @@ struct ComException {
 };
 #define HR(result) HR_Impl(result, __FILE__, __LINE__)
 
+#define FR(result)                                                             \
+  if (FAILED(result)) {                                                        \
+    weasel::DebugStream() << "[" << weasel::current_time() << " " << __FILE__  \
+                          << ":" << __LINE__ << "] "                           \
+                          << weasel::HRESULTToWString(result);                 \
+    return result;                                                             \
+  }
+
 inline void HR_Impl(HRESULT const result, const char *file, int line) {
   if (S_OK != result) {
     weasel::DebugStream() << "[" << weasel::current_time() << " " << file << ":"
                           << line << "] " << weasel::HRESULTToWString(result);
     throw ComException(result);
   }
+}
+
+template <typename T> void SafeRelease(ComPtr<T> &t) {
+  if (t) {
+    t->Release();
+    t = nullptr;
+  }
+}
+template <typename... Ts> void SafeReleaseAll(Ts &&...args) {
+  (SafeRelease(std::forward<Ts>(args)), ...);
 }
 
 } // namespace weasel
