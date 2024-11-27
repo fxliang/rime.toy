@@ -110,6 +110,10 @@ inline std::string current_time() {
   (weasel::DebugStream() << "[" << weasel::current_time() << " " << __FILE__   \
                          << ":" << __LINE__ << "] ")
 
+#define DEBUGIF(x)                                                             \
+  if (x)                                                                       \
+  DEBUG
+
 inline wstring HRESULTToWString(HRESULT hr) {
   wchar_t buffer[1024] = {0};
   if (FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,

@@ -87,12 +87,8 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
     } else if (LOWORD(wParam) == 1004) {
       enable_debug = !enable_debug;
 
-      if (hMenu) {
-        DEBUG << "yes";
+      if (hMenu)
         CheckMenuItem(hMenu, 1004, enable_debug ? MF_CHECKED : MF_UNCHECKED);
-      } else {
-        DEBUG << "No";
-      }
       InvalidateRect(hwnd, NULL, true);
     }
     break;
