@@ -15,16 +15,14 @@ std::unique_ptr<RimeWithToy> m_toy;
 
 void update_position(HWND hwnd) {
   POINT pt;
-  if (GetCursorPos(&pt)) {
-    m_ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
-  } else {
+  if (!GetCursorPos(&pt)) {
     RECT rect;
     if (hwnd)
       GetWindowRect(hwnd, &rect);
     pt.x = rect.left + (rect.right - rect.left) / 2 - 150;
     pt.y = rect.bottom - (rect.bottom - rect.top) / 2 - 100;
-    m_ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
   }
+  m_ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
 };
 
 // ----------------------------------------------------------------------------
