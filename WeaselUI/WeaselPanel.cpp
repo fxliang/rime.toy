@@ -463,6 +463,66 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
                      m_style.hilited_candidate_back_color,
                      m_style.hilited_candidate_shadow_color,
                      m_style.hilited_candidate_border_color);
+      // draw highlight mark
+      if (COLORNOTTRANSPARENT(m_style.hilited_mark_color)) {
+        if (!m_style.mark_text.empty()) {
+          CRect rc = m_layout->GetHighlightRect();
+          if (m_istorepos)
+            rc.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
+          rc.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
+                         DPI_SCALE(m_style.hilite_padding_y));
+          int vgap = m_layout->mark_height
+                         ? (rc.Height() - m_layout->mark_height) / 2
+                         : 0;
+          int hgap = m_layout->mark_width
+                         ? (rc.Width() - m_layout->mark_width) / 2
+                         : 0;
+          CRect hlRc;
+          if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+            hlRc = CRect(rc.left + hgap,
+                         rc.top + DPI_SCALE(m_style.hilite_padding_y),
+                         rc.left + hgap + m_layout->mark_width,
+                         rc.top + DPI_SCALE(m_style.hilite_padding_y) +
+                             m_layout->mark_height);
+          else
+            hlRc = CRect(rc.left + DPI_SCALE(m_style.hilite_padding_x),
+                         rc.top + vgap,
+                         rc.left + DPI_SCALE(m_style.hilite_padding_x) +
+                             m_layout->mark_width,
+                         rc.bottom - vgap);
+          _TextOut(hlRc, m_style.mark_text.c_str(), m_style.mark_text.length(),
+                   m_style.hilited_mark_color, txtFormat);
+        } else {
+          int height =
+              MIN(rect.Height() - DPI_SCALE(m_style.hilite_padding_y) * 2,
+                  rect.Height() - DPI_SCALE(m_style.round_corner) * 2);
+          int width =
+              MIN(rect.Width() - DPI_SCALE(m_style.hilite_padding_x) * 2,
+                  rect.Width() - DPI_SCALE(m_style.round_corner) * 2);
+          width = MIN(width, static_cast<int>(rect.Width() * 0.618));
+          height = MIN(height, static_cast<int>(rect.Height() * 0.618));
+          // if (bar_scale_ != 1.0f) {
+          //   width = static_cast<int>(width * bar_scale_);
+          //   height = static_cast<int>(height * bar_scale_);
+          // }
+          CRect mkrc;
+          int mark_radius;
+          if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
+            int x = rect.left + (rect.Width() - width) / 2;
+            mkrc =
+                CRect(x, rect.top, x + width, rect.top + m_layout->mark_height);
+            mark_radius = mkrc.Height() / 2;
+          } else {
+            int y = rect.top + (rect.Height() - height) / 2;
+            mkrc = CRect(rect.left, y, rect.left + m_layout->mark_width,
+                         y + height);
+            mark_radius = mkrc.Width() / 2;
+          }
+
+          _HighlightRect(mkrc, mark_radius, 0, m_style.hilited_mark_color, 0,
+                         0);
+        }
+      }
       auto i = m_ctx.cinfo.highlighted;
       auto &label = labels.at(i).str;
       if (!label.empty()) {
@@ -485,16 +545,6 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
           rect.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
         _TextOut(rect, comment, comment.length(), comment_text_color,
                  commenttxtFormat);
-      }
-      if (m_style.mark_text.empty() &&
-          COLORNOTTRANSPARENT(m_style.hilited_mark_color)) {
-        int height =
-            MIN(rect.Height() - DPI_SCALE(m_style.hilite_padding_y) * 2,
-                rect.Height() - DPI_SCALE(m_style.round_corner) * 2);
-        int width = MIN(rect.Width() - DPI_SCALE(m_style.hilite_padding_x) * 2,
-                        rect.Width() - DPI_SCALE(m_style.round_corner) * 2);
-        width = MIN(width, static_cast<int>(rect.Width() * 0.618));
-        height = MIN(height, static_cast<int>(rect.Height() * 0.618));
       }
       drawn = true;
     }
