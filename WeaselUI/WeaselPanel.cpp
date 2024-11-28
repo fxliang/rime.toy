@@ -91,6 +91,9 @@ void WeaselPanel::MoveTo(RECT rc) {
     if (x < rcWorkArea.left)
       x = rcWorkArea.right;
     bool m_istorepos_buffer = m_istorepos;
+    m_istorepos = false;
+    if (y < rcWorkArea.bottom)
+      m_sticky = false;
     if (y > rcWorkArea.bottom || m_sticky) {
       m_sticky = true;
       m_istorepos = (m_style.vertical_auto_reverse &&
