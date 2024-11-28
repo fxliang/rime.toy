@@ -82,6 +82,7 @@ void D2D::InitDirect2D() {
   HR(DCompositionCreateDevice(
       dxgiDevice.Get(), __uuidof(dcompDevice.Get()),
       reinterpret_cast<void **>(dcompDevice.ReleaseAndGetAddressOf())));
+  target.Reset();
   HR(dcompDevice->CreateTargetForHwnd(m_hWnd,
                                       true, // Top most
                                       target.ReleaseAndGetAddressOf()));
@@ -89,10 +90,7 @@ void D2D::InitDirect2D() {
   HR(visual->SetContent(swapChain.Get()));
   HR(target->SetRoot(visual.Get()));
   HR(dcompDevice->Commit());
-  D2D1_COLOR_F const brushColor = D2D1::ColorF(0.18f,  // red
-                                               0.55f,  // green
-                                               0.34f,  // blue
-                                               0.75f); // alpha
+  D2D1_COLOR_F const brushColor = D2D1::ColorF(D2D1::ColorF::Black);
   HR(dc->CreateSolidColorBrush(brushColor, m_pBrush.ReleaseAndGetAddressOf()));
 }
 

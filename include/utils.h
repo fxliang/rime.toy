@@ -6,6 +6,7 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <tchar.h>
 #include <vector>
 #include <windows.h>
 #include <winerror.h>
@@ -118,15 +119,15 @@ inline std::string current_time() {
   DEBUG
 
 // HRESULT to wstring info
-inline wstring HRESULTToWString(HRESULT hr) {
-  wchar_t buffer[1024] = {0};
-  if (FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                     NULL, hr, 0, buffer, sizeof(buffer) / sizeof(wchar_t),
-                     NULL)) {
-    return std::wstring(buffer);
+inline std::basic_string<TCHAR> StrzHr(HRESULT hr) {
+  TCHAR buffer[1024] = {0};
+  if (FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                    NULL, hr, 0, buffer, sizeof(buffer) / sizeof(TCHAR),
+                    NULL)) {
+    return std::basic_string<TCHAR>(buffer);
   } else {
-    std::wostringstream oss;
-    oss << L"Unknown error: 0x" << std::hex << hr;
+    std::basic_ostringstream<TCHAR> oss;
+    oss << _T("Unknown error: 0x") << std::hex << hr;
     return oss.str();
   }
 }
@@ -145,14 +146,20 @@ struct ComException {
   if (FAILED(result)) {                                                        \
     weasel::DebugStream() << "[" << weasel::current_time() << " " << __FILE__  \
                           << ":" << __LINE__ << "] "                           \
-                          << weasel::HRESULTToWString(result);                 \
+                          << weasel::StrzHr(result);                           \
     return result;                                                             \
+  }
+
+// if FAILED(hr), do a list of actions
+#define FAILEDACTION(hr, ...)                                                  \
+  if (FAILED(hr)) {                                                            \
+    __VA_ARGS__;                                                               \
   }
 
 inline void HR_Impl(HRESULT const result, const char *file, int line) {
   if (S_OK != result) {
     weasel::DebugStream() << "[" << weasel::current_time() << " " << file << ":"
-                          << line << "] " << weasel::HRESULTToWString(result);
+                          << line << "] " << weasel::StrzHr(result);
     throw ComException(result);
   }
 }
@@ -160,7 +167,7 @@ inline void HR_Impl(HRESULT const result, const char *file, int line) {
 // release a ComPtr
 template <typename T> void SafeRelease(ComPtr<T> &t) {
   if (t) {
-    t->Release();
+    t.Reset();
     t = nullptr;
   }
 }

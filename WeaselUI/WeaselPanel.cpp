@@ -595,6 +595,8 @@ void WeaselPanel::OnPaint() {
   // ignore if d2d resources not ready
   if (!m_pD2D)
     return;
+  auto hr = m_pD2D->direct3dDevice->GetDeviceRemovedReason();
+  FAILEDACTION(hr, DEBUG << StrzHr(hr), m_pD2D->InitDirect2D());
   _CreateLayout();
   m_layout->DoLayout();
   _ResizeWindow();
