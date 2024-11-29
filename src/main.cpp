@@ -38,7 +38,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
   if (hwnd != hwnd_previous) {
     hwnd_previous = hwnd;
     m_ui->ctx().clear();
-    m_ui->Hide();
+    m_ui->Destroy();
   }
   // ensure ime keyboard not open, not ok yet to Weasel
   HWND hImcWnd = ImmGetDefaultIMEWnd(hwnd);
@@ -57,6 +57,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (ConvertKeyEvent(pKeyboard, ki, ke)) {
       bool eat = false;
       // reverse up / down when is to reposition
+      m_ui->Create(nullptr);
       if (m_ui->GetIsReposition()) {
         if (ke.keycode == ibus::Up)
           ke.keycode = ibus::Down;
@@ -73,7 +74,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
         send_input_to_window(hwnd, commit_str);
         commit_str.clear();
         if (!status.composing)
-          m_ui->Hide();
+          m_ui->Destroy();
         else {
           m_toy->UpdateUI();
           update_position(hwnd);
@@ -112,7 +113,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   HR(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED));
   m_ui = std::make_unique<UI>();
   m_toy = std::make_unique<RimeWithToy>(m_ui.get(), hInstance, commit_str);
-  m_ui->Create(nullptr);
   // --------------------------------------------------------------------------
   hKeyboardHook =
       SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);

@@ -65,7 +65,10 @@ BOOL WeaselPanel::IsWindow() const { return ::IsWindow(m_hWnd); }
 
 void WeaselPanel::ShowWindow(int nCmdShow) { ::ShowWindow(m_hWnd, nCmdShow); }
 
-void WeaselPanel::DestroyWindow() { ::DestroyWindow(m_hWnd); }
+void WeaselPanel::DestroyWindow() {
+  ::DestroyWindow(m_hWnd);
+  m_hWnd = nullptr;
+}
 
 void WeaselPanel::MoveTo(RECT rc) {
   if (m_hWnd) {
@@ -211,7 +214,14 @@ BOOL WeaselPanel::Create(HWND parent) {
       L"WeaselPanel", L"WeaselPanel", WS_POPUP | WS_VISIBLE, CW_USEDEFAULT,
       CW_USEDEFAULT, 10, 10, parent, nullptr, GetModuleHandle(nullptr), this);
   if (m_hWnd) {
-    m_pD2D.reset(new D2D(m_style, m_hWnd));
+    if (!m_pD2D)
+      m_pD2D.reset(new D2D(m_style, m_hWnd));
+    else {
+      m_pD2D->m_hWnd = m_hWnd;
+      m_pD2D->InitDpiInfo();
+      m_pD2D->InitDirect2D();
+      m_pD2D->InitDirectWriteResources();
+    }
     m_ostyle = m_style;
   }
   return !!m_hWnd;
