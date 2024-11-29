@@ -72,7 +72,15 @@ void WeaselPanel::MoveTo(RECT rc) {
     m_inputPos = rc;
     RECT rcWorkArea;
     memset(&rcWorkArea, 0, sizeof(rcWorkArea));
+#ifdef TOY_FEATURE
+    HWND topWin = GetForegroundWindow();
+    CRect clientRect = rc;
+    if (topWin)
+      GetWindowRect(topWin, &clientRect);
+    HMONITOR hMonitor = MonitorFromRect(&clientRect, MONITOR_DEFAULTTONEAREST);
+#else
     HMONITOR hMonitor = MonitorFromRect(&m_inputPos, MONITOR_DEFAULTTONEAREST);
+#endif
     if (hMonitor) {
       MONITORINFO info;
       info.cbSize = sizeof(MONITORINFO);
@@ -86,6 +94,20 @@ void WeaselPanel::MoveTo(RECT rc) {
     rcWorkArea.bottom -= rcWindow.Height();
     int x = m_inputPos.left;
     int y = m_inputPos.bottom;
+#ifdef TOY_FEATURE
+    if (!IS_FULLSCREENLAYOUT(m_style)) {
+      POINT pt{x, y};
+      if (!clientRect.PtInRect(pt)) {
+        y = clientRect.bottom - rcWindow.Height();
+        x = clientRect.left + clientRect.Width() / 2;
+        auto xp = (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT &&
+                   !m_style.vertical_text_left_to_right)
+                      ? (rcWindow.Width() / 2)
+                      : (-rcWindow.Width() / 2);
+        x += xp;
+      }
+    }
+#endif
     if (x > rcWorkArea.right)
       x = rcWorkArea.right;
     if (x < rcWorkArea.left)

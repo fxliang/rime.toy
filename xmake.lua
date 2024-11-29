@@ -7,7 +7,7 @@ local version = "\"" .. version_major .. "." .. version_minor .. "." .. version_
 add_defines("VERSION_INFO=="..version)
 
 add_includedirs("./include")
-add_defines("UNICODE", "_UNICODE", "_WIN32_WINNT=0x0603")
+add_defines("UNICODE", "_UNICODE", "_WIN32_WINNT=0x0603", "TOY_FEATURE")
 includes("WeaselUI")
 
 target(project_name)
