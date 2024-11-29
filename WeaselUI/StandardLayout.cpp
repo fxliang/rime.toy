@@ -78,8 +78,8 @@ void StandardLayout::UpdateStatusIconLayout(int *width, int *height) {
           top = bottom_alignment;
         }
         _statusIconRect.SetRect(middle - STATUS_ICON_SIZE / 2 + 1, top,
-                                middle + STATUS_ICON_SIZE,
-                                top + STATUS_ICON_SIZE / 2 + 1);
+                                middle + STATUS_ICON_SIZE / 2 + 1,
+                                top + STATUS_ICON_SIZE + 1);
       } else {
         _statusIconRect.SetRect(0, 0, STATUS_ICON_SIZE, STATUS_ICON_SIZE);
         _statusIconRect.OffsetRect(offsetX, offsetY);
