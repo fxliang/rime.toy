@@ -1,6 +1,6 @@
 #pragma once
-#include "base.h"
 #include "d2d.h"
+#include <BaseTypes.h>
 #include <WeaselIPCData.h>
 #include <WeaselUI.h>
 

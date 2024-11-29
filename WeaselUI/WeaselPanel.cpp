@@ -3,7 +3,6 @@
 #include "HorizontalLayout.h"
 #include "VHorizontalLayout.h"
 #include "VerticalLayout.h"
-#include "base.h"
 #include <DWrite.h>
 #include <dwrite_2.h>
 #include <filesystem>
