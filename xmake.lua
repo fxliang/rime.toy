@@ -16,7 +16,8 @@ target(project_name)
   add_files("src/*.cpp", "src/*.rc")
   add_includedirs("./include")
   add_links("user32", "Shlwapi", "shcore", "rime", "gdi32", "Shell32", "d2d1",
-	"dwrite", 'dxgi', 'd3d11', 'dcomp', "oleaut32", "uiautomationcore", "ole32", "oleacc")
+	"dwrite", 'dxgi', 'd3d11', 'dcomp', "oleaut32", "uiautomationcore", "ole32",
+  "oleacc", "imm32")
   add_deps('WeaselUI')
   if is_plat('windows') then
     add_cxflags("/utf-8")

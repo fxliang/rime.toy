@@ -5,6 +5,7 @@
 #include <ShellScalingApi.h>
 #include <WeaselIPCData.h>
 #include <WeaselUI.h>
+#include <imm.h>
 
 using namespace std;
 using namespace weasel;
@@ -38,6 +39,12 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     hwnd_previous = hwnd;
     m_ui->ctx().clear();
     m_ui->Hide();
+  }
+  // ensure ime keyboard not open, not ok yet to Weasel
+  HWND hImcWnd = ImmGetDefaultIMEWnd(hwnd);
+  if (hImcWnd) {
+    if (SendMessage(hImcWnd, WM_IME_CONTROL, 5, 0))
+      SendMessage(hImcWnd, WM_IME_CONTROL, 6, 0);
   }
   if (nCode == HC_ACTION) {
     // update keyState table
