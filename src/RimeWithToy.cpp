@@ -101,8 +101,8 @@ void RimeWithToy::on_message(void *context_object, RimeSessionId session_id,
   }
 }
 
-RimeWithToy::RimeWithToy(UI *ui, HINSTANCE hInstance)
-    : m_ui(ui), m_hInstance(hInstance) {
+RimeWithToy::RimeWithToy(UI *ui, HINSTANCE hInstance, wstring &commit_str)
+    : m_ui(ui), m_hInstance(hInstance), m_commit_str(commit_str) {
   const auto tooltip = L"rime.toy\n左键点击切换ASCII\n右键菜单可退出^_^";
   m_trayIcon = std::make_unique<TrayIcon>(hInstance, tooltip);
   Initialize();
@@ -118,6 +118,12 @@ RimeWithToy::RimeWithToy(UI *ui, HINSTANCE hInstance)
   m_trayIconCallback = [&](const Status &sta) {
     m_trayIcon->SetIcon(sta.ascii_mode ? m_ascii_icon : m_ime_icon);
   };
+
+  if (!m_ui->uiCallback())
+    m_ui->SetCallback([=](size_t *const select_index, size_t *const hover_index,
+                          bool *const next_page, bool *const scroll_next_page) {
+      HandleUICallback(select_index, hover_index, next_page, scroll_next_page);
+    });
 }
 
 void RimeWithToy::Initialize() {
@@ -157,17 +163,17 @@ void RimeWithToy::SwitchAsciiMode() {
     m_trayIconCallback(status);
 }
 
-BOOL RimeWithToy::ProcessKeyEvent(KeyEvent keyEvent, wstring &commit_str) {
+BOOL RimeWithToy::ProcessKeyEvent(KeyEvent keyEvent) {
   auto reprstr = repr(keyEvent.keycode, expand_ibus_modifier(keyEvent.mask));
   DEBUGIF(m_trayIcon->debug()) << "RimeWithToy::ProcessKeyEvent " << reprstr;
   Bool handled = rime_api->process_key(m_session_id, keyEvent.keycode,
                                        expand_ibus_modifier(keyEvent.mask));
   RIME_STRUCT(RimeCommit, commit);
   if (rime_api->get_commit(m_session_id, &commit)) {
-    commit_str = u8tow(commit.text);
+    m_commit_str = u8tow(commit.text);
     rime_api->free_commit(&commit);
   } else {
-    commit_str.clear();
+    m_commit_str.clear();
   }
   UpdateUI();
   return handled;
@@ -343,6 +349,60 @@ void RimeWithToy::GetContext(Context &context, const Status &status) {
   }
 }
 
+Bool RimeWithToy::SelectCandidateCurrentPage(size_t index) {
+  return rime_api->select_candidate_on_current_page(m_session_id, index);
+}
+
+Bool RimeWithToy::ChangePage(bool backward) {
+  return rime_api->change_page(m_session_id, !!(backward));
+}
+
+Bool RimeWithToy::HighlightCandidateCurrentPage(size_t index) {
+  return rime_api->highlight_candidate_on_current_page(m_session_id, index);
+}
+
+void RimeWithToy::_HandleMousePageEvent(bool *next_page,
+                                        bool *scroll_next_page) {
+  // from scrolling event
+  bool handled = false;
+  if (*scroll_next_page) {
+    if (m_ui->style().paging_on_scroll)
+      handled = ChangePage(!(*scroll_next_page));
+    else {
+      UINT current_select = 0, cand_count = 0;
+      current_select = m_ui->ctx().cinfo.highlighted;
+      cand_count = m_ui->ctx().cinfo.candies.size();
+      bool is_reposition = m_ui->GetIsReposition();
+      int offset = *scroll_next_page ? 1 : -1;
+      offset = offset * (is_reposition ? -1 : 1);
+      int index = (int)current_select + offset;
+      if (index >= 0 && index < (int)cand_count)
+        HighlightCandidateCurrentPage(index);
+      else {
+        KeyEvent ke{0, 0};
+        ke.keycode = (index < 0) ? ibus::Up : ibus::Down;
+        handled = rime_api->process_key(m_session_id, ke.keycode,
+                                        expand_ibus_modifier(ke.mask));
+      }
+    }
+  } else { // from click event
+    ChangePage(!(*next_page));
+  }
+  if (handled) {
+    INPUT inputs[2];
+    inputs[0].type = INPUT_KEYBOARD;
+    inputs[0].ki = {VK_SELECT, 0, 0, 0, 0};
+    inputs[1].type = INPUT_KEYBOARD;
+    inputs[1].ki = {VK_SELECT, 0, KEYEVENTF_KEYUP, 0, 0};
+    ::SendInput(sizeof(inputs) / sizeof(INPUT), inputs, sizeof(INPUT));
+  }
+}
+
+void RimeWithToy::HandleUICallback(size_t *select_index, size_t *hover_index,
+                                   bool *next_page, bool *scroll_next_page) {
+  if (next_page || scroll_next_page)
+    _HandleMousePageEvent(next_page, scroll_next_page);
+}
 // ----------------------------------------------------------------------------
 
 wstring _LoadIconSettingFromSchema(RimeConfig &config, const char *key,

@@ -52,7 +52,8 @@ void LoadIconIfNeed(wstring &oicofile, const wstring &icofile, HICON &hIcon,
 WeaselPanel::WeaselPanel(UI &ui)
     : m_hWnd(nullptr), m_ctx(ui.ctx()), m_octx(ui.octx()), m_layout(nullptr),
       m_pD2D(nullptr), m_status(ui.status()), m_style(ui.style()),
-      m_ostyle(ui.ostyle()), m_candidateCount(0), hide_candidates(true) {
+      m_uiCallback(ui.uiCallback()), m_ostyle(ui.ostyle()), m_candidateCount(0),
+      hide_candidates(true) {
   auto hInstance = GetModuleHandle(nullptr);
   m_iconAlpha = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_EN));
   m_iconEnabled = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ZH));
@@ -658,6 +659,15 @@ void WeaselPanel::OnDestroy() {
   m_sticky = false;
 }
 
+HRESULT WeaselPanel::OnScroll(WPARAM wParam) {
+  int delta = GET_WHEEL_DELTA_WPARAM(wParam);
+  if (m_uiCallback && delta != 0) {
+    bool nextpage = delta < 0;
+    m_uiCallback(NULL, NULL, NULL, &nextpage);
+  }
+  return 0;
+}
+
 LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
                                          LPARAM lParam) {
   WeaselPanel *self;
@@ -680,6 +690,11 @@ LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
       self->OnDestroy();
     }
     break;
+  // not ready yet
+  // case WM_MOUSEWHEEL:
+  //  if (self)
+  //    return self->OnScroll(wParam);
+  //  break;
   case WM_LBUTTONUP: {
     return 0;
   }

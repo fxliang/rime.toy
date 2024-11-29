@@ -11,6 +11,9 @@ using namespace Microsoft::WRL;
 
 template <typename T> using an = std::shared_ptr<T>;
 template <typename T> using the = std::unique_ptr<T>;
+typedef std::function<void(size_t *const, size_t *const, bool *const,
+                           bool *const)>
+    UICallbackFunc;
 
 enum ClientCapabilities {
   INLINE_PREEDIT_CAPABLE = 1,
@@ -46,6 +49,9 @@ public:
   UIStyle &style() { return style_; }
   UIStyle &ostyle() { return ostyle_; }
   bool GetIsReposition();
+  UICallbackFunc &uiCallback() { return _uiCallback; }
+  void SetCallback(const UICallbackFunc &func) { _uiCallback = func; }
+  HWND hwnd();
 
 private:
   UIImpl *pimpl_;
@@ -54,5 +60,6 @@ private:
   Status status_;
   UIStyle style_;
   UIStyle ostyle_;
+  UICallbackFunc _uiCallback;
 };
 } // namespace weasel

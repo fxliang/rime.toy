@@ -35,6 +35,7 @@ private:
   void Render();
   void OnPaint();
   void OnDestroy();
+  HRESULT OnScroll(WPARAM wParam);
 
   static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
                                      LPARAM lParam);
@@ -69,5 +70,6 @@ private:
   wstring m_current_ascii_icon;
   wstring m_current_half_icon;
   wstring m_current_full_icon;
+  UICallbackFunc &m_uiCallback;
 };
 } // namespace weasel

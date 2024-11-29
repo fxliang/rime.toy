@@ -9,9 +9,11 @@
 using namespace std;
 using namespace weasel;
 // ----------------------------------------------------------------------------
-HHOOK hHook = NULL;
+HHOOK hKeyboardHook = NULL;
+HHOOK hMouseHook = NULL;
 std::unique_ptr<UI> m_ui;
 std::unique_ptr<RimeWithToy> m_toy;
+wstring commit_str = L"";
 
 void update_position(HWND hwnd) {
   POINT pt;
@@ -30,7 +32,6 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
   static HWND hwnd_previous = nullptr;
   static Status status;
   static bool committed = true;
-  static wstring commit_str = L"";
 
   HWND hwnd = GetForegroundWindow();
   if (hwnd != hwnd_previous) {
@@ -55,7 +56,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
         else if (ke.keycode == ibus::Down)
           ke.keycode = ibus::Up;
       }
-      eat = m_toy->ProcessKeyEvent(ke, commit_str);
+      eat = m_toy->ProcessKeyEvent(ke);
 
       m_toy->UpdateUI();
       status = m_ui->status();
@@ -86,7 +87,16 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     }
   }
 skip:
-  return CallNextHookEx(hHook, nCode, wParam, lParam);
+  return CallNextHookEx(hKeyboardHook, nCode, wParam, lParam);
+}
+
+LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
+  if (nCode == HC_ACTION && m_ui->hwnd()) {
+    if (wParam == WM_MOUSEWHEEL) {
+      PostMessage(m_ui->hwnd(), WM_MOUSEWHEEL, wParam, lParam);
+    }
+  }
+  return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
@@ -94,12 +104,19 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
   HR(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED));
   m_ui = std::make_unique<UI>();
-  m_toy = std::make_unique<RimeWithToy>(m_ui.get(), hInstance);
+  m_toy = std::make_unique<RimeWithToy>(m_ui.get(), hInstance, commit_str);
   m_ui->Create(nullptr);
   // --------------------------------------------------------------------------
-  hHook = SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
-  if (!hHook) {
-    DEBUG << L"Failed to install hook!";
+  hKeyboardHook =
+      SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
+  if (!hKeyboardHook) {
+    DEBUG << L"Failed to install keyboard hook!";
+    exit(1);
+  }
+  hMouseHook =
+      SetWindowsHookEx(WH_MOUSE, MouseProc, NULL, GetCurrentThreadId());
+  if (!hMouseHook) {
+    DEBUG << L"Failed to install mouse hook! " << std::hex << GetLastError();
     exit(1);
   }
   MSG msg;
@@ -108,7 +125,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     DispatchMessage(&msg);
   }
   m_toy->Finalize();
-  UnhookWindowsHookEx(hHook);
+  UnhookWindowsHookEx(hKeyboardHook);
+  UnhookWindowsHookEx(hMouseHook);
   CoUninitialize();
   return 0;
 }

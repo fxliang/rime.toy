@@ -13,10 +13,10 @@ namespace weasel {
 
 class RimeWithToy {
 public:
-  RimeWithToy(UI *ui, HINSTANCE hInstance);
+  RimeWithToy(UI *ui, HINSTANCE hInstance, wstring &commit_str);
   void Initialize();
   void Finalize();
-  BOOL ProcessKeyEvent(KeyEvent keyEvent, wstring &commit_str);
+  BOOL ProcessKeyEvent(KeyEvent keyEvent);
   void UpdateUI();
   void SwitchAsciiMode();
   RimeSessionId session_id() const { return m_session_id; }
@@ -29,6 +29,14 @@ private:
   void GetCandidateInfo(CandidateInfo &cinfo, RimeContext &ctx);
   void GetContext(Context &context, const Status &status);
   BOOL ShowMessage(Context &ctx, Status &status);
+
+  Bool SelectCandidateCurrentPage(size_t index);
+  Bool ChangePage(bool backward);
+  Bool HighlightCandidateCurrentPage(size_t index);
+  void HandleUICallback(size_t *const select_index, size_t *const hover_index,
+                        bool *const next_page, bool *const scroll_next_page);
+
+  void _HandleMousePageEvent(bool *next_page, bool *scroll_next_page);
 
   static std::string m_message_type;
   static std::string m_message_value;
@@ -45,6 +53,7 @@ private:
   RimeApi *rime_api;
   UI *m_ui;
   wstring m_last_schema_id;
+  wstring &m_commit_str;
 };
 
 void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize);
