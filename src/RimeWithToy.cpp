@@ -101,8 +101,9 @@ void RimeWithToy::on_message(void *context_object, RimeSessionId session_id,
   }
 }
 
-RimeWithToy::RimeWithToy(UI *ui, HINSTANCE hInstance, wstring &commit_str)
-    : m_ui(ui), m_hInstance(hInstance), m_commit_str(commit_str) {
+RimeWithToy::RimeWithToy(HINSTANCE hInstance, wstring &commit_str)
+    : m_hInstance(hInstance), m_commit_str(commit_str) {
+  m_ui = std::make_shared<UI>();
   const auto tooltip = L"rime.toy\n左键点击切换ASCII\n右键菜单可退出^_^";
   m_trayIcon = std::make_unique<TrayIcon>(hInstance, tooltip);
   Initialize();
@@ -137,7 +138,7 @@ void RimeWithToy::Initialize() {
   m_session_id = rime_api->create_session();
   RimeConfig config = {NULL};
   if (rime_api->config_open("weasel", &config)) {
-    _UpdateUIStyle(&config, m_ui, true);
+    _UpdateUIStyle(&config, m_ui.get(), true);
     rime_api->config_close(&config);
   } else
     DEBUGIF(m_trayIcon->debug()) << L"open weasel config failed";
@@ -166,6 +167,12 @@ void RimeWithToy::SwitchAsciiMode() {
 BOOL RimeWithToy::ProcessKeyEvent(KeyEvent keyEvent) {
   auto reprstr = repr(keyEvent.keycode, expand_ibus_modifier(keyEvent.mask));
   DEBUGIF(m_trayIcon->debug()) << "RimeWithToy::ProcessKeyEvent " << reprstr;
+  if (m_ui->GetIsReposition()) {
+    if (keyEvent.keycode == ibus::Up)
+      keyEvent.keycode = ibus::Down;
+    else if (keyEvent.keycode == ibus::Down)
+      keyEvent.keycode = ibus::Up;
+  }
   Bool handled = rime_api->process_key(m_session_id, keyEvent.keycode,
                                        expand_ibus_modifier(keyEvent.mask));
   RIME_STRUCT(RimeCommit, commit);
@@ -403,6 +410,26 @@ void RimeWithToy::HandleUICallback(size_t *select_index, size_t *hover_index,
   if (next_page || scroll_next_page)
     _HandleMousePageEvent(next_page, scroll_next_page);
 }
+
+void RimeWithToy::UpdateInputPosition(const RECT &rc) {
+  if (m_ui)
+    m_ui->UpdateInputPosition(rc);
+}
+
+void RimeWithToy::DestroyUI() {
+  if (m_ui) {
+    m_ui->ctx().clear();
+    m_ui->Destroy();
+  }
+}
+
+Status RimeWithToy::GetRimeStatus() {
+  Status status;
+  GetStatus(status);
+  return status;
+}
+
+bool RimeWithToy::StartUI() { return m_ui->Create(nullptr); }
 // ----------------------------------------------------------------------------
 
 wstring _LoadIconSettingFromSchema(RimeConfig &config, const char *key,

@@ -13,13 +13,18 @@ namespace weasel {
 
 class RimeWithToy {
 public:
-  RimeWithToy(UI *ui, HINSTANCE hInstance, wstring &commit_str);
+  RimeWithToy(HINSTANCE hInstance, wstring &commit_str);
   void Initialize();
   void Finalize();
   BOOL ProcessKeyEvent(KeyEvent keyEvent);
   void UpdateUI();
   void SwitchAsciiMode();
   RimeSessionId session_id() const { return m_session_id; }
+  void UpdateInputPosition(const RECT &rc);
+  bool StartUI();
+  void DestroyUI();
+  Status GetRimeStatus();
+  HWND UIHwnd() { return m_ui ? m_ui->hwnd() : nullptr; }
 
 private:
   void setup_rime();
@@ -51,7 +56,7 @@ private:
   HINSTANCE m_hInstance;
   RimeSessionId m_session_id;
   RimeApi *rime_api;
-  UI *m_ui;
+  an<UI> m_ui;
   wstring m_last_schema_id;
   wstring &m_commit_str;
 };

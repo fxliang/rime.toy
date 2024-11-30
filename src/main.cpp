@@ -12,7 +12,6 @@ using namespace weasel;
 // ----------------------------------------------------------------------------
 HHOOK hKeyboardHook = NULL;
 HHOOK hMouseHook = NULL;
-std::unique_ptr<UI> m_ui;
 std::unique_ptr<RimeWithToy> m_toy;
 wstring commit_str = L"";
 
@@ -25,7 +24,7 @@ void update_position(HWND hwnd) {
     pt.x = rect.left + (rect.right - rect.left) / 2 - 150;
     pt.y = rect.bottom - (rect.bottom - rect.top) / 2 - 100;
   }
-  m_ui->UpdateInputPosition({pt.x, 0, 0, pt.y});
+  m_toy->UpdateInputPosition({pt.x, 0, 0, pt.y});
 };
 
 // ----------------------------------------------------------------------------
@@ -37,8 +36,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
   HWND hwnd = GetForegroundWindow();
   if (hwnd != hwnd_previous) {
     hwnd_previous = hwnd;
-    m_ui->ctx().clear();
-    m_ui->Destroy();
+    m_toy->DestroyUI();
   }
   // ensure ime keyboard not open, not ok yet to Weasel
   HWND hImcWnd = ImmGetDefaultIMEWnd(hwnd);
@@ -57,24 +55,18 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (ConvertKeyEvent(pKeyboard, ki, ke)) {
       bool eat = false;
       // reverse up / down when is to reposition
-      m_ui->Create(nullptr);
-      if (m_ui->GetIsReposition()) {
-        if (ke.keycode == ibus::Up)
-          ke.keycode = ibus::Down;
-        else if (ke.keycode == ibus::Down)
-          ke.keycode = ibus::Up;
-      }
+      m_toy->StartUI();
       eat = m_toy->ProcessKeyEvent(ke);
 
       m_toy->UpdateUI();
-      status = m_ui->status();
+      status = m_toy->GetRimeStatus();
       update_position(hwnd);
       committed = !commit_str.empty();
       if (!commit_str.empty()) {
         send_input_to_window(hwnd, commit_str);
         commit_str.clear();
         if (!status.composing)
-          m_ui->Destroy();
+          m_toy->DestroyUI();
         else {
           m_toy->UpdateUI();
           update_position(hwnd);
@@ -99,9 +91,9 @@ skip:
 }
 
 LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
-  if (nCode == HC_ACTION && m_ui->hwnd()) {
+  if (nCode == HC_ACTION && m_toy->UIHwnd()) {
     if (wParam == WM_MOUSEWHEEL) {
-      PostMessage(m_ui->hwnd(), WM_MOUSEWHEEL, wParam, lParam);
+      PostMessage(m_toy->UIHwnd(), WM_MOUSEWHEEL, wParam, lParam);
     }
   }
   return CallNextHookEx(NULL, nCode, wParam, lParam);
@@ -111,8 +103,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                     LPWSTR lpCmdLine, int nCmdShow) {
   SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
   HR(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED));
-  m_ui = std::make_unique<UI>();
-  m_toy = std::make_unique<RimeWithToy>(m_ui.get(), hInstance, commit_str);
+  m_toy = std::make_unique<RimeWithToy>(hInstance, commit_str);
   // --------------------------------------------------------------------------
   hKeyboardHook =
       SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
