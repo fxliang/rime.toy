@@ -106,12 +106,20 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance, wstring &commit_str)
   m_ui = std::make_shared<UI>();
   const auto tooltip = L"rime.toy\n左键点击切换ASCII\n右键菜单可退出^_^";
   m_trayIcon = std::make_unique<TrayIcon>(hInstance, tooltip);
+  m_reload_icon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_RELOAD));
+  m_trayIcon->SetIcon(m_reload_icon);
   Initialize();
   m_trayIcon->SetDeployFunc([&]() {
     DEBUGIF(m_trayIcon->debug()) << L"Deploy Menu clicked";
+    m_disabled = true;
+    m_trayIcon->SetIcon(m_reload_icon);
+    rime_api->finalize();
+    rime_api->deploy();
+    rime_api->deploy_config_file("weasel.yaml", "config_version");
     Initialize();
     BOOL ascii = rime_api->get_option(m_session_id, "ascii_mode");
     m_trayIcon->SetIcon(ascii ? m_ascii_icon : m_ime_icon);
+    m_disabled = false;
   });
   m_trayIcon->SetSwichAsciiFunc([&]() { SwitchAsciiMode(); });
   m_trayIcon->SetIcon(m_ime_icon);

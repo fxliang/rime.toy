@@ -53,6 +53,7 @@ private:
   std::unique_ptr<TrayIcon> m_trayIcon;
   HICON m_ime_icon;
   HICON m_ascii_icon;
+  HICON m_reload_icon;
   HINSTANCE m_hInstance;
   RimeSessionId m_session_id;
   RimeApi *rime_api;
