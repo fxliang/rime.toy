@@ -102,7 +102,7 @@ void RimeWithToy::on_message(void *context_object, RimeSessionId session_id,
 }
 
 RimeWithToy::RimeWithToy(HINSTANCE hInstance, wstring &commit_str)
-    : m_hInstance(hInstance), m_commit_str(commit_str) {
+    : m_hInstance(hInstance), m_commit_str(commit_str), m_disabled(false) {
   m_ui = std::make_shared<UI>();
   const auto tooltip = L"rime.toy\n左键点击切换ASCII\n右键菜单可退出^_^";
   m_trayIcon = std::make_unique<TrayIcon>(hInstance, tooltip);
@@ -130,6 +130,7 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance, wstring &commit_str)
 void RimeWithToy::Initialize() {
   DEBUGIF(m_trayIcon->debug()) << L"RimeWithToy::Initialize() called";
   setup_rime();
+  m_disabled = true;
   rime_api = rime_get_api();
   rime_api->initialize(NULL);
   if (rime_api->start_maintenance(true))
@@ -146,6 +147,7 @@ void RimeWithToy::Initialize() {
   GetStatus(status);
   rime_api->set_option(m_session_id, "soft_cursor",
                        Bool(!m_ui->style().inline_preedit));
+  m_disabled = false;
 }
 
 void RimeWithToy::Finalize() {
@@ -165,6 +167,8 @@ void RimeWithToy::SwitchAsciiMode() {
 }
 
 BOOL RimeWithToy::ProcessKeyEvent(KeyEvent keyEvent) {
+  if (m_disabled)
+    return False;
   auto reprstr = repr(keyEvent.keycode, expand_ibus_modifier(keyEvent.mask));
   DEBUGIF(m_trayIcon->debug()) << "RimeWithToy::ProcessKeyEvent " << reprstr;
   if (m_ui->GetIsReposition()) {
@@ -187,7 +191,7 @@ BOOL RimeWithToy::ProcessKeyEvent(KeyEvent keyEvent) {
 }
 
 void RimeWithToy::UpdateUI() {
-  if (!m_ui)
+  if (!m_ui || m_disabled)
     return;
   Status &status = m_ui->status();
   Context ctx;

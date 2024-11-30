@@ -59,6 +59,7 @@ private:
   an<UI> m_ui;
   wstring m_last_schema_id;
   wstring &m_commit_str;
+  bool m_disabled;
 };
 
 void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize);
