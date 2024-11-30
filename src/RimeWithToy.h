@@ -42,6 +42,7 @@ private:
                         bool *const next_page, bool *const scroll_next_page);
 
   void _HandleMousePageEvent(bool *next_page, bool *scroll_next_page);
+  void _LoadSchemaSpecificSettings(RimeSessionId id, const wstring &schema_id);
 
   static std::string m_message_type;
   static std::string m_message_value;
@@ -60,7 +61,9 @@ private:
   an<UI> m_ui;
   wstring m_last_schema_id;
   wstring &m_commit_str;
+  UIStyle m_base_style;
   bool m_disabled;
+  bool m_current_dark_mode;
 };
 
 void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize);

@@ -29,6 +29,8 @@ int expand_ibus_modifier(int m) { return (m & 0xff) | ((m & 0xff00) << 16); }
 
 namespace weasel {
 
+bool _UpdateUIStyleColor(RimeConfig *config, UIStyle &style, string color);
+
 wstring _LoadIconSettingFromSchema(RimeConfig &config, const char *key,
                                    const char *backup,
                                    const std::filesystem::path &user_dir,
@@ -122,6 +124,12 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance, wstring &commit_str)
     m_disabled = false;
   });
   m_trayIcon->SetSwichAsciiFunc([&]() { SwitchAsciiMode(); });
+  m_trayIcon->SetSwichDarkFunc([&]() {
+    m_current_dark_mode = IsUserDarkMode();
+    _LoadSchemaSpecificSettings(m_session_id, GetRimeStatus().schema_id);
+    if (m_ui)
+      m_ui->Refresh();
+  });
   m_trayIcon->SetIcon(m_ime_icon);
   m_trayIcon->Show();
   m_trayIconCallback = [&](const Status &sta) {
@@ -151,6 +159,8 @@ void RimeWithToy::Initialize() {
     rime_api->config_close(&config);
   } else
     DEBUGIF(m_trayIcon->debug()) << L"open weasel config failed";
+  m_base_style = m_ui->style();
+  m_current_dark_mode = IsUserDarkMode();
   Status &status = m_ui->status();
   GetStatus(status);
   rime_api->set_option(m_session_id, "soft_cursor",
@@ -290,33 +300,9 @@ void RimeWithToy::GetStatus(Status &status) {
     rime_api->free_status(&status_);
   }
   if (status.schema_id != m_last_schema_id) {
-    RimeConfig config = {NULL};
-    if (rime_api->schema_open(wtou8(status.schema_id).c_str(), &config)) {
-      const auto shared_dir = data_path("shared");
-      const auto user_dir = data_path("usr");
-      UIStyle &style = m_ui->style();
-      style.current_zhung_icon = _LoadIconSettingFromSchema(
-          config, "schema/icon", "schema/zhung_icon", user_dir, shared_dir);
-      style.current_ascii_icon = _LoadIconSettingFromSchema(
-          config, "schema/ascii_icon", nullptr, user_dir, shared_dir);
-      const int STATUS_ICON_SIZE = GetSystemMetrics(SM_CXICON);
-      if (!style.current_zhung_icon.empty()) {
-        m_ime_icon = (HICON)LoadImage(NULL, style.current_zhung_icon.c_str(),
-                                      IMAGE_ICON, STATUS_ICON_SIZE,
-                                      STATUS_ICON_SIZE, LR_LOADFROMFILE);
-      } else {
-        m_ime_icon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
-      }
-      if (!style.current_ascii_icon.empty()) {
-        m_ascii_icon = (HICON)LoadImage(NULL, style.current_ascii_icon.c_str(),
-                                        IMAGE_ICON, STATUS_ICON_SIZE,
-                                        STATUS_ICON_SIZE, LR_LOADFROMFILE);
-      } else {
-        m_ascii_icon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ICON_ASCII));
-      }
-      rime_api->config_close(&config);
-    }
     m_last_schema_id = status.schema_id;
+    if (m_last_schema_id != L".default")
+      _LoadSchemaSpecificSettings(m_session_id, m_last_schema_id);
   }
 }
 
@@ -439,6 +425,78 @@ Status RimeWithToy::GetRimeStatus() {
   Status status;
   GetStatus(status);
   return status;
+}
+
+void RimeWithToy::_LoadSchemaSpecificSettings(RimeSessionId id,
+                                              const wstring &schema_id) {
+  RimeConfig config;
+  if (!rime_api->schema_open(wtou8(schema_id).c_str(), &config))
+    return;
+  const auto shared_dir = data_path("shared");
+  const auto user_dir = data_path("usr");
+  UIStyle &style = m_ui->style();
+  style = m_base_style;
+  _UpdateUIStyle(&config, m_ui.get(), false);
+  const int BUF_SIZE = 255;
+  char buffer[BUF_SIZE + 1] = {0};
+  if (!m_current_dark_mode &&
+      rime_api->config_get_string(&config, "style/color_scheme", buffer,
+                                  BUF_SIZE)) {
+    std::string color_name(buffer);
+    RimeConfigIterator preset = {0};
+    if (rime_api->config_begin_map(
+            &preset, &config, ("preset_color_schemes/" + color_name).c_str())) {
+      _UpdateUIStyleColor(&config, style, color_name);
+      rime_api->config_end(&preset);
+    } else {
+      RimeConfig weaselconfig;
+      if (rime_api->config_open("weasel", &weaselconfig)) {
+        _UpdateUIStyleColor(&weaselconfig, style, color_name);
+        rime_api->config_close(&weaselconfig);
+      }
+    }
+  } else if (m_current_dark_mode &&
+             rime_api->config_get_string(&config, "style/color_scheme_dark",
+                                         buffer, BUF_SIZE)) {
+    std::string color_name(buffer);
+    RimeConfigIterator preset = {0};
+    if (rime_api->config_begin_map(
+            &preset, &config, ("preset_color_schemes/" + color_name).c_str())) {
+      _UpdateUIStyleColor(&config, style, color_name);
+      rime_api->config_end(&preset);
+    } else {
+      RimeConfig weaselconfig;
+      if (rime_api->config_open("weasel", &weaselconfig)) {
+        _UpdateUIStyleColor(&weaselconfig, style, color_name);
+        rime_api->config_close(&weaselconfig);
+      }
+    }
+  }
+  Bool inline_preedit = false;
+  if (rime_api->config_get_bool(&config, "style/inline_preedit",
+                                &inline_preedit)) {
+    style.inline_preedit = !!inline_preedit;
+  }
+  style.current_zhung_icon = _LoadIconSettingFromSchema(
+      config, "schema/icon", "schema/zhung_icon", user_dir, shared_dir);
+  style.current_ascii_icon = _LoadIconSettingFromSchema(
+      config, "schema/ascii_icon", nullptr, user_dir, shared_dir);
+  const int STATUS_ICON_SIZE = GetSystemMetrics(SM_CXICON);
+  if (!style.current_zhung_icon.empty()) {
+    m_ime_icon =
+        (HICON)LoadImage(NULL, style.current_zhung_icon.c_str(), IMAGE_ICON,
+                         STATUS_ICON_SIZE, STATUS_ICON_SIZE, LR_LOADFROMFILE);
+  } else {
+    m_ime_icon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ICON_MAIN));
+  }
+  if (!style.current_ascii_icon.empty()) {
+    m_ascii_icon =
+        (HICON)LoadImage(NULL, style.current_ascii_icon.c_str(), IMAGE_ICON,
+                         STATUS_ICON_SIZE, STATUS_ICON_SIZE, LR_LOADFROMFILE);
+  } else {
+    m_ascii_icon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ICON_ASCII));
+  }
+  rime_api->config_close(&config);
 }
 
 bool RimeWithToy::StartUI() { return m_ui->Create(nullptr); }

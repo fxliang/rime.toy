@@ -6,6 +6,7 @@
 TrayIcon::TrayIcon(HINSTANCE hInstance, const std::wstring &tooltip)
     : hInst(hInstance), hMenu(NULL), deploy_func(nullptr),
       switch_ascii(nullptr), enable_debug(false) {
+  current_dark_mode = IsUserDarkMode();
   CreateHwnd();
   nid.cbSize = sizeof(NOTIFYICONDATA);
   nid.hWnd = m_hWnd;
@@ -74,6 +75,14 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
     } else if (lParam == WM_LBUTTONUP) {
       if (switch_ascii)
         switch_ascii();
+    }
+    break;
+
+  case WM_SETTINGCHANGE:
+    if (current_dark_mode != IsUserDarkMode()) {
+      current_dark_mode = !current_dark_mode;
+      if (switch_dark)
+        switch_dark();
     }
     break;
 
