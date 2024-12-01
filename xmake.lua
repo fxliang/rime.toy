@@ -52,7 +52,7 @@ target(project_name)
   local version = "\"" .. version_major .. "." .. version_minor .. "." .. version_patch .. "\""
   add_defines("VERSION_INFO=="..version)
   -- generate src/rime.toy.rc before build if needed
-  before_build(function (target)
+  on_load(function (target)
     import("core.base.text")
     local rc_template = path.join(os.projectdir(), "src/rime.toy.rc.in")
     local rc_output = path.join(os.projectdir(), "src/rime.toy.rc")
