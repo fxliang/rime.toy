@@ -110,6 +110,7 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance, wstring &commit_str)
   m_trayIcon = std::make_unique<TrayIcon>(hInstance, tooltip);
   m_reload_icon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_RELOAD));
   m_trayIcon->SetIcon(m_reload_icon);
+  m_trayIcon->Show();
   Initialize();
   m_trayIcon->SetDeployFunc([&]() {
     DEBUGIF(m_trayIcon->debug()) << L"Deploy Menu clicked";
@@ -131,7 +132,6 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance, wstring &commit_str)
       m_ui->Refresh();
   });
   m_trayIcon->SetIcon(m_ime_icon);
-  m_trayIcon->Show();
   m_trayIconCallback = [&](const Status &sta) {
     m_trayIcon->SetIcon(sta.ascii_mode ? m_ascii_icon : m_ime_icon);
   };
