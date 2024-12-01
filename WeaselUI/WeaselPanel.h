@@ -32,8 +32,7 @@ private:
                       uint32_t back_color, uint32_t shadow_color,
                       uint32_t border_color);
 
-  void Render();
-  void OnPaint();
+  void DoPaint();
   void OnDestroy();
   HRESULT OnScroll(WPARAM wParam);
 

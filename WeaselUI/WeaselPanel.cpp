@@ -134,7 +134,7 @@ void WeaselPanel::MoveTo(RECT rc) {
 
     SetWindowPos(m_hWnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
     if (m_istorepos_buffer != m_istorepos)
-      Render();
+      InvalidateRect(m_hWnd, NULL, TRUE); // 请求重绘
   }
 }
 
@@ -196,6 +196,11 @@ void WeaselPanel::Refresh() {
         (m_style.inline_preedit && m_candidateCount == 0) && !show_tips;
     hide_candidates = inline_no_candidates ||
                       (margin_negative && !show_tips && !show_schema_menu);
+    auto hr = m_pD2D->direct3dDevice->GetDeviceRemovedReason();
+    FAILEDACTION(hr, DEBUG << StrzHr(hr), m_pD2D->InitDirect2D());
+    _CreateLayout();
+    m_layout->DoLayout();
+    _ResizeWindow();
     InvalidateRect(m_hWnd, NULL, TRUE); // 请求重绘
   }
 }
@@ -237,7 +242,11 @@ D2D1_ROUNDED_RECT RoundedRectFromRect(const RECT &rect, uint32_t radius) {
   );
 }
 
-void WeaselPanel::Render() {
+void WeaselPanel::DoPaint() {
+  if (!m_pD2D)
+    return;
+  auto hr = m_pD2D->direct3dDevice->GetDeviceRemovedReason();
+  FAILEDACTION(hr, DEBUG << StrzHr(hr), m_pD2D->InitDirect2D());
   m_pD2D->dc->BeginDraw();
   m_pD2D->dc->Clear(D2D1::ColorF({0.0f, 0.0f, 0.0f, 0.0f}));
   if (!hide_candidates) {
@@ -673,18 +682,6 @@ void WeaselPanel::_HighlightRect(const RECT &rect, float radius,
   }
 }
 
-void WeaselPanel::OnPaint() {
-  // ignore if d2d resources not ready
-  if (!m_pD2D)
-    return;
-  auto hr = m_pD2D->direct3dDevice->GetDeviceRemovedReason();
-  FAILEDACTION(hr, DEBUG << StrzHr(hr), m_pD2D->InitDirect2D());
-  _CreateLayout();
-  m_layout->DoLayout();
-  _ResizeWindow();
-  Render();
-}
-
 void WeaselPanel::OnDestroy() {
   m_layout.reset();
   m_sticky = false;
@@ -713,7 +710,7 @@ LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
   switch (uMsg) {
   case WM_PAINT:
     if (self) {
-      self->OnPaint();
+      self->DoPaint();
     }
     break;
   case WM_DESTROY:
