@@ -23,6 +23,10 @@ public:
   void UpdateInputPosition(const RECT &rc);
   bool StartUI();
   void DestroyUI();
+  void HideUI() {
+    if (m_ui)
+      m_ui->Hide();
+  }
   Status GetRimeStatus();
   HWND UIHwnd() { return m_ui ? m_ui->hwnd() : nullptr; }
 
