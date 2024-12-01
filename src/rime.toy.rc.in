@@ -32,7 +32,7 @@ BEGIN
             VALUE "LegalCopyright", "Copyleft fxliang/rime.toy"
             VALUE "OriginalFilename", "rime.toy.exe"
             VALUE "ProductName", "rime.toy"
-            VALUE "ProductVersion", "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.0"
+            VALUE "ProductVersion", "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${TAG_SUFFIX}"
         END
     END
     BLOCK "VarFileInfo"
