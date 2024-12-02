@@ -63,7 +63,7 @@ void D2D::InitDirect2D() {
   HR(d2Device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
                                    dc.ReleaseAndGetAddressOf()));
   dc->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-  dc->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE);
+  dc->SetTextAntialiasMode((D2D1_TEXT_ANTIALIAS_MODE)m_style.antialias_mode);
   // Retrieve the swap chain's back buffer
   HR(swapChain->GetBuffer(
       0, // index
