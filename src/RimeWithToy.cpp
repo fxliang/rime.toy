@@ -89,6 +89,16 @@ void RimeWithToy::on_message(void *context_object, RimeSessionId session_id,
     return;
   m_message_type = message_type;
   m_message_value = message_value;
+
+  if (m_message_type == "deploy") {
+    if (m_message_value == "start")
+      self->BalloonMsg("开始部署");
+    else if (m_message_value == "success")
+      self->BalloonMsg("部署完成");
+    else if (m_message_value == "failure")
+      self->BalloonMsg("部署失败，请查看日志");
+  }
+
   RimeApi *rime_api = rime_get_api();
   if (RIME_API_AVAILABLE(rime_api, get_state_label) &&
       !strcmp(message_type, "option")) {
@@ -101,6 +111,10 @@ void RimeWithToy::on_message(void *context_object, RimeSessionId session_id,
       m_message_label = string(state_label);
     }
   }
+}
+
+void RimeWithToy::BalloonMsg(const string &msg) {
+  m_trayIcon->ShowBalloonTip(L"rime.toy", u8tow(msg), 500);
 }
 
 RimeWithToy::RimeWithToy(HINSTANCE hInstance, wstring &commit_str)

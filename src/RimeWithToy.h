@@ -38,6 +38,7 @@ private:
   void GetCandidateInfo(CandidateInfo &cinfo, RimeContext &ctx);
   void GetContext(Context &context, const Status &status);
   BOOL ShowMessage(Context &ctx, Status &status);
+  void BalloonMsg(const string &msg);
 
   Bool SelectCandidateCurrentPage(size_t index);
   Bool ChangePage(bool backward);

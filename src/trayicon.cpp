@@ -2,6 +2,7 @@
 #include <resource.h>
 #include <shellapi.h>
 #include <utils.h>
+#include <winuser.h>
 
 TrayIcon::TrayIcon(HINSTANCE hInstance, const std::wstring &tooltip)
     : hInst(hInstance), hMenu(NULL), deploy_func(nullptr),
@@ -62,6 +63,35 @@ void TrayIcon::CreateContextMenu() {
   }
 }
 
+void TrayIcon::ShowBalloonTip(const std::wstring &title,
+                              const std::wstring &message, DWORD timeout) {
+  if (nid.uFlags | NIF_INFO) {
+    OnBalloonTimeout();
+  }
+  // 设置 NIF_INFO 来显示气泡提示
+  nid.uFlags |= NIF_INFO;
+  // 设置气泡提示的标题和内容
+  wcsncpy_s(nid.szInfoTitle, title.c_str(), _TRUNCATE);
+  wcsncpy_s(nid.szInfo, message.c_str(), _TRUNCATE);
+  // 设置气泡提示的显示时间
+  nid.uTimeout = timeout;      // 以毫秒为单位
+  nid.dwInfoFlags = NIIF_INFO; // 设定气泡提示的类型（信息级别）
+  // 发送更新托盘图标的消息并显示气泡提示
+  Shell_NotifyIcon(NIM_MODIFY, &nid);
+  // 启动定时器，超时后清除气泡提示
+  SetTimer(m_hWnd, TIMER_BALLOON_TIMEOUT, timeout, NULL);
+}
+
+void TrayIcon::OnBalloonTimeout() {
+  KillTimer(m_hWnd, TIMER_BALLOON_TIMEOUT);
+  // 清除气泡提示内容
+  nid.uFlags &= ~NIF_INFO;                             // 移除 NIF_INFO 标志
+  memset(nid.szInfoTitle, 0, sizeof(nid.szInfoTitle)); // 清空标题
+  memset(nid.szInfo, 0, sizeof(nid.szInfo));           // 清空提示内容
+  // 更新托盘图标，清除气泡提示
+  Shell_NotifyIcon(NIM_MODIFY, &nid);
+}
+
 void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
                               LPARAM lParam) {
   switch (msg) {
@@ -86,6 +116,10 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
     }
     break;
 
+  case WM_TIMER:
+    if (wParam == TIMER_BALLOON_TIMEOUT)
+      OnBalloonTimeout();
+    break;
   case WM_COMMAND:
     if (LOWORD(wParam) == 1002) { // Exit
       Hide();

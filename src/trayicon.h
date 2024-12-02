@@ -22,8 +22,12 @@ public:
     switch_dark = func;
   }
   bool debug() { return enable_debug; }
+  void ShowBalloonTip(const std::wstring &title, const std::wstring &message,
+                      DWORD timeout = 1000);
 
 private:
+  void OnBalloonTimeout();
+  static const UINT TIMER_BALLOON_TIMEOUT = 20241202;
   HINSTANCE hInst;
   NOTIFYICONDATA nid;
   HMENU hMenu;
