@@ -30,7 +30,7 @@ private:
                 ComPtr<IDWriteTextFormat1> &pTextFormat);
   void _HighlightRect(const RECT &rect, float radius, uint32_t border,
                       uint32_t back_color, uint32_t shadow_color,
-                      uint32_t border_color);
+                      uint32_t border_color, IsToRoundStruct roundInfo);
 
   void DoPaint();
   void OnDestroy();

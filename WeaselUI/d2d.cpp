@@ -591,4 +591,70 @@ HRESULT D2D::GetIconFromFile(const wstring &iconPath,
 
   return S_OK;
 }
+
+HRESULT
+D2D::CreateRoundedRectanglePath(const RECT &rc, float radius,
+                                const IsToRoundStruct &roundInfo,
+                                ComPtr<ID2D1PathGeometry> &pPathGeometry) {
+  D2D1_RECT_F rectf{(float)rc.left, (float)rc.top, (float)rc.right,
+                    (float)rc.bottom};
+#define PT2F(x, y) D2D1::Point2F(x, y)
+  // 创建路径几何对象
+  HRESULT hr =
+      d2Factory->CreatePathGeometry(pPathGeometry.ReleaseAndGetAddressOf());
+  FAILEDACTION(hr, return hr);
+  // 打开路径几何
+  ComPtr<ID2D1GeometrySink> pSink = nullptr;
+  hr = pPathGeometry->Open(pSink.ReleaseAndGetAddressOf());
+  FAILEDACTION(hr, return hr);
+  pSink->SetFillMode(D2D1_FILL_MODE_WINDING);
+  // 从左上角开始
+  if (roundInfo.IsTopLeftNeedToRound) {
+    pSink->BeginFigure(PT2F(rectf.left + radius, rectf.top),
+                       D2D1_FIGURE_BEGIN_FILLED);
+  } else
+    pSink->BeginFigure(PT2F(rectf.left, rectf.top), D2D1_FIGURE_BEGIN_FILLED);
+  // 顶边
+  pSink->AddLine(PT2F(rectf.right - radius, rectf.top));
+  // 右上角圆角
+  if (roundInfo.IsTopRightNeedToRound) {
+    pSink->AddArc(D2D1::ArcSegment(
+        PT2F(rectf.right, rectf.top + radius), D2D1_SIZE_F{radius, radius},
+        0.0f, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+  } else
+    pSink->AddLine(PT2F(rectf.right, rectf.top));
+  // 右边
+  pSink->AddLine(PT2F(rectf.right, rectf.bottom - radius));
+  // 右下角圆角
+  if (roundInfo.IsBottomRightNeedToRound) {
+    pSink->AddArc(D2D1::ArcSegment(
+        PT2F(rectf.right - radius, rectf.bottom), D2D1_SIZE_F{radius, radius},
+        0.0f, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+  } else
+    pSink->AddLine(PT2F(rectf.right, rectf.bottom));
+  // 底边
+  pSink->AddLine(PT2F(rectf.left + radius, rectf.bottom));
+  // 左下角圆角
+  if (roundInfo.IsBottomLeftNeedToRound) {
+    pSink->AddArc(D2D1::ArcSegment(
+        PT2F(rectf.left, rectf.bottom - radius), D2D1_SIZE_F{radius, radius},
+        0.0f, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+  } else
+    pSink->AddLine(PT2F(rectf.left, rectf.bottom));
+  // 左边
+  pSink->AddLine(PT2F(rectf.left, rectf.top + radius));
+  // 左上角圆角
+  if (roundInfo.IsTopLeftNeedToRound) {
+    pSink->AddArc(D2D1::ArcSegment(
+        PT2F(rectf.left + radius, rectf.top), D2D1_SIZE_F{radius, radius}, 0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+  } else {
+    pSink->AddLine(PT2F(rectf.left, rectf.top));
+  }
+  // 闭合路径
+  pSink->EndFigure(D2D1_FIGURE_END_CLOSED);
+  hr = pSink->Close();
+#undef PT2F
+  return hr;
+}
 } // namespace weasel

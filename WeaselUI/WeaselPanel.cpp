@@ -3,15 +3,8 @@
 #include "HorizontalLayout.h"
 #include "VHorizontalLayout.h"
 #include "VerticalLayout.h"
-#include <DWrite.h>
-#include <dwrite_2.h>
 #include <filesystem>
-#include <map>
-#include <regex>
 #include <resource.h>
-#include <string>
-#include <utils.h>
-#include <vector>
 #include <wrl/client.h>
 
 namespace fs = std::filesystem;
@@ -232,16 +225,6 @@ BOOL WeaselPanel::Create(HWND parent) {
   return !!m_hWnd;
 }
 
-D2D1_ROUNDED_RECT RoundedRectFromRect(const RECT &rect, uint32_t radius) {
-  return D2D1::RoundedRect(
-      D2D1::RectF(static_cast<float>(rect.left), static_cast<float>(rect.top),
-                  static_cast<float>(rect.right),
-                  static_cast<float>(rect.bottom)),
-      radius, // radiusX
-      radius  // radiusY
-  );
-}
-
 void WeaselPanel::DoPaint() {
   if (!m_pD2D)
     return;
@@ -251,9 +234,10 @@ void WeaselPanel::DoPaint() {
   m_pD2D->dc->Clear(D2D1::ColorF({0.0f, 0.0f, 0.0f, 0.0f}));
   if (!hide_candidates) {
     auto rc = m_layout->GetContentRect();
+    IsToRoundStruct roundInfo;
     _HighlightRect(rc, DPI_SCALE(m_style.round_corner_ex),
                    DPI_SCALE(m_style.border), m_style.back_color,
-                   m_style.shadow_color, m_style.border_color);
+                   m_style.shadow_color, m_style.border_color, roundInfo);
     auto prc = m_layout->GetPreeditRect();
     auto arc = m_layout->GetAuxiliaryRect();
     // if vertical auto reverse triggered
@@ -374,9 +358,10 @@ bool WeaselPanel::_DrawPreedit(const Text &text, CRect &rc) {
         CRect rc_hib = rc_hi;
         rc_hib.Inflate(DPI_SCALE(m_style.hilite_padding_x),
                        DPI_SCALE(m_style.hilite_padding_y));
+        IsToRoundStruct roundInfo = m_layout->GetTextRoundInfo();
         _HighlightRect(rc_hib, DPI_SCALE(m_style.round_corner),
                        DPI_SCALE(m_style.border), m_style.hilited_back_color,
-                       m_style.hilited_shadow_color, 0);
+                       m_style.hilited_shadow_color, 0, roundInfo);
         _TextOut(rc_hi, hilited_str, hilited_str.length(),
                  m_style.hilited_text_color, pTextFormat);
         if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
@@ -439,8 +424,9 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
           rect.OffsetRect(0, m_offsetys[i]);
         rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
                          DPI_SCALE(m_style.hilite_padding_y));
+        IsToRoundStruct roundInfo = m_layout->GetRoundInfo(i);
         _HighlightRect(rect, m_style.round_corner, 0, 0,
-                       m_style.candidate_shadow_color, 0);
+                       m_style.candidate_shadow_color, 0, roundInfo);
         drawn = true;
       }
     }
@@ -458,9 +444,11 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
         rect.OffsetRect(0, m_offsetys[i]);
       rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
                        DPI_SCALE(m_style.hilite_padding_y));
+
+      IsToRoundStruct roundInfo = m_layout->GetRoundInfo(i);
       _HighlightRect(rect, DPI_SCALE(m_style.round_corner), 0,
                      m_style.candidate_back_color, 0,
-                     m_style.candidate_border_color);
+                     m_style.candidate_border_color, roundInfo);
 
       auto &label = labels.at(i).str;
       if (!label.empty()) {
@@ -499,11 +487,13 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
         rect.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
       rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
                        DPI_SCALE(m_style.hilite_padding_y));
+      IsToRoundStruct roundInfo =
+          m_layout->GetRoundInfo(m_ctx.cinfo.highlighted);
       _HighlightRect(rect, DPI_SCALE(m_style.round_corner),
                      DPI_SCALE(m_style.border),
                      m_style.hilited_candidate_back_color,
                      m_style.hilited_candidate_shadow_color,
-                     m_style.hilited_candidate_border_color);
+                     m_style.hilited_candidate_border_color, roundInfo);
       // draw highlight mark
       if (COLORNOTTRANSPARENT(m_style.hilited_mark_color)) {
         if (!m_style.mark_text.empty()) {
@@ -559,9 +549,9 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
                          y + height);
             mark_radius = mkrc.Width() / 2;
           }
-
-          _HighlightRect(mkrc, mark_radius, 0, m_style.hilited_mark_color, 0,
-                         0);
+          IsToRoundStruct roundInfo;
+          _HighlightRect(mkrc, mark_radius, 0, m_style.hilited_mark_color, 0, 0,
+                         roundInfo);
         }
       }
       auto i = m_ctx.cinfo.highlighted;
@@ -626,17 +616,18 @@ void WeaselPanel::_TextOut(CRect &rc, const wstring &text, size_t cch,
 
 void WeaselPanel::_HighlightRect(const RECT &rect, float radius,
                                  uint32_t border, uint32_t back_color,
-                                 uint32_t shadow_color, uint32_t border_color) {
+                                 uint32_t shadow_color, uint32_t border_color,
+                                 IsToRoundStruct roundInfo) {
+  if (roundInfo.Hemispherical)
+    radius = m_style.round_corner_ex;
   // draw shadow
   if ((shadow_color & 0xff000000) && m_style.shadow_radius) {
     CRect rc = rect;
     rc.OffsetRect(DPI_SCALE(m_style.shadow_offset_x),
                   DPI_SCALE(m_style.shadow_offset_y));
     // Define a rounded rectangle
-    ComPtr<ID2D1RoundedRectangleGeometry> roundedRectGeometry;
-    D2D1_ROUNDED_RECT roundedRect = RoundedRectFromRect(rc, radius);
-    HR(m_pD2D->d2Factory->CreateRoundedRectangleGeometry(roundedRect,
-                                                         &roundedRectGeometry));
+    ComPtr<ID2D1PathGeometry> pGeometry;
+    HR(m_pD2D->CreateRoundedRectanglePath(rc, radius, roundInfo, pGeometry));
     // Create a compatible render target
     ComPtr<ID2D1BitmapRenderTarget> bitmapRenderTarget;
     HR(m_pD2D->dc->CreateCompatibleRenderTarget(&bitmapRenderTarget));
@@ -644,8 +635,7 @@ void WeaselPanel::_HighlightRect(const RECT &rect, float radius,
     // Draw the rounded rectangle onto the bitmap render target
     m_pD2D->SetBrushColor(shadow_color);
     bitmapRenderTarget->BeginDraw();
-    bitmapRenderTarget->FillGeometry(roundedRectGeometry.Get(),
-                                     m_pD2D->m_pBrush.Get());
+    bitmapRenderTarget->FillGeometry(pGeometry.Get(), m_pD2D->m_pBrush.Get());
     bitmapRenderTarget->EndDraw();
     // Get the bitmap from the bitmap render target
     ComPtr<ID2D1Bitmap> bitmap;
@@ -663,22 +653,21 @@ void WeaselPanel::_HighlightRect(const RECT &rect, float radius,
   // draw back color
   if (back_color & 0xff000000) {
     // Define a rounded rectangle
-    ComPtr<ID2D1RoundedRectangleGeometry> roundedRectGeometry;
-    D2D1_ROUNDED_RECT roundedRect = RoundedRectFromRect(rect, radius);
-    HR(m_pD2D->d2Factory->CreateRoundedRectangleGeometry(roundedRect,
-                                                         &roundedRectGeometry));
+    ComPtr<ID2D1PathGeometry> pGeometry;
+    HR(m_pD2D->CreateRoundedRectanglePath(rect, radius, roundInfo, pGeometry));
     m_pD2D->SetBrushColor(back_color);
-    m_pD2D->dc->FillGeometry(roundedRectGeometry.Get(), m_pD2D->m_pBrush.Get());
+    m_pD2D->dc->FillGeometry(pGeometry.Get(), m_pD2D->m_pBrush.Get());
   }
   // draw border
   if ((border_color & 0xff000000) && border) {
     float hb = -(float)border / 2;
     CRect rc = rect;
     rc.InflateRect(hb, hb);
-    D2D1_ROUNDED_RECT borderRect = RoundedRectFromRect(rc, radius + hb);
+    ComPtr<ID2D1PathGeometry> pGeometry;
+    HR(m_pD2D->CreateRoundedRectanglePath(rc, radius + hb, roundInfo,
+                                          pGeometry));
     m_pD2D->SetBrushColor(border_color);
-    m_pD2D->dc->DrawRoundedRectangle(&borderRect, m_pD2D->m_pBrush.Get(),
-                                     border);
+    m_pD2D->dc->DrawGeometry(pGeometry.Get(), m_pD2D->m_pBrush.Get(), border);
   }
 }
 

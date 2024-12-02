@@ -16,18 +16,6 @@ const int STATUS_ICON_SIZE = GetSystemMetrics(SM_CXICON);
   (style.layout_type != UIStyle::LAYOUT_VERTICAL_FULLSCREEN &&                 \
    style.layout_type != UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN)
 
-struct IsToRoundStruct {
-  bool IsTopLeftNeedToRound;
-  bool IsBottomLeftNeedToRound;
-  bool IsTopRightNeedToRound;
-  bool IsBottomRightNeedToRound;
-  bool Hemispherical;
-  IsToRoundStruct()
-      : IsTopLeftNeedToRound(true), IsTopRightNeedToRound(true),
-        IsBottomLeftNeedToRound(true), IsBottomRightNeedToRound(true),
-        Hemispherical(false) {}
-};
-
 class Layout {
 public:
   Layout(const UIStyle &style, const Context &context, const Status &status,

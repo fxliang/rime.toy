@@ -15,6 +15,18 @@
 
 namespace weasel {
 
+struct IsToRoundStruct {
+  bool IsTopLeftNeedToRound;
+  bool IsBottomLeftNeedToRound;
+  bool IsTopRightNeedToRound;
+  bool IsBottomRightNeedToRound;
+  bool Hemispherical;
+  IsToRoundStruct()
+      : IsTopLeftNeedToRound(true), IsTopRightNeedToRound(true),
+        IsBottomLeftNeedToRound(true), IsBottomRightNeedToRound(true),
+        Hemispherical(false) {}
+};
+
 struct D2D {
 
   D2D(UIStyle &style, HWND hwnd);
@@ -39,6 +51,10 @@ struct D2D {
   HRESULT GetBmpFromIcon(HICON hIcon, ComPtr<ID2D1Bitmap1> &pBitmap);
   HRESULT GetIconFromFile(const wstring &iconPath,
                           ComPtr<ID2D1Bitmap1> &pD2DBitmap);
+
+  HRESULT CreateRoundedRectanglePath(const RECT &rc, float radius,
+                                     const IsToRoundStruct &roundInfo,
+                                     ComPtr<ID2D1PathGeometry> &pPathGeometry);
   ComPtr<ID3D11Device> direct3dDevice;
   ComPtr<IDXGIDevice> dxgiDevice;
   ComPtr<IDXGIFactory2> dxFactory;
