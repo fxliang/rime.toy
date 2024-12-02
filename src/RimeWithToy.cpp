@@ -128,11 +128,12 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance, wstring &commit_str)
   Initialize();
   m_trayIcon->SetDeployFunc([&]() {
     DEBUGIF(m_trayIcon->debug()) << L"Deploy Menu clicked";
+    DEBUGIF(m_disabled) << "Deploy job running, skip this request";
+    if (m_disabled)
+      return;
     m_disabled = true;
     m_trayIcon->SetIcon(m_reload_icon);
-    rime_api->finalize();
-    rime_api->deploy();
-    rime_api->deploy_config_file("weasel.yaml", "config_version");
+    Finalize();
     Initialize();
     BOOL ascii = rime_api->get_option(m_session_id, "ascii_mode");
     m_trayIcon->SetIcon(ascii ? m_ascii_icon : m_ime_icon);
