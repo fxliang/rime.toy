@@ -81,6 +81,15 @@ void UI::Update(const Context &ctx, const Status &status) {
     return;
   ctx_ = ctx;
   status_ = status;
+  if (style_.candidate_abbreviate_length > 0) {
+    for (auto &c : ctx_.cinfo.candies) {
+      if (c.str.length() > (size_t)style_.candidate_abbreviate_length) {
+        c.str =
+            c.str.substr(0, (size_t)style_.candidate_abbreviate_length - 1) +
+            L"..." + c.str.substr(c.str.length() - 1);
+      }
+    }
+  }
   Refresh();
 }
 void UI::Refresh() {
