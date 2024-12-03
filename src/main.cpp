@@ -63,7 +63,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
       update_position(hwnd);
       committed = !commit_str.empty();
       if (!commit_str.empty()) {
-        send_input_to_window(hwnd, commit_str);
+        send_input_to_window(commit_str);
         commit_str.clear();
         if (!status.composing)
           m_toy->HideUI();

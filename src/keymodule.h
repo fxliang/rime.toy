@@ -237,7 +237,7 @@ struct KeyInfo {
 
 extern bool inserting;
 extern BYTE keyState[256];
-void send_input_to_window(HWND hwnd, const std::wstring &text);
+void send_input_to_window(const std::wstring &text);
 void update_keystates(WPARAM wParam, LPARAM lParam);
 KeyInfo parse_key(WPARAM wParam, LPARAM lParam);
 bool ConvertKeyEvent(const KBDLLHOOKSTRUCT *pKeyboard, KeyInfo &kinfo,

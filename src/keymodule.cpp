@@ -325,7 +325,7 @@ void update_keystates(WPARAM wParam, LPARAM lParam) {
 
 bool inserting = false;
 
-void send_input_to_window(HWND hwnd, const std::wstring &text) {
+void send_input_to_window(const std::wstring &text) {
   std::vector<INPUT> inputs;
   for (const auto &ch : text) {
     INPUT input = {};
@@ -336,10 +336,6 @@ void send_input_to_window(HWND hwnd, const std::wstring &text) {
     input.ki.time = 0;
     input.ki.dwExtraInfo = GetMessageExtraInfo();
     inputs.push_back(input);
-
-    INPUT inputRelease = input;
-    inputRelease.ki.dwFlags |= KEYEVENTF_KEYUP;
-    inputs.push_back(inputRelease);
   }
 
   if (!inputs.empty()) {
