@@ -1,4 +1,6 @@
 #include "keymodule.h"
+#include <vector>
+
 namespace weasel {
 
 BYTE keyState[256] = {0};
@@ -321,19 +323,29 @@ void update_keystates(WPARAM wParam, LPARAM lParam) {
   keyState[VK_MENU] = (keyState[VK_LMENU] | keyState[VK_RMENU]);
 }
 
+bool inserting = false;
+
 void send_input_to_window(HWND hwnd, const std::wstring &text) {
+  std::vector<INPUT> inputs;
   for (const auto &ch : text) {
-    INPUT input;
+    INPUT input = {};
     input.type = INPUT_KEYBOARD;
     input.ki.wVk = 0;
     input.ki.wScan = ch;
     input.ki.dwFlags = KEYEVENTF_UNICODE;
     input.ki.time = 0;
     input.ki.dwExtraInfo = GetMessageExtraInfo();
+    inputs.push_back(input);
+
     INPUT inputRelease = input;
     inputRelease.ki.dwFlags |= KEYEVENTF_KEYUP;
-    SendInput(1, &input, sizeof(INPUT));
-    SendInput(1, &inputRelease, sizeof(INPUT));
+    inputs.push_back(inputRelease);
+  }
+
+  if (!inputs.empty()) {
+    inserting = true;
+    SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
+    inserting = false;
   }
 }
 } // namespace weasel

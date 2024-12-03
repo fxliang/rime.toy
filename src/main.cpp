@@ -44,7 +44,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (SendMessage(hImcWnd, WM_IME_CONTROL, 5, 0))
       SendMessage(hImcWnd, WM_IME_CONTROL, 6, 0);
   }
-  if (nCode == HC_ACTION) {
+  if (nCode == HC_ACTION && !inserting) {
     // update keyState table
     update_keystates(wParam, lParam);
 
