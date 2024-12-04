@@ -286,7 +286,7 @@ void WeaselPanel::DoPaint() {
       _DrawPreedit(m_ctx.aux, arc);
     }
     if (m_candidateCount) {
-      _DrawCandidates(true);
+      _DrawCandidates();
     }
     if (m_layout->ShouldDisplayStatusIcon()) {
       ComPtr<ID2D1Bitmap1> pBitmap;
@@ -405,7 +405,7 @@ bool WeaselPanel::_DrawPreedit(const Text &text, CRect &rc) {
   return drawn;
 }
 
-bool WeaselPanel::_DrawCandidates(bool back = false) {
+bool WeaselPanel::_DrawCandidates() {
   bool drawn = false;
   const vector<Text> &candidates(m_ctx.cinfo.candies);
   const vector<Text> &comments(m_ctx.cinfo.comments);
@@ -413,172 +413,117 @@ bool WeaselPanel::_DrawCandidates(bool back = false) {
   ComPtr<IDWriteTextFormat1> &txtFormat = m_pD2D->pTextFormat;
   ComPtr<IDWriteTextFormat1> &labeltxtFormat = m_pD2D->pLabelFormat;
   ComPtr<IDWriteTextFormat1> &commenttxtFormat = m_pD2D->pCommentFormat;
-
-  if (back) {
-    if (COLORNOTTRANSPARENT(m_style.candidate_shadow_color)) {
-      for (auto i = 0; i < m_candidateCount; i++) {
-        if (i == m_ctx.cinfo.highlighted || i == m_hoverIndex)
-          continue;
-        auto rect = m_layout->GetCandidateRect(i);
-        if (m_istorepos)
-          rect.OffsetRect(0, m_offsetys[i]);
-        rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
-                         DPI_SCALE(m_style.hilite_padding_y));
-        IsToRoundStruct roundInfo = m_layout->GetRoundInfo(i);
-        _HighlightRect(rect, m_style.round_corner, 0, 0,
-                       m_style.candidate_shadow_color, 0, roundInfo);
-        drawn = true;
-      }
-    }
-    // if (COLORNOTTRANSPARENT(m_style.candidate_back_color) ||
-    // COLORNOTTRANSPARENT(m_style.candidate_border_color)) {
-    int label_text_color = m_style.label_text_color;
-    int candidate_text_color = m_style.candidate_text_color;
-    int comment_text_color = m_style.comment_text_color;
-    for (auto i = 0; i < candidates.size(); i++) {
-      if (i == m_ctx.cinfo.highlighted || i == m_hoverIndex)
-        continue;
-
+  for (auto i = 0; i < m_candidateCount; i++) {
+    bool hilited = (i == m_ctx.cinfo.highlighted);
+    int shadow_color = hilited ? m_style.hilited_candidate_shadow_color
+                               : m_style.candidate_shadow_color;
+    if (COLORNOTTRANSPARENT(shadow_color)) {
       auto rect = m_layout->GetCandidateRect(i);
       if (m_istorepos)
         rect.OffsetRect(0, m_offsetys[i]);
       rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
                        DPI_SCALE(m_style.hilite_padding_y));
-
       IsToRoundStruct roundInfo = m_layout->GetRoundInfo(i);
-      _HighlightRect(rect, DPI_SCALE(m_style.round_corner), 0,
-                     m_style.candidate_back_color, 0,
-                     m_style.candidate_border_color, roundInfo);
-
-      auto &label = labels.at(i).str;
-      if (!label.empty()) {
-        rect = m_layout->GetCandidateLabelRect(i);
-        if (m_istorepos)
-          rect.OffsetRect(0, m_offsetys[i]);
-        _TextOut(rect, label, label.length(), label_text_color, labeltxtFormat);
-      }
-      auto &text = candidates.at(i).str;
-      if (!text.empty()) {
-        rect = m_layout->GetCandidateTextRect(i);
-        if (m_istorepos)
-          rect.OffsetRect(0, m_offsetys[i]);
-        _TextOut(rect, text, text.length(), candidate_text_color, txtFormat);
-      }
-      auto &comment = comments.at(i).str;
-      if (!comment.empty() && COLORNOTTRANSPARENT(m_style.comment_text_color)) {
-        rect = m_layout->GetCandidateCommentRect(i);
-        if (m_istorepos)
-          rect.OffsetRect(0, m_offsetys[i]);
-        _TextOut(rect, comment, comment.length(), comment_text_color,
-                 commenttxtFormat);
-      }
-
-      drawn = true;
+      _HighlightRect(rect, m_style.round_corner, 0, 0, shadow_color, 0,
+                     roundInfo);
     }
-    //}
-
-    // draw highlighted background and shadow
-    {
-      int label_text_color = m_style.hilited_label_text_color;
-      int candidate_text_color = m_style.hilited_candidate_text_color;
-      int comment_text_color = m_style.hilited_comment_text_color;
-      auto rect = m_layout->GetHighlightRect();
-      if (m_istorepos)
-        rect.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
-      rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
+    drawn = true;
+  }
+  // draw highlighted background and text
+  for (auto i = 0; i < candidates.size(); i++) {
+    bool hilited = (i == m_ctx.cinfo.highlighted);
+    int label_text_color =
+        hilited ? m_style.hilited_label_text_color : m_style.label_text_color;
+    int candidate_text_color = hilited ? m_style.hilited_candidate_text_color
+                                       : m_style.candidate_text_color;
+    int comment_text_color = hilited ? m_style.hilited_comment_text_color
+                                     : m_style.comment_text_color;
+    int back_color = hilited ? m_style.hilited_candidate_back_color
+                             : m_style.candidate_back_color;
+    int border_color = hilited ? m_style.hilited_candidate_border_color
+                               : m_style.candidate_border_color;
+    auto rect = m_layout->GetCandidateRect(i);
+    if (m_istorepos)
+      rect.OffsetRect(0, m_offsetys[i]);
+    rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
+                     DPI_SCALE(m_style.hilite_padding_y));
+    IsToRoundStruct roundInfo = m_layout->GetRoundInfo(i);
+    _HighlightRect(rect, DPI_SCALE(m_style.round_corner),
+                   DPI_SCALE(m_style.border), back_color, 0, border_color,
+                   roundInfo);
+    // draw highlight mark
+    if (hilited && COLORNOTTRANSPARENT(m_style.hilited_mark_color)) {
+      if (!m_style.mark_text.empty()) {
+        CRect rc = m_layout->GetHighlightRect();
+        if (m_istorepos)
+          rc.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
+        rc.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
                        DPI_SCALE(m_style.hilite_padding_y));
-      IsToRoundStruct roundInfo =
-          m_layout->GetRoundInfo(m_ctx.cinfo.highlighted);
-      _HighlightRect(rect, DPI_SCALE(m_style.round_corner),
-                     DPI_SCALE(m_style.border),
-                     m_style.hilited_candidate_back_color,
-                     m_style.hilited_candidate_shadow_color,
-                     m_style.hilited_candidate_border_color, roundInfo);
-      // draw highlight mark
-      if (COLORNOTTRANSPARENT(m_style.hilited_mark_color)) {
-        if (!m_style.mark_text.empty()) {
-          CRect rc = m_layout->GetHighlightRect();
-          if (m_istorepos)
-            rc.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
-          rc.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
-                         DPI_SCALE(m_style.hilite_padding_y));
-          int vgap = m_layout->mark_height
-                         ? (rc.Height() - m_layout->mark_height) / 2
-                         : 0;
-          int hgap = m_layout->mark_width
-                         ? (rc.Width() - m_layout->mark_width) / 2
-                         : 0;
-          CRect hlRc;
-          if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
-            hlRc = CRect(rc.left + hgap,
-                         rc.top + DPI_SCALE(m_style.hilite_padding_y),
-                         rc.left + hgap + m_layout->mark_width,
-                         rc.top + DPI_SCALE(m_style.hilite_padding_y) +
-                             m_layout->mark_height);
-          else
-            hlRc = CRect(rc.left + DPI_SCALE(m_style.hilite_padding_x),
-                         rc.top + vgap,
-                         rc.left + DPI_SCALE(m_style.hilite_padding_x) +
-                             m_layout->mark_width,
-                         rc.bottom - vgap);
-          _TextOut(hlRc, m_style.mark_text.c_str(), m_style.mark_text.length(),
-                   m_style.hilited_mark_color, txtFormat);
+        int vgap = m_layout->mark_height
+                       ? (rc.Height() - m_layout->mark_height) / 2
+                       : 0;
+        int hgap =
+            m_layout->mark_width ? (rc.Width() - m_layout->mark_width) / 2 : 0;
+        CRect hlRc;
+        if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+          hlRc = CRect(rc.left + hgap,
+                       rc.top + DPI_SCALE(m_style.hilite_padding_y),
+                       rc.left + hgap + m_layout->mark_width,
+                       rc.top + DPI_SCALE(m_style.hilite_padding_y) +
+                           m_layout->mark_height);
+        else
+          hlRc = CRect(rc.left + DPI_SCALE(m_style.hilite_padding_x),
+                       rc.top + vgap,
+                       rc.left + DPI_SCALE(m_style.hilite_padding_x) +
+                           m_layout->mark_width,
+                       rc.bottom - vgap);
+        _TextOut(hlRc, m_style.mark_text.c_str(), m_style.mark_text.length(),
+                 m_style.hilited_mark_color, txtFormat);
+      } else {
+        int height =
+            MIN(rect.Height() - DPI_SCALE(m_style.hilite_padding_y) * 2,
+                rect.Height() - DPI_SCALE(m_style.round_corner) * 2);
+        int width = MIN(rect.Width() - DPI_SCALE(m_style.hilite_padding_x) * 2,
+                        rect.Width() - DPI_SCALE(m_style.round_corner) * 2);
+        width = MIN(width, static_cast<int>(rect.Width() * 0.618));
+        height = MIN(height, static_cast<int>(rect.Height() * 0.618));
+        CRect mkrc;
+        int mark_radius;
+        if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
+          int x = rect.left + (rect.Width() - width) / 2;
+          mkrc =
+              CRect(x, rect.top, x + width, rect.top + m_layout->mark_height);
+          mark_radius = mkrc.Height() / 2;
         } else {
-          int height =
-              MIN(rect.Height() - DPI_SCALE(m_style.hilite_padding_y) * 2,
-                  rect.Height() - DPI_SCALE(m_style.round_corner) * 2);
-          int width =
-              MIN(rect.Width() - DPI_SCALE(m_style.hilite_padding_x) * 2,
-                  rect.Width() - DPI_SCALE(m_style.round_corner) * 2);
-          width = MIN(width, static_cast<int>(rect.Width() * 0.618));
-          height = MIN(height, static_cast<int>(rect.Height() * 0.618));
-          // if (bar_scale_ != 1.0f) {
-          //   width = static_cast<int>(width * bar_scale_);
-          //   height = static_cast<int>(height * bar_scale_);
-          // }
-          CRect mkrc;
-          int mark_radius;
-          if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
-            int x = rect.left + (rect.Width() - width) / 2;
-            mkrc =
-                CRect(x, rect.top, x + width, rect.top + m_layout->mark_height);
-            mark_radius = mkrc.Height() / 2;
-          } else {
-            int y = rect.top + (rect.Height() - height) / 2;
-            mkrc = CRect(rect.left, y, rect.left + m_layout->mark_width,
-                         y + height);
-            mark_radius = mkrc.Width() / 2;
-          }
-          IsToRoundStruct roundInfo;
-          _HighlightRect(mkrc, mark_radius, 0, m_style.hilited_mark_color, 0, 0,
-                         roundInfo);
+          int y = rect.top + (rect.Height() - height) / 2;
+          mkrc =
+              CRect(rect.left, y, rect.left + m_layout->mark_width, y + height);
+          mark_radius = mkrc.Width() / 2;
         }
+        IsToRoundStruct roundInfo;
+        _HighlightRect(mkrc, mark_radius, 0, m_style.hilited_mark_color, 0, 0,
+                       roundInfo);
       }
-      auto i = m_ctx.cinfo.highlighted;
-      auto &label = labels.at(i).str;
-      if (!label.empty()) {
-        rect = m_layout->GetCandidateLabelRect(i);
-        if (m_istorepos)
-          rect.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
-        _TextOut(rect, label, label.length(), label_text_color, labeltxtFormat);
-      }
-      auto &text = candidates.at(i).str;
-      if (!text.empty()) {
-        rect = m_layout->GetCandidateTextRect(i);
-        if (m_istorepos)
-          rect.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
-        _TextOut(rect, text, text.length(), candidate_text_color, txtFormat);
-      }
-      auto &comment = comments.at(i).str;
-      if (!comment.empty() && COLORNOTTRANSPARENT(m_style.comment_text_color)) {
-        rect = m_layout->GetCandidateCommentRect(i);
-        if (m_istorepos)
-          rect.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
-        _TextOut(rect, comment, comment.length(), comment_text_color,
-                 commenttxtFormat);
-      }
-      drawn = true;
     }
+    const auto drawText =
+        [&](int i, const vector<Text> &texts, int color,
+            ComPtr<IDWriteTextFormat1> &textFormat,
+            const std::function<CRect(int)> &layoutRectGetter) {
+          const auto &text = texts.at(i).str;
+          if (!text.empty()) {
+            CRect rc = layoutRectGetter(i);
+            if (m_istorepos)
+              rc.OffsetRect(0, m_offsetys[i]);
+            _TextOut(rc, text, text.length(), color, textFormat);
+          }
+        };
+    drawText(i, labels, label_text_color, labeltxtFormat,
+             [&](int i) { return m_layout->GetCandidateLabelRect(i); });
+    drawText(i, candidates, candidate_text_color, txtFormat,
+             [&](int i) { return m_layout->GetCandidateTextRect(i); });
+    drawText(i, comments, comment_text_color, commenttxtFormat,
+             [&](int i) { return m_layout->GetCandidateCommentRect(i); });
+    drawn = true;
   }
   return drawn;
 }

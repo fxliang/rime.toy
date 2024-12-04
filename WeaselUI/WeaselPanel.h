@@ -24,7 +24,7 @@ public:
 private:
   void _CreateLayout();
   bool _DrawPreedit(const Text &text, CRect &rc);
-  bool _DrawCandidates(bool back);
+  bool _DrawCandidates();
   void _ResizeWindow();
   void _TextOut(CRect &rc, const wstring &text, size_t cch, uint32_t color,
                 ComPtr<IDWriteTextFormat1> &pTextFormat);
