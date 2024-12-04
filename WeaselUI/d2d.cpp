@@ -183,8 +183,7 @@ void D2D::InitFontFormats(const wstring &label_font_face,
                                    ? DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
                                    : DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT;
   auto func = [&](const wstring &font_face, const int font_point,
-                  ComPtr<IDWriteTextFormat1> &_pTextFormat,
-                  DWRITE_WORD_WRAPPING wrap) {
+                  PtTextFormat &_pTextFormat, DWRITE_WORD_WRAPPING wrap) {
     bool vertical_text = m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT;
     std::vector<std::wstring> fontFaceStrVector;
 
@@ -300,7 +299,7 @@ void D2D::InitDpiInfo() {
   m_dpiScaleLayout = m_dpiY / 96.0;
 }
 
-void D2D::_SetFontFallback(ComPtr<IDWriteTextFormat1> textFormat,
+void D2D::_SetFontFallback(PtTextFormat textFormat,
                            const std::vector<std::wstring> &fontVector) {
   ComPtr<IDWriteFontFallback> pSysFallback;
   HR(m_pWriteFactory->GetSystemFontFallback(pSysFallback.GetAddressOf()));
@@ -395,7 +394,7 @@ void D2D::_ParseFontFace(const std::wstring &fontFaceStr,
 }
 
 void D2D::GetTextSize(const wstring &text, size_t nCount,
-                      ComPtr<IDWriteTextFormat1> &pTextFormat, LPSIZE lpSize) {
+                      PtTextFormat &pTextFormat, LPSIZE lpSize) {
 
   D2D1_SIZE_F sz;
 

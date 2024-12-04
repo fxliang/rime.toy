@@ -15,6 +15,7 @@
 
 namespace weasel {
 
+typedef ComPtr<IDWriteTextFormat1> PtTextFormat;
 struct IsToRoundStruct {
   bool IsTopLeftNeedToRound;
   bool IsBottomLeftNeedToRound;
@@ -42,8 +43,8 @@ struct D2D {
   void OnResize(UINT width, UINT height);
   void SetBrushColor(uint32_t color);
   void GetTextSize(const wstring &text, size_t nCount,
-                   ComPtr<IDWriteTextFormat1> &pTextFormat, LPSIZE lpSize);
-  void _SetFontFallback(ComPtr<IDWriteTextFormat1> textFormat,
+                   PtTextFormat &pTextFormat, LPSIZE lpSize);
+  void _SetFontFallback(PtTextFormat textFormat,
                         const std::vector<std::wstring> &fontVector);
   void _ParseFontFace(const std::wstring &fontFaceStr,
                       DWRITE_FONT_WEIGHT &fontWeight,
@@ -67,10 +68,10 @@ struct D2D {
   ComPtr<IDCompositionDevice> dcompDevice;
   ComPtr<IDCompositionTarget> target;
   ComPtr<IDCompositionVisual> visual;
-  ComPtr<IDWriteTextFormat1> pPreeditFormat;
-  ComPtr<IDWriteTextFormat1> pTextFormat;
-  ComPtr<IDWriteTextFormat1> pLabelFormat;
-  ComPtr<IDWriteTextFormat1> pCommentFormat;
+  PtTextFormat pPreeditFormat;
+  PtTextFormat pTextFormat;
+  PtTextFormat pLabelFormat;
+  PtTextFormat pCommentFormat;
   ComPtr<IDWriteFactory2> m_pWriteFactory;
   ComPtr<ID2D1SolidColorBrush> m_pBrush;
   UIStyle &m_style;
