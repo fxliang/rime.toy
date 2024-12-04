@@ -336,6 +336,9 @@ void send_input_to_window(const std::wstring &text) {
     input.ki.time = 0;
     input.ki.dwExtraInfo = GetMessageExtraInfo();
     inputs.push_back(input);
+    INPUT inputRelease = input;
+    inputRelease.ki.dwFlags |= KEYEVENTF_KEYUP;
+    inputs.push_back(inputRelease);
   }
 
   if (!inputs.empty()) {
