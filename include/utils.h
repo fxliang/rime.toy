@@ -176,4 +176,23 @@ template <typename... Ts> void SafeReleaseAll(Ts &&...args) {
   (SafeRelease(std::forward<Ts>(args)), ...);
 }
 
+inline BOOL GetVersionEx2(LPOSVERSIONINFOW lpVersionInformation) {
+  HMODULE hNtDll = GetModuleHandleW(L"NTDLL"); // 获取ntdll.dll的句柄
+  typedef NTSTATUS(NTAPI * tRtlGetVersion)(PRTL_OSVERSIONINFOW povi);
+  tRtlGetVersion pRtlGetVersion =
+      hNtDll ? (tRtlGetVersion)GetProcAddress(hNtDll, "RtlGetVersion") : 0;
+  return (pRtlGetVersion &&
+          pRtlGetVersion((PRTL_OSVERSIONINFOW)lpVersionInformation) >= 0);
+}
+
+inline BOOL IsWinVersionGreaterThan(DWORD major, DWORD minor) {
+  OSVERSIONINFOEXW ovi = {sizeof ovi};
+  GetVersionEx2((LPOSVERSIONINFOW)&ovi);
+  return ((ovi.dwMajorVersion == major && ovi.dwMinorVersion >= minor) ||
+          ovi.dwMajorVersion > major);
+}
+
+// Use WinBlue for Windows 8.1
+#define IsWindowsBlueOrLaterEx() IsWinVersionGreaterThan(6, 3)
+
 } // namespace weasel

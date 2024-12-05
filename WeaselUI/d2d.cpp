@@ -252,49 +252,17 @@ void D2D::SetBrushColor(uint32_t color) {
   m_pBrush->SetColor(colorf);
 }
 
-inline BOOL GetVersionEx2(LPOSVERSIONINFOW lpVersionInformation) {
-  HMODULE hNtDll = GetModuleHandleW(L"NTDLL"); // 获取ntdll.dll的句柄
-  typedef NTSTATUS(NTAPI * tRtlGetVersion)(
-      PRTL_OSVERSIONINFOW povi); // RtlGetVersion的原型
-  tRtlGetVersion pRtlGetVersion = NULL;
-  if (hNtDll) {
-    pRtlGetVersion = (tRtlGetVersion)GetProcAddress(
-        hNtDll, "RtlGetVersion"); // 获取RtlGetVersion地址
-  }
-  if (pRtlGetVersion) {
-    return pRtlGetVersion((PRTL_OSVERSIONINFOW)lpVersionInformation) >=
-           0; // 调用RtlGetVersion
-  }
-  return FALSE;
-}
-
-static inline BOOL IsWinVersionGreaterThan(DWORD dwMajorVersion,
-                                           DWORD dwMinorVersion) {
-  OSVERSIONINFOEXW ovi = {sizeof ovi};
-  GetVersionEx2((LPOSVERSIONINFOW)&ovi);
-  if ((ovi.dwMajorVersion == dwMajorVersion &&
-       ovi.dwMinorVersion >= dwMinorVersion) ||
-      ovi.dwMajorVersion > dwMajorVersion)
-    return true;
-  else
-    return false;
-}
-
-// Use WinBlue for Windows 8.1
-#define IsWindowsBlueOrLaterEx() IsWinVersionGreaterThan(6, 3)
-
 void D2D::InitDpiInfo() {
-  if (!IsWindowsBlueOrLaterEx())
-    return;
-  HMONITOR const monitor = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
-  unsigned x = 0;
-  unsigned y = 0;
-  HR(GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &x, &y));
-  m_dpiX = static_cast<float>(x);
-  m_dpiY = static_cast<float>(y);
-  if (m_dpiY == 0) {
-    m_dpiX = m_dpiY = 96.0;
-  }
+  if (IsWindowsBlueOrLaterEx()) {
+    HMONITOR const mon = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
+    UINT x = 0, y = 0;
+    HR(GetDpiForMonitor(mon, MDT_EFFECTIVE_DPI, &x, &y));
+    m_dpiX = static_cast<float>(x);
+    m_dpiY = static_cast<float>(y);
+    if (m_dpiY == 0)
+      m_dpiX = m_dpiY = 96.0;
+  } else
+    m_dpiY = m_dpiX = 96.0f;
   m_dpiScaleFontPoint = m_dpiY / 72.0f;
   m_dpiScaleLayout = m_dpiY / 96.0;
 }
