@@ -468,12 +468,11 @@ bool WeaselPanel::_DrawCandidates() {
   }
   // draw highlight mark
   if (COLORNOTTRANSPARENT(m_style.hilited_mark_color)) {
-    auto rect = m_layout->GetHighlightRect();
+    CRect rc = m_layout->GetHighlightRect();
+    if (m_istorepos)
+      rc.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
+    rc.InflateRect(padx, pady);
     if (!m_style.mark_text.empty()) {
-      CRect rc = m_layout->GetHighlightRect();
-      if (m_istorepos)
-        rc.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
-      rc.InflateRect(padx, pady);
       int vgap =
           m_layout->mark_height ? (rc.Height() - m_layout->mark_height) / 2 : 0;
       int hgap =
@@ -489,22 +488,21 @@ bool WeaselPanel::_DrawCandidates() {
       _TextOut(hlRc, m_style.mark_text.c_str(), m_style.mark_text.length(),
                m_style.hilited_mark_color, txtFormat);
     } else {
-      int height = MIN(rect.Height() - pady * 2,
-                       rect.Height() - DPI_SCALE(m_style.round_corner) * 2);
-      int width = MIN(rect.Width() - padx * 2,
-                      rect.Width() - DPI_SCALE(m_style.round_corner) * 2);
-      width = MIN(width, static_cast<int>(rect.Width() * 0.618));
-      height = MIN(height, static_cast<int>(rect.Height() * 0.618));
+      int height = MIN(rc.Height() - pady * 2,
+                       rc.Height() - DPI_SCALE(m_style.round_corner) * 2);
+      int width = MIN(rc.Width() - padx * 2,
+                      rc.Width() - DPI_SCALE(m_style.round_corner) * 2);
+      width = MIN(width, static_cast<int>(rc.Width() * 0.618));
+      height = MIN(height, static_cast<int>(rc.Height() * 0.618));
       CRect mkrc;
       int mark_radius;
       if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
-        int x = rect.left + (rect.Width() - width) / 2;
-        mkrc = CRect(x, rect.top, x + width, rect.top + m_layout->mark_height);
+        int x = rc.left + (rc.Width() - width) / 2;
+        mkrc = CRect(x, rc.top, x + width, rc.top + m_layout->mark_height);
         mark_radius = mkrc.Height() / 2;
       } else {
-        int y = rect.top + (rect.Height() - height) / 2;
-        mkrc =
-            CRect(rect.left, y, rect.left + m_layout->mark_width, y + height);
+        int y = rc.top + (rc.Height() - height) / 2;
+        mkrc = CRect(rc.left, y, rc.left + m_layout->mark_width, y + height);
         mark_radius = mkrc.Width() / 2;
       }
       IsToRoundStruct roundInfo;
@@ -575,9 +573,8 @@ void WeaselPanel::_HighlightRect(const RECT &rect, float radius,
     ComPtr<ID2D1Effect> blurEffect;
     HR(m_pD2D->dc->CreateEffect(CLSID_D2D1GaussianBlur, &blurEffect));
     blurEffect->SetInput(0, bitmap.Get());
-    blurEffect->SetValue(
-        D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION,
-        (float)m_style.shadow_radius); // Adjust blur radius as needed
+    blurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION,
+                         (float)m_style.shadow_radius);
     // Draw the blurred rounded rectangle onto the main render target
     m_pD2D->dc->DrawImage(blurEffect.Get());
   }
