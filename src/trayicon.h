@@ -3,6 +3,8 @@
 #include <string>
 #include <windows.h>
 
+typedef std::function<void(void)> vhandler;
+
 class TrayIcon {
 public:
   TrayIcon(HINSTANCE hInstance, const std::wstring &tooltip);
@@ -12,21 +14,13 @@ public:
   void SetIcon(HICON hIcon);
   void SetTooltip(const std::wstring &tooltip);
   void ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-  void SetDeployFunc(const std::function<void(void)> &func) {
-    deploy_func = func;
-  }
-  void SetSwichAsciiFunc(const std::function<void(void)> &func) {
-    switch_ascii = func;
-  }
-  void SetSwichDarkFunc(const std::function<void(void)> &func) {
-    switch_dark = func;
-  }
-  void SetOpenSharedDirFunc(const std::function<void(void)> &func) {
-    open_shareddir = func;
-  }
-  void SetOpenUserdDirFunc(const std::function<void(void)> &func) {
-    open_userdir = func;
-  }
+  void SetDeployFunc(const vhandler &func) { deploy_func = func; }
+  void SetSwichAsciiFunc(const vhandler &func) { switch_ascii = func; }
+  void SetSwichDarkFunc(const vhandler &func) { switch_dark = func; }
+  void SetOpenSharedDirFunc(const vhandler &func) { open_shareddir = func; }
+  void SetOpenUserdDirFunc(const vhandler &func) { open_userdir = func; }
+  void SetOpenLogDirFunc(const vhandler &func) { open_logdir = func; }
+  void SetSyncFunc(const vhandler &func) { sync_data = func; }
   bool debug() { return enable_debug; }
   void ShowBalloonTip(const std::wstring &title, const std::wstring &message,
                       DWORD timeout = 1000);
@@ -38,11 +32,13 @@ private:
   NOTIFYICONDATA nid;
   HMENU hMenu;
   HWND m_hWnd;
-  std::function<void(void)> deploy_func;
-  std::function<void(void)> switch_ascii;
-  std::function<void(void)> switch_dark;
-  std::function<void(void)> open_userdir;
-  std::function<void(void)> open_shareddir;
+  vhandler deploy_func;
+  vhandler switch_ascii;
+  vhandler switch_dark;
+  vhandler open_userdir;
+  vhandler open_shareddir;
+  vhandler open_logdir;
+  vhandler sync_data;
   bool enable_debug;
   bool current_dark_mode;
 

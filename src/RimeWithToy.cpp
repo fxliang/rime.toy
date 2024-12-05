@@ -153,6 +153,18 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance, wstring &commit_str)
   });
   m_trayIcon->SetOpenSharedDirFunc([&]() { OPEN("shared"); });
   m_trayIcon->SetOpenUserdDirFunc([&]() { OPEN("usr"); });
+  m_trayIcon->SetOpenLogDirFunc([&]() { OPEN("log"); });
+  m_trayIcon->SetSyncFunc([&]() {
+    m_disabled = true;
+    m_trayIcon->SetIcon(m_reload_icon);
+    DEBUGIF(m_trayIcon->debug()) << L"Sync Menu clicked";
+    if (!rime_api->sync_user_data())
+      BalloonMsg("同步用户数据失败");
+    Initialize();
+    BOOL ascii = rime_api->get_option(m_session_id, "ascii_mode");
+    m_trayIcon->SetIcon(ascii ? m_ascii_icon : m_ime_icon);
+    m_disabled = false;
+  });
   m_trayIcon->SetIcon(m_ime_icon);
   m_trayIconCallback = [&](const Status &sta) {
     m_trayIcon->SetIcon(sta.ascii_mode ? m_ascii_icon : m_ime_icon);

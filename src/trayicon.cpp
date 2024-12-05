@@ -10,6 +10,7 @@
 #define MENU_DEBUG 1005
 #define MENU_SHARED_DIR 1006
 #define MENU_USER_DIR 1007
+#define MENU_LOG_DIR 1008
 
 TrayIcon::TrayIcon(HINSTANCE hInstance, const std::wstring &tooltip)
     : hInst(hInstance), hMenu(NULL), deploy_func(nullptr),
@@ -63,10 +64,13 @@ void TrayIcon::SetTooltip(const std::wstring &tooltip) {
 void TrayIcon::CreateContextMenu() {
   if (hMenu == NULL) {
     hMenu = CreatePopupMenu();
+    AppendMenu(hMenu, MF_STRING, MENU_LOG_DIR, L"日志目录");
     AppendMenu(hMenu, MF_STRING, MENU_SHARED_DIR, L"共享目录");
     AppendMenu(hMenu, MF_STRING, MENU_USER_DIR, L"用户目录");
+    AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
     AppendMenu(hMenu, MF_STRING | (enable_debug ? MF_CHECKED : MFS_UNCHECKED),
                MENU_DEBUG, L"调试信息");
+    AppendMenu(hMenu, MF_STRING, MENU_SYNC, L"同步数据");
     AppendMenu(hMenu, MF_STRING, MENU_DEPLOY, L"重新部署");
     AppendMenu(hMenu, MF_STRING, MENU_QUIT, L"退出");
   }
@@ -129,28 +133,48 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
     if (wParam == TIMER_BALLOON_TIMEOUT)
       OnBalloonTimeout();
     break;
-  case WM_COMMAND:
-    if (LOWORD(wParam) == MENU_QUIT) { // Exit
+  case WM_COMMAND: {
+    switch (LOWORD(wParam)) {
+    case MENU_QUIT: {
       Hide();
       PostQuitMessage(0);
-    } else if (LOWORD(wParam) == MENU_DEPLOY) {
+      break;
+    }
+    case MENU_DEPLOY: {
       if (deploy_func)
         deploy_func();
-    } else if (LOWORD(wParam) == MENU_DEBUG) {
+      break;
+    }
+    case MENU_DEBUG: {
       enable_debug = !enable_debug;
-
       if (hMenu)
         CheckMenuItem(hMenu, MENU_DEBUG,
                       enable_debug ? MF_CHECKED : MF_UNCHECKED);
       InvalidateRect(hwnd, NULL, true);
-    } else if (LOWORD(wParam) == MENU_USER_DIR) {
-      if (open_userdir)
-        open_userdir();
-    } else if (LOWORD(wParam) == MENU_SHARED_DIR) {
+      break;
+    }
+    case MENU_SHARED_DIR: {
       if (open_shareddir)
         open_shareddir();
+      break;
     }
-    break;
+    case MENU_USER_DIR: {
+      if (open_userdir)
+        open_userdir();
+      break;
+    }
+    case MENU_LOG_DIR: {
+      if (open_logdir)
+        open_logdir();
+      break;
+    }
+    case MENU_SYNC: {
+      if (sync_data)
+        sync_data();
+      break;
+    }
+    }
+  } break;
   }
 }
 
