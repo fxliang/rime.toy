@@ -4,6 +4,13 @@
 #include <utils.h>
 #include <winuser.h>
 
+#define MENU_QUIT 1002
+#define MENU_DEPLOY 1003
+#define MENU_SYNC 1004
+#define MENU_DEBUG 1005
+#define MENU_SHARED_DIR 1006
+#define MENU_USER_DIR 1007
+
 TrayIcon::TrayIcon(HINSTANCE hInstance, const std::wstring &tooltip)
     : hInst(hInstance), hMenu(NULL), deploy_func(nullptr),
       switch_ascii(nullptr), enable_debug(false) {
@@ -56,10 +63,12 @@ void TrayIcon::SetTooltip(const std::wstring &tooltip) {
 void TrayIcon::CreateContextMenu() {
   if (hMenu == NULL) {
     hMenu = CreatePopupMenu();
+    AppendMenu(hMenu, MF_STRING, MENU_SHARED_DIR, L"共享目录");
+    AppendMenu(hMenu, MF_STRING, MENU_USER_DIR, L"用户目录");
     AppendMenu(hMenu, MF_STRING | (enable_debug ? MF_CHECKED : MFS_UNCHECKED),
-               1004, L"调试信息");
-    AppendMenu(hMenu, MF_STRING, 1003, L"重新部署");
-    AppendMenu(hMenu, MF_STRING, 1002, L"退出");
+               MENU_DEBUG, L"调试信息");
+    AppendMenu(hMenu, MF_STRING, MENU_DEPLOY, L"重新部署");
+    AppendMenu(hMenu, MF_STRING, MENU_QUIT, L"退出");
   }
 }
 
@@ -121,18 +130,25 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
       OnBalloonTimeout();
     break;
   case WM_COMMAND:
-    if (LOWORD(wParam) == 1002) { // Exit
+    if (LOWORD(wParam) == MENU_QUIT) { // Exit
       Hide();
       PostQuitMessage(0);
-    } else if (LOWORD(wParam) == 1003) {
+    } else if (LOWORD(wParam) == MENU_DEPLOY) {
       if (deploy_func)
         deploy_func();
-    } else if (LOWORD(wParam) == 1004) {
+    } else if (LOWORD(wParam) == MENU_DEBUG) {
       enable_debug = !enable_debug;
 
       if (hMenu)
-        CheckMenuItem(hMenu, 1004, enable_debug ? MF_CHECKED : MF_UNCHECKED);
+        CheckMenuItem(hMenu, MENU_DEBUG,
+                      enable_debug ? MF_CHECKED : MF_UNCHECKED);
       InvalidateRect(hwnd, NULL, true);
+    } else if (LOWORD(wParam) == MENU_USER_DIR) {
+      if (open_userdir)
+        open_userdir();
+    } else if (LOWORD(wParam) == MENU_SHARED_DIR) {
+      if (open_shareddir)
+        open_shareddir();
     }
     break;
   }

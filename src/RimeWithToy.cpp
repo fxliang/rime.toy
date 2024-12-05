@@ -23,6 +23,11 @@ typedef enum { COLOR_ABGR = 0, COLOR_ARGB, COLOR_RGBA } ColorFormat;
 #define HEX_REGEX std::regex("^0x[0-9a-f]+$", std::regex::icase)
 #define TRIMHEAD_REGEX std::regex("0x", std::regex::icase)
 #endif
+
+#define OPEN(x)                                                                \
+  ShellExecute(nullptr, _T("open"), data_path(x).c_str(), NULL, NULL,          \
+               SW_SHOWNORMAL);
+
 namespace fs = std::filesystem;
 
 int expand_ibus_modifier(int m) { return (m & 0xff) | ((m & 0xff00) << 16); }
@@ -146,6 +151,8 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance, wstring &commit_str)
     if (m_ui)
       m_ui->Refresh();
   });
+  m_trayIcon->SetOpenSharedDirFunc([&]() { OPEN("shared"); });
+  m_trayIcon->SetOpenUserdDirFunc([&]() { OPEN("usr"); });
   m_trayIcon->SetIcon(m_ime_icon);
   m_trayIconCallback = [&](const Status &sta) {
     m_trayIcon->SetIcon(sta.ascii_mode ? m_ascii_icon : m_ime_icon);

@@ -21,6 +21,12 @@ public:
   void SetSwichDarkFunc(const std::function<void(void)> &func) {
     switch_dark = func;
   }
+  void SetOpenSharedDirFunc(const std::function<void(void)> &func) {
+    open_shareddir = func;
+  }
+  void SetOpenUserdDirFunc(const std::function<void(void)> &func) {
+    open_userdir = func;
+  }
   bool debug() { return enable_debug; }
   void ShowBalloonTip(const std::wstring &title, const std::wstring &message,
                       DWORD timeout = 1000);
@@ -35,6 +41,8 @@ private:
   std::function<void(void)> deploy_func;
   std::function<void(void)> switch_ascii;
   std::function<void(void)> switch_dark;
+  std::function<void(void)> open_userdir;
+  std::function<void(void)> open_shareddir;
   bool enable_debug;
   bool current_dark_mode;
 
