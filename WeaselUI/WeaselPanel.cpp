@@ -242,38 +242,31 @@ void WeaselPanel::DoPaint() {
     auto arc = m_layout->GetAuxiliaryRect();
     // if vertical auto reverse triggered
     if (m_istorepos) {
-      CRect *rects = new CRect[m_candidateCount];
-      int *btmys = new int[m_candidateCount];
-      for (auto i = 0; i < m_candidateCount && i < MAX_CANDIDATES_COUNT; ++i) {
+      std::vector<CRect> rects(m_candidateCount);
+      std::vector<int> btmys(m_candidateCount);
+      for (int i = 0; i < m_candidateCount && i < MAX_CANDIDATES_COUNT; ++i) {
         rects[i] = m_layout->GetCandidateRect(i);
         btmys[i] = rects[i].bottom;
       }
-      if (m_candidateCount) {
-        if (!m_layout->IsInlinePreedit() && !m_ctx.preedit.str.empty())
-          m_offsety_preedit = rects[m_candidateCount - 1].bottom - prc.bottom;
-        if (!m_ctx.aux.str.empty())
-          m_offsety_aux = rects[m_candidateCount - 1].bottom - arc.bottom;
-      } else {
-        m_offsety_preedit = 0;
-        m_offsety_aux = 0;
+      m_offsety_preedit = m_candidateCount && !m_layout->IsInlinePreedit() &&
+                                  !m_ctx.preedit.str.empty()
+                              ? rects.back().bottom - prc.bottom
+                              : 0;
+      m_offsety_aux = m_candidateCount && !m_ctx.aux.str.empty()
+                          ? rects.back().bottom - arc.bottom
+                          : 0;
+      int base_gap =
+          !m_ctx.aux.str.empty()
+              ? arc.Height() + m_style.spacing
+              : (!m_layout->IsInlinePreedit() && !m_ctx.preedit.str.empty()
+                     ? prc.Height() + m_style.spacing
+                     : 0);
+      for (int i = 0; i < m_candidateCount && i < MAX_CANDIDATES_COUNT; ++i) {
+        m_offsetys[i] = i == 0 ? btmys.back() - base_gap - rects[i].bottom
+                               : rects[i - 1].top + m_offsetys[i - 1] -
+                                     DPI_SCALE(m_style.candidate_spacing) -
+                                     rects[i].bottom;
       }
-      int base_gap = 0;
-      if (!m_ctx.aux.str.empty())
-        base_gap = arc.Height() + m_style.spacing;
-      else if (!m_layout->IsInlinePreedit() && !m_ctx.preedit.str.empty())
-        base_gap = prc.Height() + m_style.spacing;
-
-      for (auto i = 0; i < m_candidateCount && i < MAX_CANDIDATES_COUNT; ++i) {
-        if (i == 0)
-          m_offsetys[i] =
-              btmys[m_candidateCount - i - 1] - base_gap - rects[i].bottom;
-        else
-          m_offsetys[i] = (rects[i - 1].top + m_offsetys[i - 1] -
-                           DPI_SCALE(m_style.candidate_spacing)) -
-                          rects[i].bottom;
-      }
-      delete[] rects;
-      delete[] btmys;
     }
     if (!m_ctx.preedit.empty()) {
       if (m_istorepos)
