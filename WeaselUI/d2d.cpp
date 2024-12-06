@@ -565,6 +565,8 @@ D2D::CreateRoundedRectanglePath(const RECT &rc, float radius,
                                 ComPtr<ID2D1PathGeometry> &pPathGeometry) {
   D2D1_RECT_F rectf{(float)rc.left, (float)rc.top, (float)rc.right,
                     (float)rc.bottom};
+  radius = MIN(radius, (rc.right - rc.left) / 2.0f);
+  radius = MIN(radius, (rc.bottom - rc.top) / 2.0f);
 #define PT2F(x, y) D2D1::Point2F(x, y)
   // 创建路径几何对象
   HRESULT hr =
