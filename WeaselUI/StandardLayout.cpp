@@ -137,6 +137,31 @@ bool StandardLayout::ShouldDisplayStatusIcon() const {
 }
 
 bool StandardLayout::_IsHighlightOverCandidateWindow(const CRect &rc) {
+  ComPtr<ID2D1PathGeometry> bgPathGeometry;
+  HR(_pD2D->CreateRoundedRectanglePath(_bgRect, _style.round_corner_ex,
+                                       IsToRoundStruct(), bgPathGeometry));
+  // check if the center of arcs is out of _bgRect
+  auto offset = _style.round_corner * 0.414213562f;
+  D2D1_POINT_2F lt = D2D1::Point2F(rc.left + offset, rc.top + offset);
+  D2D1_POINT_2F lb = D2D1::Point2F(rc.left + offset, rc.bottom - offset);
+  D2D1_POINT_2F rb = D2D1::Point2F(rc.right - offset, rc.bottom - offset);
+  D2D1_POINT_2F rt = D2D1::Point2F(rc.right - offset, rc.top + offset);
+  static const D2D1_MATRIX_3X2_F wtf = D2D1::Matrix3x2F::Identity();
+  static const float flatteningTolerance = 1.0f;
+  BOOL inside = FALSE;
+  bgPathGeometry->FillContainsPoint(lt, &wtf, flatteningTolerance, &inside);
+  if (!inside)
+    return true;
+  bgPathGeometry->FillContainsPoint(lb, &wtf, flatteningTolerance, &inside);
+  if (!inside)
+    return true;
+  bgPathGeometry->FillContainsPoint(rb, &wtf, flatteningTolerance, &inside);
+  if (!inside)
+    return true;
+  bgPathGeometry->FillContainsPoint(rt, &wtf, flatteningTolerance, &inside);
+  if (!inside)
+    return true;
+  // check if the rc out of _bgRect
   return (rc.left <= _bgRect.left || rc.right >= _bgRect.right ||
           rc.top <= _bgRect.top || rc.bottom >= _bgRect.bottom);
 }
