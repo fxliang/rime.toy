@@ -94,6 +94,12 @@ LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
   if (nCode == HC_ACTION && m_toy->UIHwnd()) {
     if (wParam == WM_MOUSEWHEEL) {
       PostMessage(m_toy->UIHwnd(), WM_MOUSEWHEEL, wParam, lParam);
+    } else if (wParam == WM_MOUSEMOVE) {
+      PostMessage(m_toy->UIHwnd(), WM_MOUSEMOVE, wParam, lParam);
+    } else if (wParam == WM_MOUSEACTIVATE) {
+      PostMessage(m_toy->UIHwnd(), WM_MOUSEACTIVATE, wParam, lParam);
+    } else if (wParam == WM_MOUSELEAVE) {
+      PostMessage(m_toy->UIHwnd(), WM_MOUSELEAVE, wParam, lParam);
     }
   }
   return CallNextHookEx(NULL, nCode, wParam, lParam);

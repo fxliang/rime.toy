@@ -34,7 +34,10 @@ private:
 
   void DoPaint();
   void OnDestroy();
-  HRESULT OnScroll(WPARAM wParam);
+  HRESULT OnScroll(UINT uMsg, WPARAM wParam, LPARAM lParam);
+  LRESULT OnMouseMove(UINT uMsg, WPARAM wParam, LPARAM lParam);
+  LRESULT OnMouseActive(UINT uMsg, WPARAM wParam, LPARAM lParam);
+  LRESULT OnMouseLeave(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
   static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
                                      LPARAM lParam);
@@ -57,6 +60,7 @@ private:
   int m_offsety_aux = 0;
   bool m_istorepos = false;
   bool m_sticky = false;
+  bool m_mouse_entry = false;
   // ------------------------------------------------------------
   an<D2D> m_pD2D;
   an<Layout> m_layout;

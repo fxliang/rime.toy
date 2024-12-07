@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <chrono>
 #include <iomanip>
@@ -83,6 +83,15 @@ public:
   DebugStream &operator<<(const string value) {
     std::wstring wvalue(u8tow(value)); // utf-8
     ss << wvalue;
+    return *this;
+  }
+  DebugStream &operator<<(const RECT &rc) {
+    ss << L"rc = {" << rc.left << L", " << rc.top << L", " << rc.right << L", "
+       << rc.bottom << L"}";
+    return *this;
+  }
+  DebugStream &operator<<(const POINT &pt) {
+    ss << L"pt = (" << pt.x << L", " << pt.y << L")";
     return *this;
   }
 

@@ -5,6 +5,7 @@
 #include "VerticalLayout.h"
 #include <filesystem>
 #include <resource.h>
+#include <windowsx.h>
 #include <wrl/client.h>
 
 namespace fs = std::filesystem;
@@ -201,6 +202,7 @@ void WeaselPanel::Refresh() {
 BOOL WeaselPanel::Create(HWND parent) {
   if (m_hWnd)
     return !!m_hWnd;
+  m_hoverIndex = -1;
   WNDCLASS wc = {};
   wc.lpfnWndProc = WindowProc;
   wc.hInstance = GetModuleHandle(nullptr);
@@ -420,12 +422,20 @@ bool WeaselPanel::_DrawCandidates() {
                    back_color, shadow_color, border_color, roundInfo);
   };
   for (auto i = 0; i < m_candidateCount; i++) {
+    if (i == m_hoverIndex)
+      continue;
     bool hilited = (i == m_ctx.cinfo.highlighted);
     int shadow_color = hilited ? m_style.hilited_candidate_shadow_color
                                : m_style.candidate_shadow_color;
     if (COLORNOTTRANSPARENT(shadow_color))
       hilitefunc(i, 0, shadow_color, 0);
     drawn = true;
+  }
+  if (m_hoverIndex >= 0) {
+    hilitefunc(m_hoverIndex,
+               HALF_ALPHA_COLOR(m_style.hilited_candidate_back_color),
+               HALF_ALPHA_COLOR(m_style.hilited_candidate_shadow_color),
+               HALF_ALPHA_COLOR(m_style.hilited_candidate_border_color));
   }
   // draw highlighted background and text
   const auto drawText = [&](int i, const vector<Text> &texts, int color,
@@ -562,17 +572,71 @@ void WeaselPanel::_HighlightRect(const RECT &rect, float radius,
 }
 
 void WeaselPanel::OnDestroy() {
+  m_hoverIndex = -1;
   m_layout.reset();
   m_sticky = false;
 }
 
-HRESULT WeaselPanel::OnScroll(WPARAM wParam) {
+HRESULT WeaselPanel::OnScroll(UINT uMsg, WPARAM wParam, LPARAM lParam) {
   int delta = GET_WHEEL_DELTA_WPARAM(wParam);
   if (m_uiCallback && delta != 0) {
     bool nextpage = delta < 0;
     m_uiCallback(NULL, NULL, NULL, &nextpage);
   }
   return 0;
+}
+
+LRESULT WeaselPanel::OnMouseLeave(UINT uMsg, WPARAM wParam, LPARAM lParam) {
+  m_hoverIndex = -1;
+  m_mouse_entry = false;
+  InvalidateRect(m_hWnd, nullptr, true);
+  return 0;
+}
+
+LRESULT WeaselPanel::OnMouseMove(UINT uMsg, WPARAM wParam, LPARAM lParam) {
+  if (m_style.hover_type == UIStyle::NONE)
+    return 0;
+  if (m_mouse_entry == false) {
+    TRACKMOUSEEVENT tme;
+    tme.cbSize = sizeof(TRACKMOUSEEVENT);
+    tme.dwFlags = TME_LEAVE;
+    tme.dwHoverTime = 20; // unit: ms
+    tme.hwndTrack = m_hWnd;
+    TrackMouseEvent(&tme);
+  }
+  m_mouse_entry = true;
+  CPoint point(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+  CRect rc;
+  GetWindowRect(m_hWnd, &rc);
+  auto offsetX = m_layout ? m_layout->offsetX : 0;
+  auto offsetY = m_layout ? m_layout->offsetY : 0;
+  rc.Inflate(-offsetX, -offsetY);
+  for (int i = 0; i < m_candidateCount; i++) {
+    CRect rect = m_layout->GetCandidateRect(i);
+    if (m_istorepos)
+      rect.OffsetRect(0, m_offsetys[i]);
+    rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
+                     DPI_SCALE(m_style.hilite_padding_y));
+    if (rect.PtInRect(point)) {
+      if (i != m_ctx.cinfo.highlighted) {
+        if (m_style.hover_type == UIStyle::HoverType::HILITE) {
+          // todo: change highlighted and update ui
+        } else if (m_hoverIndex != i) {
+          m_hoverIndex = i;
+          InvalidateRect(m_hWnd, nullptr, true);
+        }
+      } else if (m_style.hover_type == UIStyle::HoverType::SEMI_HILITE &&
+                 m_hoverIndex != -1) {
+        m_hoverIndex = -1;
+        InvalidateRect(m_hWnd, nullptr, true);
+      }
+    }
+  }
+  return 0;
+}
+
+LRESULT WeaselPanel::OnMouseActive(UINT uMsg, WPARAM wParam, LPARAM lParam) {
+  return MA_NOACTIVATE;
 }
 
 LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
@@ -595,7 +659,20 @@ LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
   case WM_DESTROY:
     if (self) {
       self->OnDestroy();
+      return 0;
     }
+    break;
+  case WM_MOUSEMOVE:
+    if (self)
+      self->OnMouseMove(uMsg, wParam, lParam);
+    break;
+  case WM_MOUSELEAVE:
+    if (self)
+      self->OnMouseLeave(uMsg, wParam, lParam);
+    break;
+  case WM_MOUSEACTIVATE:
+    if (self)
+      return self->OnMouseActive(uMsg, wParam, lParam);
     break;
   // not ready yet
   // case WM_MOUSEWHEEL:
@@ -603,7 +680,7 @@ LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
   //    return self->OnScroll(wParam);
   //  break;
   case WM_LBUTTONUP: {
-    return 0;
+    break;
   }
   }
   return DefWindowProc(hwnd, uMsg, wParam, lParam);
