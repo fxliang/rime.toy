@@ -543,44 +543,13 @@ void WeaselPanel::_HighlightRect(const RECT &rect, float radius,
   if (roundInfo.Hemispherical)
     radius = DPI_SCALE(m_style.round_corner_ex);
   // draw shadow
-  if ((shadow_color & 0xff000000) && m_style.shadow_radius) {
-    CRect rc = rect;
-    rc.OffsetRect(DPI_SCALE(m_style.shadow_offset_x),
-                  DPI_SCALE(m_style.shadow_offset_y));
-    // Define a rounded rectangle
-    ComPtr<ID2D1PathGeometry> pGeometry;
-    HR(m_pD2D->CreateRoundedRectanglePath(rc, radius, roundInfo, pGeometry));
-    // Create a compatible render target
-    ComPtr<ID2D1BitmapRenderTarget> bitmapRenderTarget;
-    HR(m_pD2D->dc->CreateCompatibleRenderTarget(&bitmapRenderTarget));
-
-    // Draw the rounded rectangle onto the bitmap render target
-    m_pD2D->SetBrushColor(shadow_color);
-    bitmapRenderTarget->BeginDraw();
-    bitmapRenderTarget->FillGeometry(pGeometry.Get(), m_pD2D->m_pBrush.Get());
-    bitmapRenderTarget->EndDraw();
-    // Get the bitmap from the bitmap render target
-    ComPtr<ID2D1Bitmap> bitmap;
-    HR(bitmapRenderTarget->GetBitmap(&bitmap));
-    //// Create a Gaussian blur effect
-    ComPtr<ID2D1Effect> blurEffect;
-    HR(m_pD2D->dc->CreateEffect(CLSID_D2D1GaussianBlur, &blurEffect));
-    blurEffect->SetInput(0, bitmap.Get());
-    blurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION,
-                         (float)m_style.shadow_radius);
-    // Draw the blurred rounded rectangle onto the main render target
-    m_pD2D->dc->DrawImage(blurEffect.Get());
-  }
+  if (COLORNOTTRANSPARENT(shadow_color) && m_style.shadow_radius)
+    m_pD2D->FillGeometry(rect, shadow_color, radius, roundInfo, true);
   // draw back color
-  if (back_color & 0xff000000) {
-    // Define a rounded rectangle
-    ComPtr<ID2D1PathGeometry> pGeometry;
-    HR(m_pD2D->CreateRoundedRectanglePath(rect, radius, roundInfo, pGeometry));
-    m_pD2D->SetBrushColor(back_color);
-    m_pD2D->dc->FillGeometry(pGeometry.Get(), m_pD2D->m_pBrush.Get());
-  }
+  if (COLORNOTTRANSPARENT(back_color))
+    m_pD2D->FillGeometry(rect, back_color, radius, roundInfo);
   // draw border
-  if ((border_color & 0xff000000) && border) {
+  if (COLORNOTTRANSPARENT(border_color) && border) {
     float hb = -(float)border / 2;
     CRect rc = rect;
     rc.InflateRect(hb, hb);

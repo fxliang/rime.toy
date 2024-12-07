@@ -2,6 +2,7 @@
 #ifndef D2D_H
 #define D2D_H
 
+#include <BaseTypes.h>
 #include <WeaselIPCData.h>
 #include <d2d1.h>
 #include <d2d1_2.h>
@@ -56,6 +57,8 @@ struct D2D {
   HRESULT CreateRoundedRectanglePath(const RECT &rc, float radius,
                                      const IsToRoundStruct &roundInfo,
                                      ComPtr<ID2D1PathGeometry> &pPathGeometry);
+  HRESULT FillGeometry(const CRect &rect, uint32_t color, uint32_t radius,
+                       IsToRoundStruct roundInfo, bool to_blur = false);
   ComPtr<ID3D11Device> direct3dDevice;
   ComPtr<IDXGIDevice> dxgiDevice;
   ComPtr<IDXGIFactory2> dxFactory;

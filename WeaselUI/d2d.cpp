@@ -626,4 +626,36 @@ D2D::CreateRoundedRectanglePath(const RECT &rc, float radius,
 #undef PT2F
   return hr;
 }
+
+HRESULT D2D::FillGeometry(const CRect &rect, uint32_t color, uint32_t radius,
+                          IsToRoundStruct roundInfo, bool to_blur) {
+  SetBrushColor(color);
+  ComPtr<ID2D1PathGeometry> pGeometry;
+  if (to_blur) {
+    CRect rc = rect;
+    rc.OffsetRect(m_dpiScaleLayout * m_style.shadow_offset_x,
+                  m_dpiScaleLayout * m_style.shadow_offset_y);
+    CreateRoundedRectanglePath(rc, radius, roundInfo, pGeometry);
+    ComPtr<ID2D1BitmapRenderTarget> bitmapRenderTarget;
+    HR(dc->CreateCompatibleRenderTarget(&bitmapRenderTarget));
+    bitmapRenderTarget->BeginDraw();
+    bitmapRenderTarget->FillGeometry(pGeometry.Get(), m_pBrush.Get());
+    bitmapRenderTarget->EndDraw();
+    // Get the bitmap from the bitmap render target
+    ComPtr<ID2D1Bitmap> bitmap;
+    HR(bitmapRenderTarget->GetBitmap(&bitmap));
+    //// Create a Gaussian blur effect
+    ComPtr<ID2D1Effect> blurEffect;
+    HR(dc->CreateEffect(CLSID_D2D1GaussianBlur, &blurEffect));
+    blurEffect->SetInput(0, bitmap.Get());
+    blurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION,
+                         (float)m_style.shadow_radius);
+    // Draw the blurred rounded rectangle onto the main render target
+    dc->DrawImage(blurEffect.Get());
+  } else {
+    HR(CreateRoundedRectanglePath(rect, radius, roundInfo, pGeometry));
+    dc->FillGeometry(pGeometry.Get(), m_pBrush.Get());
+  }
+  return S_OK;
+}
 } // namespace weasel
