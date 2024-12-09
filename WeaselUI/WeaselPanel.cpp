@@ -580,8 +580,8 @@ void WeaselPanel::OnDestroy() {
 HRESULT WeaselPanel::OnScroll(UINT uMsg, WPARAM wParam, LPARAM lParam) {
   int delta = GET_WHEEL_DELTA_WPARAM(wParam);
   if (m_uiCallback && delta != 0) {
-    bool nextpage = delta < 0;
-    m_uiCallback(NULL, NULL, NULL, &nextpage);
+    bool scroll_down = delta < 0;
+    m_uiCallback(NULL, NULL, NULL, &scroll_down);
   }
   return 0;
 }
@@ -675,10 +675,10 @@ LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
       return self->OnMouseActive(uMsg, wParam, lParam);
     break;
   // not ready yet
-  // case WM_MOUSEWHEEL:
-  //  if (self)
-  //    return self->OnScroll(wParam);
-  //  break;
+  case WM_MOUSEWHEEL:
+    if (self)
+      return self->OnScroll(uMsg, wParam, lParam);
+    break;
   case WM_LBUTTONUP: {
     break;
   }

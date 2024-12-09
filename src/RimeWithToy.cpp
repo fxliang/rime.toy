@@ -172,8 +172,8 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance, wstring &commit_str)
 
   if (!m_ui->uiCallback())
     m_ui->SetCallback([=](size_t *const select_index, size_t *const hover_index,
-                          bool *const next_page, bool *const scroll_next_page) {
-      HandleUICallback(select_index, hover_index, next_page, scroll_next_page);
+                          bool *const next_page, bool *const scroll_down) {
+      HandleUICallback(select_index, hover_index, next_page, scroll_down);
     });
 }
 
@@ -400,19 +400,18 @@ Bool RimeWithToy::HighlightCandidateCurrentPage(size_t index) {
   return rime_api->highlight_candidate_on_current_page(m_session_id, index);
 }
 
-void RimeWithToy::_HandleMousePageEvent(bool *next_page,
-                                        bool *scroll_next_page) {
+void RimeWithToy::_HandleMousePageEvent(bool *next_page, bool *scroll_down) {
   // from scrolling event
   bool handled = false;
-  if (*scroll_next_page) {
+  if (scroll_down) {
     if (m_ui->style().paging_on_scroll)
-      handled = ChangePage(!(*scroll_next_page));
+      handled = ChangePage(!(*scroll_down));
     else {
       UINT current_select = 0, cand_count = 0;
       current_select = m_ui->ctx().cinfo.highlighted;
       cand_count = m_ui->ctx().cinfo.candies.size();
       bool is_reposition = m_ui->GetIsReposition();
-      int offset = *scroll_next_page ? 1 : -1;
+      int offset = *scroll_down ? 1 : -1;
       offset = offset * (is_reposition ? -1 : 1);
       int index = (int)current_select + offset;
       if (index >= 0 && index < (int)cand_count)
@@ -424,23 +423,16 @@ void RimeWithToy::_HandleMousePageEvent(bool *next_page,
                                         expand_ibus_modifier(ke.mask));
       }
     }
-  } else { // from click event
+  } else if (next_page) { // from click event
     ChangePage(!(*next_page));
   }
-  if (handled) {
-    INPUT inputs[2];
-    inputs[0].type = INPUT_KEYBOARD;
-    inputs[0].ki = {VK_SELECT, 0, 0, 0, 0};
-    inputs[1].type = INPUT_KEYBOARD;
-    inputs[1].ki = {VK_SELECT, 0, KEYEVENTF_KEYUP, 0, 0};
-    ::SendInput(sizeof(inputs) / sizeof(INPUT), inputs, sizeof(INPUT));
-  }
+  UpdateUI();
 }
 
 void RimeWithToy::HandleUICallback(size_t *select_index, size_t *hover_index,
-                                   bool *next_page, bool *scroll_next_page) {
-  if (next_page || scroll_next_page)
-    _HandleMousePageEvent(next_page, scroll_next_page);
+                                   bool *next_page, bool *scroll_down) {
+  if (next_page || scroll_down)
+    _HandleMousePageEvent(next_page, scroll_down);
 }
 
 void RimeWithToy::UpdateInputPosition(const RECT &rc) {

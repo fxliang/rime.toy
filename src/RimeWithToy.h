@@ -44,9 +44,9 @@ private:
   Bool ChangePage(bool backward);
   Bool HighlightCandidateCurrentPage(size_t index);
   void HandleUICallback(size_t *const select_index, size_t *const hover_index,
-                        bool *const next_page, bool *const scroll_next_page);
+                        bool *const next_page, bool *const scroll_down);
 
-  void _HandleMousePageEvent(bool *next_page, bool *scroll_next_page);
+  void _HandleMousePageEvent(bool *next_page, bool *scroll_down);
   void _LoadSchemaSpecificSettings(RimeSessionId id, const wstring &schema_id);
 
   static std::string m_message_type;
