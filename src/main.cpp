@@ -13,6 +13,7 @@ using namespace weasel;
 HHOOK hKeyboardHook = NULL;
 HHOOK hMouseHook = NULL;
 std::unique_ptr<RimeWithToy> m_toy;
+wstring commit_str = L"";
 
 void update_position(HWND hwnd) {
   POINT pt;
@@ -29,6 +30,9 @@ void update_position(HWND hwnd) {
 static HWND hwnd_previous = nullptr;
 // ----------------------------------------------------------------------------
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
+  static Status status;
+  static bool committed = true;
+
   HWND hwnd = GetForegroundWindow();
   if (hwnd != hwnd_previous) {
     hwnd_previous = hwnd;
@@ -49,16 +53,31 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     KeyInfo ki = parse_key(wParam, lParam);
     KeyEvent ke;
     if (ConvertKeyEvent(pKeyboard, ki, ke)) {
+      bool eat = false;
+      // reverse up / down when is to reposition
       m_toy->StartUI();
-      bool eat = m_toy->ProcessKeyEvent(ke);
+      eat = m_toy->ProcessKeyEvent(ke);
+
+      m_toy->UpdateUI();
+      status = m_toy->GetRimeStatus();
       update_position(hwnd);
+      committed = !commit_str.empty();
+      if (!commit_str.empty()) {
+        send_input_to_window(commit_str);
+        commit_str.clear();
+        if (!status.composing)
+          m_toy->HideUI();
+        else {
+          m_toy->UpdateUI();
+          update_position(hwnd);
+        }
+      }
 
       if (ke.keycode == ibus::Caps_Lock && eat) {
         if (keyState[VK_CAPITAL] & 0x01) {
           keyState[VK_CAPITAL] = 0;
           SetKeyboardState(keyState);
-          auto status = m_toy->GetRimeStatus();
-          if (m_toy->Committed() || status.composing)
+          if (committed || status.composing)
             return 1;
           goto skip;
         }
@@ -98,7 +117,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                     LPWSTR lpCmdLine, int nCmdShow) {
   SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
   HR(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED));
-  m_toy = std::make_unique<RimeWithToy>(hInstance);
+  m_toy = std::make_unique<RimeWithToy>(hInstance, commit_str);
   // --------------------------------------------------------------------------
   hKeyboardHook =
       SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
