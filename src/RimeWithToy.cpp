@@ -246,7 +246,7 @@ BOOL RimeWithToy::ProcessKeyEvent(KeyEvent keyEvent) {
       m_commit_str.clear();
       auto status = GetRimeStatus();
       if (!status.composing) {
-        HideUI();
+        m_ui->Destroy();
         return handled;
       }
     }

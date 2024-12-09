@@ -49,9 +49,8 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     KeyInfo ki = parse_key(wParam, lParam);
     KeyEvent ke;
     if (ConvertKeyEvent(pKeyboard, ki, ke)) {
-      bool eat = false;
       m_toy->StartUI();
-      eat = m_toy->ProcessKeyEvent(ke);
+      bool eat = m_toy->ProcessKeyEvent(ke);
       update_position(hwnd);
 
       if (ke.keycode == ibus::Caps_Lock && eat) {
