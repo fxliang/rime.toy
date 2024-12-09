@@ -648,7 +648,7 @@ HRESULT D2D::FillGeometry(const CRect &rect, uint32_t color, uint32_t radius,
     ComPtr<ID2D1Effect> blurEffect;
     HR(dc->CreateEffect(CLSID_D2D1GaussianBlur, &blurEffect));
     blurEffect->SetInput(0, bitmap.Get());
-    blurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION,
+    blurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION,
                          (float)m_style.shadow_radius);
     // Draw the blurred rounded rectangle onto the main render target
     dc->DrawImage(blurEffect.Get());
