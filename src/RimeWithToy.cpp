@@ -69,6 +69,9 @@ void RimeWithToy::setup_rime() {
     fs::create_directory(usr_path);
   if (!fs::exists(log_path))
     fs::create_directory(log_path);
+  DEBUGIF(m_trayIcon->debug())
+      << "shared_path: " << shared_path << ", usr_path: " << usr_path
+      << ", log_path: " << log_path;
   static auto shared_dir = shared_path.u8string();
   static auto usr_dir = usr_path.u8string();
   static auto log_dir = log_path.u8string();

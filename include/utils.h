@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <filesystem>
 #include <iomanip>
 #include <memory>
 #include <regex>
@@ -92,6 +93,10 @@ public:
   }
   DebugStream &operator<<(const POINT &pt) {
     ss << L"pt = (" << pt.x << L", " << pt.y << L")";
+    return *this;
+  }
+  DebugStream &operator<<(const std::filesystem::path &path) {
+    ss << path.c_str();
     return *this;
   }
 
