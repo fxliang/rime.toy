@@ -27,9 +27,9 @@ void update_position(HWND hwnd) {
   m_toy->UpdateInputPosition({pt.x, 0, 0, pt.y});
 };
 
+static HWND hwnd_previous = nullptr;
 // ----------------------------------------------------------------------------
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
-  static HWND hwnd_previous = nullptr;
   static Status status;
   static bool committed = true;
 
@@ -92,6 +92,12 @@ skip:
 
 LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
   if (nCode == HC_ACTION && m_toy->UIHwnd()) {
+    HWND hwnd = GetForegroundWindow();
+    if (hwnd != hwnd_previous) {
+      hwnd_previous = hwnd;
+      m_toy->DestroyUI();
+      return CallNextHookEx(NULL, nCode, wParam, lParam);
+    }
     if (wParam == WM_MOUSEWHEEL) {
       PostMessage(m_toy->UIHwnd(), WM_MOUSEWHEEL, wParam, lParam);
     } else if (wParam == WM_MOUSEMOVE) {

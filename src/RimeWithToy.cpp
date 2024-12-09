@@ -455,6 +455,7 @@ void RimeWithToy::UpdateInputPosition(const RECT &rc) {
 void RimeWithToy::DestroyUI() {
   if (m_ui) {
     m_ui->ctx().clear();
+    rime_api->clear_composition(m_session_id);
     m_ui->Destroy();
   }
 }
