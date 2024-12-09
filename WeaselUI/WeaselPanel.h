@@ -39,6 +39,8 @@ private:
                       uint32_t back_color, uint32_t shadow_color,
                       uint32_t border_color, IsToRoundStruct roundInfo);
 
+  void _CaptureRect(CRect &rect);
+
   void DoPaint();
   void OnDestroy();
   HRESULT OnScroll(UINT uMsg, WPARAM wParam, LPARAM lParam);

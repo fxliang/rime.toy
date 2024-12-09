@@ -581,6 +581,50 @@ void WeaselPanel::_Reposition() {
     InvalidateRect(m_hWnd, NULL, TRUE); // 请求重绘
 }
 
+static HBITMAP CopyDCToBitmap(HDC hDC, LPRECT lpRect) {
+  if (!hDC || !lpRect || IsRectEmpty(lpRect))
+    return NULL;
+  HDC hMemDC;
+  HBITMAP hBitmap, hOldBitmap;
+  int nX, nY, nX2, nY2;
+  int nWidth, nHeight;
+
+  nX = lpRect->left;
+  nY = lpRect->top;
+  nX2 = lpRect->right;
+  nY2 = lpRect->bottom;
+  nWidth = nX2 - nX;
+  nHeight = nY2 - nY;
+
+  hMemDC = CreateCompatibleDC(hDC);
+  hBitmap = CreateCompatibleBitmap(hDC, nWidth, nHeight);
+  hOldBitmap = (HBITMAP)SelectObject(hMemDC, hBitmap);
+  StretchBlt(hMemDC, 0, 0, nWidth, nHeight, hDC, nX, nY, nWidth, nHeight,
+             SRCCOPY);
+  hBitmap = (HBITMAP)SelectObject(hMemDC, hOldBitmap);
+
+  DeleteDC(hMemDC);
+  DeleteObject(hOldBitmap);
+  return hBitmap;
+}
+
+void WeaselPanel::_CaptureRect(CRect &rect) {
+  HDC ScreenDC = ::GetDC(NULL);
+  CRect rc;
+  GetWindowRect(m_hWnd, &rc);
+  POINT WindowPosAtScreen = {rc.left, rc.top};
+  rect.OffsetRect(WindowPosAtScreen);
+  // capture input window
+  if (::OpenClipboard(m_hWnd)) {
+    HBITMAP bmp = CopyDCToBitmap(ScreenDC, LPRECT(rect));
+    EmptyClipboard();
+    SetClipboardData(CF_BITMAP, bmp);
+    CloseClipboard();
+    DeleteObject(bmp);
+  }
+  ::ReleaseDC(m_hWnd, ScreenDC);
+}
+
 void WeaselPanel::OnDestroy() {
   m_hoverIndex = -1;
   m_layout.reset();
@@ -685,9 +729,49 @@ LRESULT WeaselPanel::OnLeftClickDown(UINT uMsg, WPARAM wParam, LPARAM lParam) {
   if (hide_candidates)
     return 0;
   CPoint point(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+  // capture
   if (m_style.click_to_capture) {
-    // to impl
+    CRect rcw;
+    GetClientRect(m_hWnd, &rcw);
+    CRect recth = m_layout->GetCandidateRect((int)m_ctx.cinfo.highlighted);
+    if (m_istorepos)
+      recth.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
+    recth.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
+                      DPI_SCALE(m_style.hilite_padding_y));
+    if (recth.PtInRect(point))
+      _CaptureRect(recth);
+    else {
+      CRect crc(rcw);
+      // if shadow_color transparent, decrease the capture rectangle size
+      if (COLORTRANSPARENT(m_style.shadow_color) &&
+          DPI_SCALE(m_style.shadow_radius) != 0) {
+        int shadow_gap = (DPI_SCALE(m_style.shadow_offset_x) == 0 &&
+                          DPI_SCALE(m_style.shadow_offset_y) == 0)
+                             ? 2 * DPI_SCALE(m_style.shadow_radius)
+                             : DPI_SCALE(m_style.shadow_radius) +
+                                   DPI_SCALE(m_style.shadow_radius) / 2;
+        int ofx = DPI_SCALE(m_style.hilite_padding_x) +
+                              abs(DPI_SCALE(m_style.shadow_offset_x)) +
+                              shadow_gap >
+                          abs(DPI_SCALE(m_style.margin_x))
+                      ? DPI_SCALE(m_style.hilite_padding_x) +
+                            abs(DPI_SCALE(m_style.shadow_offset_x)) +
+                            shadow_gap - abs(DPI_SCALE(m_style.margin_x))
+                      : 0;
+        int ofy = DPI_SCALE(m_style.hilite_padding_y) +
+                              abs(DPI_SCALE(m_style.shadow_offset_y)) +
+                              shadow_gap >
+                          abs(DPI_SCALE(m_style.margin_y))
+                      ? DPI_SCALE(m_style.hilite_padding_y) +
+                            abs(DPI_SCALE(m_style.shadow_offset_y)) +
+                            shadow_gap - abs(DPI_SCALE(m_style.margin_y))
+                      : 0;
+        crc.DeflateRect(m_layout->offsetX - ofx, m_layout->offsetY - ofy);
+      }
+      _CaptureRect(crc);
+    }
   }
+  // page buttons, and click to select
   {
     if (!m_style.inline_preedit && m_candidateCount != 0 &&
         COLORNOTTRANSPARENT(m_style.prevpage_color) &&
