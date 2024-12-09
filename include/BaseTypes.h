@@ -77,7 +77,6 @@ public:
   void OffsetRect(SIZE sz) {
     left += sz.cx, right += sz.cx, top += sz.cy, bottom += sz.cy;
   }
-  void Inflate(int x, int y) { left -= x, right += x, top -= y, bottom += y; }
   int Width() noexcept {
     NormalizeRect();
     return right - left;

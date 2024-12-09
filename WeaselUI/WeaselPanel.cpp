@@ -293,7 +293,7 @@ bool WeaselPanel::_DrawPreedit(const Text &text, CRect &rc) {
         else
           rc_hi = CRect(x, rc.top, x + hilitedSz.cx, rc.bottom);
         CRect rc_hib = rc_hi;
-        rc_hib.Inflate(padx, pady);
+        rc_hib.InflateRect(padx, pady);
         IsToRoundStruct roundInfo = m_layout->GetTextRoundInfo();
         _HighlightRect(rc_hib, DPI_SCALE(m_style.round_corner),
                        DPI_SCALE(m_style.border), m_style.hilited_back_color,
@@ -341,6 +341,16 @@ bool WeaselPanel::_DrawPreedit(const Text &text, CRect &rc) {
   return drawn;
 }
 
+CRect WeaselPanel::_GetInflatedCandRect(int i) {
+  CRect rc = m_layout->GetCandidateRect(i);
+  if (m_istorepos)
+    rc.OffsetRect(0, m_offsetys[i]);
+  const auto padx = m_style.hilite_padding_x * m_pD2D->m_dpiScaleLayout;
+  const auto pady = m_style.hilite_padding_y * m_pD2D->m_dpiScaleLayout;
+  rc.InflateRect(padx, pady);
+  return rc;
+}
+
 bool WeaselPanel::_DrawCandidates() {
   bool drawn = false;
   const vector<Text> &candidates(m_ctx.cinfo.candies);
@@ -353,10 +363,7 @@ bool WeaselPanel::_DrawCandidates() {
   auto pady = m_style.hilite_padding_y * m_pD2D->m_dpiScaleLayout;
   const auto hilitefunc = [&](int i, uint32_t back_color, uint32_t shadow_color,
                               uint32_t border_color, uint32_t border = 0) {
-    auto rect = m_layout->GetCandidateRect(i);
-    if (m_istorepos)
-      rect.OffsetRect(0, m_offsetys[i]);
-    rect.InflateRect(padx, pady);
+    auto rect = _GetInflatedCandRect(i);
     IsToRoundStruct roundInfo = m_layout->GetRoundInfo(i);
     _HighlightRect(rect, DPI_SCALE(m_style.round_corner), DPI_SCALE(border),
                    back_color, shadow_color, border_color, roundInfo);
@@ -379,10 +386,9 @@ bool WeaselPanel::_DrawCandidates() {
   }
   // draw highlighted background and text
   const auto drawText = [&](int i, const vector<Text> &texts, int color,
-                            PtTextFormat &textFormat, const CRect &rect) {
+                            PtTextFormat &textFormat, CRect rc) {
     const auto &text = texts.at(i).str;
     if (!text.empty()) {
-      CRect rc = rect;
       if (m_istorepos)
         rc.OffsetRect(0, m_offsetys[i]);
       _TextOut(rc, text, text.length(), color, textFormat);
@@ -411,10 +417,7 @@ bool WeaselPanel::_DrawCandidates() {
   }
   // draw highlight mark
   if (COLORNOTTRANSPARENT(m_style.hilited_mark_color)) {
-    CRect rc = m_layout->GetHighlightRect();
-    if (m_istorepos)
-      rc.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
-    rc.InflateRect(padx, pady);
+    CRect rc = _GetInflatedCandRect(m_ctx.cinfo.highlighted);
     if (!m_style.mark_text.empty()) {
       int vgap =
           m_layout->mark_height ? (rc.Height() - m_layout->mark_height) / 2 : 0;
@@ -664,13 +667,9 @@ LRESULT WeaselPanel::OnMouseMove(UINT uMsg, WPARAM wParam, LPARAM lParam) {
   GetWindowRect(m_hWnd, &rc);
   auto offsetX = m_layout ? m_layout->offsetX : 0;
   auto offsetY = m_layout ? m_layout->offsetY : 0;
-  rc.Inflate(-offsetX, -offsetY);
+  rc.InflateRect(-offsetX, -offsetY);
   for (int i = 0; i < m_candidateCount; i++) {
-    CRect rect = m_layout->GetCandidateRect(i);
-    if (m_istorepos)
-      rect.OffsetRect(0, m_offsetys[i]);
-    rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
-                     DPI_SCALE(m_style.hilite_padding_y));
+    CRect rect = _GetInflatedCandRect(i);
     if (rect.PtInRect(point)) {
       if (i != m_ctx.cinfo.highlighted) {
         if (m_style.hover_type == UIStyle::HoverType::HILITE) {
@@ -706,11 +705,7 @@ LRESULT WeaselPanel::OnLeftClickUp(UINT uMsg, WPARAM wParam, LPARAM lParam) {
   m_bar_scale = 1.0;
   ptimer = 0;
 
-  CRect rect = m_layout->GetCandidateRect(m_ctx.cinfo.highlighted);
-  if (m_istorepos)
-    rect.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
-  rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
-                   DPI_SCALE(m_style.hilite_padding_y));
+  auto rect = _GetInflatedCandRect(m_ctx.cinfo.highlighted);
   if (rect.PtInRect(point)) {
     size_t i = m_ctx.cinfo.highlighted;
     if (m_uiCallback) {
@@ -729,15 +724,13 @@ LRESULT WeaselPanel::OnLeftClickDown(UINT uMsg, WPARAM wParam, LPARAM lParam) {
   if (hide_candidates)
     return 0;
   CPoint point(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+  auto padx = m_style.hilite_padding_x * m_pD2D->m_dpiScaleLayout;
+  auto pady = m_style.hilite_padding_y * m_pD2D->m_dpiScaleLayout;
   // capture
   if (m_style.click_to_capture) {
     CRect rcw;
     GetClientRect(m_hWnd, &rcw);
-    CRect recth = m_layout->GetCandidateRect((int)m_ctx.cinfo.highlighted);
-    if (m_istorepos)
-      recth.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
-    recth.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
-                      DPI_SCALE(m_style.hilite_padding_y));
+    auto recth = _GetInflatedCandRect(m_ctx.cinfo.highlighted);
     if (recth.PtInRect(point))
       _CaptureRect(recth);
     else {
@@ -745,25 +738,19 @@ LRESULT WeaselPanel::OnLeftClickDown(UINT uMsg, WPARAM wParam, LPARAM lParam) {
       // if shadow_color transparent, decrease the capture rectangle size
       if (COLORTRANSPARENT(m_style.shadow_color) &&
           DPI_SCALE(m_style.shadow_radius) != 0) {
-        int shadow_gap = (DPI_SCALE(m_style.shadow_offset_x) == 0 &&
-                          DPI_SCALE(m_style.shadow_offset_y) == 0)
-                             ? 2 * DPI_SCALE(m_style.shadow_radius)
-                             : DPI_SCALE(m_style.shadow_radius) +
-                                   DPI_SCALE(m_style.shadow_radius) / 2;
-        int ofx = DPI_SCALE(m_style.hilite_padding_x) +
-                              abs(DPI_SCALE(m_style.shadow_offset_x)) +
-                              shadow_gap >
+        int shadow_gap =
+            (m_style.shadow_offset_x == m_style.shadow_offset_y == 0)
+                ? 2 * DPI_SCALE(m_style.shadow_radius)
+                : DPI_SCALE(m_style.shadow_radius) +
+                      DPI_SCALE(m_style.shadow_radius) / 2;
+        int ofx = padx + abs(DPI_SCALE(m_style.shadow_offset_x)) + shadow_gap >
                           abs(DPI_SCALE(m_style.margin_x))
-                      ? DPI_SCALE(m_style.hilite_padding_x) +
-                            abs(DPI_SCALE(m_style.shadow_offset_x)) +
+                      ? padx + abs(DPI_SCALE(m_style.shadow_offset_x)) +
                             shadow_gap - abs(DPI_SCALE(m_style.margin_x))
                       : 0;
-        int ofy = DPI_SCALE(m_style.hilite_padding_y) +
-                              abs(DPI_SCALE(m_style.shadow_offset_y)) +
-                              shadow_gap >
+        int ofy = pady + abs(DPI_SCALE(m_style.shadow_offset_y)) + shadow_gap >
                           abs(DPI_SCALE(m_style.margin_y))
-                      ? DPI_SCALE(m_style.hilite_padding_y) +
-                            abs(DPI_SCALE(m_style.shadow_offset_y)) +
+                      ? pady + abs(DPI_SCALE(m_style.shadow_offset_y)) +
                             shadow_gap - abs(DPI_SCALE(m_style.margin_y))
                       : 0;
         crc.DeflateRect(m_layout->offsetX - ofx, m_layout->offsetY - ofy);
@@ -803,11 +790,7 @@ LRESULT WeaselPanel::OnLeftClickDown(UINT uMsg, WPARAM wParam, LPARAM lParam) {
     }
     // select by click relative actions
     for (size_t i = 0; i < m_candidateCount && i < MAX_CANDIDATES_COUNT; ++i) {
-      CRect rect = m_layout->GetCandidateRect((int)i);
-      if (m_istorepos)
-        rect.OffsetRect(0, m_offsetys[i]);
-      rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
-                       DPI_SCALE(m_style.hilite_padding_y));
+      auto rect = _GetInflatedCandRect(i);
       if (rect.PtInRect(point)) {
         m_bar_scale = 0.8f;
         //  modify highlighted
