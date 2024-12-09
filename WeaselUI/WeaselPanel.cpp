@@ -67,68 +67,7 @@ void WeaselPanel::DestroyWindow() {
 void WeaselPanel::MoveTo(RECT rc) {
   if (m_hWnd) {
     m_inputPos = rc;
-    RECT rcWorkArea;
-    memset(&rcWorkArea, 0, sizeof(rcWorkArea));
-#ifdef TOY_FEATURE
-    HWND topWin = GetForegroundWindow();
-    CRect clientRect = rc;
-    if (topWin)
-      GetWindowRect(topWin, &clientRect);
-    HMONITOR hMonitor = MonitorFromRect(&clientRect, MONITOR_DEFAULTTONEAREST);
-#else
-    HMONITOR hMonitor = MonitorFromRect(&m_inputPos, MONITOR_DEFAULTTONEAREST);
-#endif
-    if (hMonitor) {
-      MONITORINFO info;
-      info.cbSize = sizeof(MONITORINFO);
-      if (GetMonitorInfo(hMonitor, &info)) {
-        rcWorkArea = info.rcWork;
-      }
-    }
-    CRect rcWindow;
-    GetWindowRect(m_hWnd, &rcWindow);
-    rcWorkArea.right -= rcWindow.Width();
-    rcWorkArea.bottom -= rcWindow.Height();
-    int x = m_inputPos.left;
-    int y = m_inputPos.bottom;
-#ifdef TOY_FEATURE
-    if (!IS_FULLSCREENLAYOUT(m_style)) {
-      POINT pt{x, y};
-      if (!clientRect.PtInRect(pt)) {
-        y = clientRect.bottom - rcWindow.Height();
-        x = clientRect.left + clientRect.Width() / 2;
-        auto xp = (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT &&
-                   !m_style.vertical_text_left_to_right)
-                      ? (rcWindow.Width() / 2)
-                      : (-rcWindow.Width() / 2);
-        x += xp;
-      }
-    }
-#endif
-    if (x > rcWorkArea.right)
-      x = rcWorkArea.right;
-    if (x < rcWorkArea.left)
-      x = rcWorkArea.right;
-    bool m_istorepos_buffer = m_istorepos;
-    m_istorepos = false;
-    if (y < rcWorkArea.bottom)
-      m_sticky = false;
-    if (y > rcWorkArea.bottom || m_sticky) {
-      m_sticky = true;
-      m_istorepos = (m_style.vertical_auto_reverse &&
-                     m_style.layout_type == UIStyle::LAYOUT_VERTICAL);
-      y = rcWorkArea.bottom;
-    }
-    if (y < rcWorkArea.top)
-      y = rcWorkArea.top;
-    if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT &&
-        !m_style.vertical_text_left_to_right)
-      x -= rcWindow.Width();
-    m_inputPos.bottom = y;
-
-    SetWindowPos(m_hWnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
-    if (m_istorepos_buffer != m_istorepos)
-      InvalidateRect(m_hWnd, NULL, TRUE); // 请求重绘
+    _Reposition();
   }
 }
 
@@ -195,6 +134,7 @@ void WeaselPanel::Refresh() {
     _CreateLayout();
     m_layout->DoLayout();
     _ResizeWindow();
+    _Reposition();
     InvalidateRect(m_hWnd, NULL, TRUE); // 请求重绘
   }
 }
@@ -497,6 +437,11 @@ bool WeaselPanel::_DrawCandidates() {
                       rc.Width() - DPI_SCALE(m_style.round_corner) * 2);
       width = MIN(width, static_cast<int>(rc.Width() * 0.618));
       height = MIN(height, static_cast<int>(rc.Height() * 0.618));
+      if (m_bar_scale != 1.0f) {
+        width = static_cast<int>(width * m_bar_scale);
+        height = static_cast<int>(height * m_bar_scale);
+      }
+
       CRect mkrc;
       int mark_radius;
       if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
@@ -571,6 +516,71 @@ void WeaselPanel::_HighlightRect(const RECT &rect, float radius,
   }
 }
 
+void WeaselPanel::_Reposition() {
+  RECT rcWorkArea;
+  memset(&rcWorkArea, 0, sizeof(rcWorkArea));
+#ifdef TOY_FEATURE
+  HWND topWin = GetForegroundWindow();
+  CRect clientRect = m_inputPos;
+  if (topWin)
+    GetWindowRect(topWin, &clientRect);
+  HMONITOR hMonitor = MonitorFromRect(&clientRect, MONITOR_DEFAULTTONEAREST);
+#else
+  HMONITOR hMonitor = MonitorFromRect(&m_inputPos, MONITOR_DEFAULTTONEAREST);
+#endif
+  if (hMonitor) {
+    MONITORINFO info;
+    info.cbSize = sizeof(MONITORINFO);
+    if (GetMonitorInfo(hMonitor, &info)) {
+      rcWorkArea = info.rcWork;
+    }
+  }
+  CRect rcWindow;
+  GetWindowRect(m_hWnd, &rcWindow);
+  rcWorkArea.right -= rcWindow.Width();
+  rcWorkArea.bottom -= rcWindow.Height();
+  int x = m_inputPos.left;
+  int y = m_inputPos.bottom;
+#ifdef TOY_FEATURE
+  if (!IS_FULLSCREENLAYOUT(m_style)) {
+    POINT pt{x, y};
+    if (!clientRect.PtInRect(pt)) {
+      y = clientRect.bottom - rcWindow.Height();
+      x = clientRect.left + clientRect.Width() / 2;
+      auto xp = (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT &&
+                 !m_style.vertical_text_left_to_right)
+                    ? (rcWindow.Width() / 2)
+                    : (-rcWindow.Width() / 2);
+      x += xp;
+    }
+  }
+#endif
+  if (x > rcWorkArea.right)
+    x = rcWorkArea.right;
+  if (x < rcWorkArea.left)
+    x = rcWorkArea.right;
+  bool m_istorepos_buffer = m_istorepos;
+  m_istorepos = false;
+  if (y < rcWorkArea.bottom)
+    m_sticky = false;
+  if (y > rcWorkArea.bottom || m_sticky) {
+    m_sticky = true;
+    m_istorepos = (m_style.vertical_auto_reverse &&
+                   m_style.layout_type == UIStyle::LAYOUT_VERTICAL);
+    y = rcWorkArea.bottom;
+  }
+  if (y < rcWorkArea.top)
+    y = rcWorkArea.top;
+  if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT &&
+      !m_style.vertical_text_left_to_right)
+    x -= rcWindow.Width();
+  m_inputPos.bottom = y;
+
+  SetWindowPos(m_hWnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+  if (m_istorepos_buffer != m_istorepos)
+    InvalidateRect(m_hWnd, NULL, TRUE); // 请求重绘
+}
+
 void WeaselPanel::OnDestroy() {
   m_hoverIndex = -1;
   m_layout.reset();
@@ -589,7 +599,7 @@ HRESULT WeaselPanel::OnScroll(UINT uMsg, WPARAM wParam, LPARAM lParam) {
 LRESULT WeaselPanel::OnMouseLeave(UINT uMsg, WPARAM wParam, LPARAM lParam) {
   m_hoverIndex = -1;
   m_mouse_entry = false;
-  InvalidateRect(m_hWnd, nullptr, true);
+  RedrawWindow();
   return 0;
 }
 
@@ -621,14 +631,18 @@ LRESULT WeaselPanel::OnMouseMove(UINT uMsg, WPARAM wParam, LPARAM lParam) {
       if (i != m_ctx.cinfo.highlighted) {
         if (m_style.hover_type == UIStyle::HoverType::HILITE) {
           // todo: change highlighted and update ui
+          if (m_uiCallback) {
+            size_t hover_index = i;
+            m_uiCallback(nullptr, &hover_index, nullptr, nullptr);
+          }
         } else if (m_hoverIndex != i) {
           m_hoverIndex = i;
-          InvalidateRect(m_hWnd, nullptr, true);
+          RedrawWindow();
         }
       } else if (m_style.hover_type == UIStyle::HoverType::SEMI_HILITE &&
                  m_hoverIndex != -1) {
         m_hoverIndex = -1;
-        InvalidateRect(m_hWnd, nullptr, true);
+        RedrawWindow();
       }
     }
   }
@@ -637,6 +651,108 @@ LRESULT WeaselPanel::OnMouseMove(UINT uMsg, WPARAM wParam, LPARAM lParam) {
 
 LRESULT WeaselPanel::OnMouseActive(UINT uMsg, WPARAM wParam, LPARAM lParam) {
   return MA_NOACTIVATE;
+}
+
+LRESULT WeaselPanel::OnLeftClickUp(UINT uMsg, WPARAM wParam, LPARAM lParam) {
+  if (hide_candidates)
+    return 0;
+  CPoint point(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+
+  ::KillTimer(m_hWnd, AUTOREV_TIMER);
+  m_bar_scale = 1.0;
+  ptimer = 0;
+
+  CRect rect = m_layout->GetCandidateRect(m_ctx.cinfo.highlighted);
+  if (m_istorepos)
+    rect.OffsetRect(0, m_offsetys[m_ctx.cinfo.highlighted]);
+  rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
+                   DPI_SCALE(m_style.hilite_padding_y));
+  if (rect.PtInRect(point)) {
+    size_t i = m_ctx.cinfo.highlighted;
+    if (m_uiCallback) {
+      m_mouse_entry = false;
+      m_uiCallback(&i, nullptr, nullptr, nullptr);
+      if (!m_status.composing)
+        DestroyWindow();
+    }
+  } else {
+    RedrawWindow();
+  }
+  return 0;
+}
+
+LRESULT WeaselPanel::OnLeftClickDown(UINT uMsg, WPARAM wParam, LPARAM lParam) {
+  if (hide_candidates)
+    return 0;
+  CPoint point(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+  if (m_style.click_to_capture) {
+    // to impl
+  }
+  {
+    if (!m_style.inline_preedit && m_candidateCount != 0 &&
+        COLORNOTTRANSPARENT(m_style.prevpage_color) &&
+        COLORNOTTRANSPARENT(m_style.nextpage_color)) {
+      // click prepage
+      if (m_ctx.cinfo.currentPage != 0) {
+        CRect prc = m_layout->GetPrepageRect();
+        if (m_istorepos)
+          prc.OffsetRect(0, m_offsety_preedit);
+        if (prc.PtInRect(point)) {
+          bool nextPage = false;
+          if (m_uiCallback)
+            m_uiCallback(NULL, NULL, &nextPage, NULL);
+          return 0;
+        }
+      }
+      // click nextpage
+      if (!m_ctx.cinfo.is_last_page) {
+        CRect prc = m_layout->GetNextpageRect();
+        if (m_istorepos)
+          prc.OffsetRect(0, m_offsety_preedit);
+        if (prc.PtInRect(point)) {
+          bool nextPage = true;
+          if (m_uiCallback)
+            m_uiCallback(NULL, NULL, &nextPage, NULL);
+          return 0;
+        }
+      }
+    }
+    // select by click relative actions
+    for (size_t i = 0; i < m_candidateCount && i < MAX_CANDIDATES_COUNT; ++i) {
+      CRect rect = m_layout->GetCandidateRect((int)i);
+      if (m_istorepos)
+        rect.OffsetRect(0, m_offsetys[i]);
+      rect.InflateRect(DPI_SCALE(m_style.hilite_padding_x),
+                       DPI_SCALE(m_style.hilite_padding_y));
+      if (rect.PtInRect(point)) {
+        m_bar_scale = 0.8f;
+        //  modify highlighted
+        if (i != m_ctx.cinfo.highlighted) {
+          if (m_uiCallback)
+            m_uiCallback(NULL, &i, NULL, NULL);
+        } else {
+          RedrawWindow();
+        }
+        ptimer = UINT_PTR(this);
+        ::SetTimer(m_hWnd, AUTOREV_TIMER, 1000, &WeaselPanel::OnClickTimer);
+        return 0;
+      }
+    }
+  }
+  return 0;
+}
+
+UINT_PTR WeaselPanel::ptimer = 0;
+VOID CALLBACK WeaselPanel::OnClickTimer(_In_ HWND hwnd, _In_ UINT uMsg,
+                                        _In_ UINT_PTR idEvent,
+                                        _In_ DWORD dwTime) {
+  ::KillTimer(hwnd, idEvent);
+  WeaselPanel *self = (WeaselPanel *)ptimer;
+  ptimer = 0;
+  if (self) {
+    self->m_bar_scale = 1.0;
+    InvalidateRect(self->m_hWnd, nullptr, true);
+  }
 }
 
 LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
@@ -679,9 +795,14 @@ LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
     if (self)
       return self->OnScroll(uMsg, wParam, lParam);
     break;
-  case WM_LBUTTONUP: {
+  case WM_LBUTTONUP:
+    if (self)
+      return self->OnLeftClickUp(uMsg, wParam, lParam);
     break;
-  }
+  case WM_LBUTTONDOWN:
+    if (self)
+      return self->OnLeftClickDown(uMsg, wParam, lParam);
+    break;
   }
   return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }

@@ -100,6 +100,8 @@ LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
       PostMessage(m_toy->UIHwnd(), WM_MOUSEACTIVATE, wParam, lParam);
     } else if (wParam == WM_MOUSELEAVE) {
       PostMessage(m_toy->UIHwnd(), WM_MOUSELEAVE, wParam, lParam);
+    } else if (wParam == WM_LBUTTONUP) {
+      PostMessage(m_toy->UIHwnd(), WM_LBUTTONUP, wParam, lParam);
     }
   }
   return CallNextHookEx(NULL, nCode, wParam, lParam);

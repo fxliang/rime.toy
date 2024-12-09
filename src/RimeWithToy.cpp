@@ -433,6 +433,18 @@ void RimeWithToy::HandleUICallback(size_t *select_index, size_t *hover_index,
                                    bool *next_page, bool *scroll_down) {
   if (next_page || scroll_down)
     _HandleMousePageEvent(next_page, scroll_down);
+  else if (select_index) {
+    rime_api->select_candidate_on_current_page(m_session_id, *select_index);
+    INPUT inputs[2];
+    inputs[0].type = INPUT_KEYBOARD;
+    inputs[0].ki = {VK_SELECT, 0, 0, 0, 0};
+    inputs[1].type = INPUT_KEYBOARD;
+    inputs[1].ki = {VK_SELECT, 0, KEYEVENTF_KEYUP, 0, 0};
+    ::SendInput(sizeof(inputs) / sizeof(INPUT), inputs, sizeof(INPUT));
+  } else if (hover_index) {
+    rime_api->highlight_candidate_on_current_page(m_session_id, *hover_index);
+    UpdateUI();
+  }
 }
 
 void RimeWithToy::UpdateInputPosition(const RECT &rc) {

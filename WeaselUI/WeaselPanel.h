@@ -21,11 +21,18 @@ public:
 
   HWND m_hWnd;
 
+  static void CALLBACK OnClickTimer(_In_ HWND hwnd, _In_ UINT uMsg,
+                                    _In_ UINT_PTR idEvent, _In_ DWORD dwTime);
+  static UINT_PTR ptimer;
+  static const int AUTOREV_TIMER = 20241209;
+
 private:
+  void RedrawWindow() { InvalidateRect(m_hWnd, nullptr, true); }
   void _CreateLayout();
   bool _DrawPreedit(const Text &text, CRect &rc);
   bool _DrawCandidates();
   void _ResizeWindow();
+  void _Reposition();
   void _TextOut(CRect &rc, const wstring &text, size_t cch, uint32_t color,
                 ComPtr<IDWriteTextFormat1> &pTextFormat);
   void _HighlightRect(const RECT &rect, float radius, uint32_t border,
@@ -38,6 +45,8 @@ private:
   LRESULT OnMouseMove(UINT uMsg, WPARAM wParam, LPARAM lParam);
   LRESULT OnMouseActive(UINT uMsg, WPARAM wParam, LPARAM lParam);
   LRESULT OnMouseLeave(UINT uMsg, WPARAM wParam, LPARAM lParam);
+  LRESULT OnLeftClickUp(UINT uMsg, WPARAM wParam, LPARAM lParam);
+  LRESULT OnLeftClickDown(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
   static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
                                      LPARAM lParam);
@@ -61,6 +70,7 @@ private:
   bool m_istorepos = false;
   bool m_sticky = false;
   bool m_mouse_entry = false;
+  float m_bar_scale = 1.0f;
   // ------------------------------------------------------------
   an<D2D> m_pD2D;
   an<Layout> m_layout;
