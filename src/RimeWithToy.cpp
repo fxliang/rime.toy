@@ -122,8 +122,8 @@ void RimeWithToy::BalloonMsg(const string &msg) {
   m_trayIcon->ShowBalloonTip(L"rime.toy", u8tow(msg), 500);
 }
 
-RimeWithToy::RimeWithToy(HINSTANCE hInstance, wstring &commit_str)
-    : m_hInstance(hInstance), m_commit_str(commit_str), m_disabled(false) {
+RimeWithToy::RimeWithToy(HINSTANCE hInstance)
+    : m_hInstance(hInstance), m_disabled(false) {
   m_ui = std::make_shared<UI>();
   const auto tooltip = L"rime.toy\n左键点击切换ASCII\n右键菜单可退出^_^";
   m_trayIcon = std::make_unique<TrayIcon>(hInstance, tooltip);
@@ -235,6 +235,18 @@ BOOL RimeWithToy::ProcessKeyEvent(KeyEvent keyEvent) {
   if (rime_api->get_commit(m_session_id, &commit)) {
     m_commit_str = u8tow(commit.text);
     rime_api->free_commit(&commit);
+    m_committed = !m_commit_str.empty();
+    if (m_committed) {
+      inserting = true;
+      send_input_to_window(m_commit_str);
+      inserting = false;
+      m_commit_str.clear();
+      auto status = GetRimeStatus();
+      if (!status.composing) {
+        HideUI();
+        return handled;
+      }
+    }
   } else {
     m_commit_str.clear();
   }
@@ -435,12 +447,7 @@ void RimeWithToy::HandleUICallback(size_t *select_index, size_t *hover_index,
     _HandleMousePageEvent(next_page, scroll_down);
   else if (select_index) {
     rime_api->select_candidate_on_current_page(m_session_id, *select_index);
-    INPUT inputs[2];
-    inputs[0].type = INPUT_KEYBOARD;
-    inputs[0].ki = {VK_SELECT, 0, 0, 0, 0};
-    inputs[1].type = INPUT_KEYBOARD;
-    inputs[1].ki = {VK_SELECT, 0, KEYEVENTF_KEYUP, 0, 0};
-    ::SendInput(sizeof(inputs) / sizeof(INPUT), inputs, sizeof(INPUT));
+    ProcessKeyEvent(0);
   } else if (hover_index) {
     rime_api->highlight_candidate_on_current_page(m_session_id, *hover_index);
     UpdateUI();
