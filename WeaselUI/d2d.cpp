@@ -182,7 +182,7 @@ void D2D::InitFontFormats(const wstring &label_font_face,
   DWRITE_FLOW_DIRECTION flow = m_style.vertical_text_left_to_right
                                    ? DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
                                    : DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT;
-  auto func = [&](const wstring &font_face, const int font_point,
+  auto func = [&](const wstring &font_face, int font_point,
                   PtTextFormat &_pTextFormat, DWRITE_WORD_WRAPPING wrap) {
     bool vertical_text = m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT;
     std::vector<std::wstring> fontFaceStrVector;
@@ -204,10 +204,12 @@ void D2D::InitFontFormats(const wstring &label_font_face,
     fontFaceStrVector[0] =
         std::regex_replace(fontFaceStrVector[0],
                            std::wregex(STYLEORWEIGHT, std::wregex::icase), L"");
+    if (font_point < 0)
+      font_point = -font_point;
     HR(m_pWriteFactory->CreateTextFormat(
         _mainFontFace.c_str(), NULL, DWRITE_FONT_WEIGHT_NORMAL,
         DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-        font_point * (m_dpiY / 72.0f), L"",
+        font_point * m_dpiScaleFontPoint, L"",
         reinterpret_cast<IDWriteTextFormat **>(
             _pTextFormat.ReleaseAndGetAddressOf())));
 
