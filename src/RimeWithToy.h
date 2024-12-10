@@ -27,8 +27,8 @@ public:
     if (m_ui)
       m_ui->Hide();
   }
-  Status& GetRimeStatus() { return m_ui->status(); }
-  wstring& GetCommitStr() { return m_commit_str; }
+  Status &GetRimeStatus() { return m_ui->status(); }
+  wstring &GetCommitStr() { return m_commit_str; }
   HWND UIHwnd() { return m_ui ? m_ui->hwnd() : nullptr; }
   bool CheckCommit();
 
