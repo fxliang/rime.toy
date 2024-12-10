@@ -13,7 +13,7 @@ namespace weasel {
 
 class RimeWithToy {
 public:
-  RimeWithToy(HINSTANCE hInstance, wstring &commit_str);
+  RimeWithToy(HINSTANCE hInstance);
   void Initialize();
   void Finalize();
   BOOL ProcessKeyEvent(KeyEvent keyEvent);
@@ -27,8 +27,10 @@ public:
     if (m_ui)
       m_ui->Hide();
   }
-  Status GetRimeStatus();
+  Status& GetRimeStatus() { return m_ui->status(); }
+  wstring& GetCommitStr() { return m_commit_str; }
   HWND UIHwnd() { return m_ui ? m_ui->hwnd() : nullptr; }
+  bool CheckCommit();
 
 private:
   void setup_rime();
@@ -65,7 +67,7 @@ private:
   RimeApi *rime_api;
   an<UI> m_ui;
   wstring m_last_schema_id;
-  wstring &m_commit_str;
+  wstring m_commit_str;
   UIStyle m_base_style;
   bool m_disabled;
   bool m_current_dark_mode;

@@ -13,7 +13,6 @@ using namespace weasel;
 HHOOK hKeyboardHook = NULL;
 HHOOK hMouseHook = NULL;
 std::unique_ptr<RimeWithToy> m_toy;
-wstring commit_str = L"";
 
 void update_position(HWND hwnd) {
   POINT pt;
@@ -30,9 +29,6 @@ void update_position(HWND hwnd) {
 static HWND hwnd_previous = nullptr;
 // ----------------------------------------------------------------------------
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
-  static Status status;
-  static bool committed = true;
-
   HWND hwnd = GetForegroundWindow();
   if (hwnd != hwnd_previous) {
     hwnd_previous = hwnd;
@@ -47,37 +43,22 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
   if (nCode == HC_ACTION && !inserting) {
     // update keyState table
     update_keystates(wParam, lParam);
-
     KBDLLHOOKSTRUCT *pKeyboard = (KBDLLHOOKSTRUCT *)lParam;
     // get KBDLLHOOKSTRUCT info, generate keyinfo
     KeyInfo ki = parse_key(wParam, lParam);
     KeyEvent ke;
     if (ConvertKeyEvent(pKeyboard, ki, ke)) {
       bool eat = false;
-      // reverse up / down when is to reposition
       m_toy->StartUI();
       eat = m_toy->ProcessKeyEvent(ke);
-
-      m_toy->UpdateUI();
-      status = m_toy->GetRimeStatus();
       update_position(hwnd);
-      committed = !commit_str.empty();
-      if (!commit_str.empty()) {
-        send_input_to_window(commit_str);
-        commit_str.clear();
-        if (!status.composing)
-          m_toy->HideUI();
-        else {
-          m_toy->UpdateUI();
-          update_position(hwnd);
-        }
-      }
 
+      auto committed = m_toy->CheckCommit();
       if (ke.keycode == ibus::Caps_Lock && eat) {
         if (keyState[VK_CAPITAL] & 0x01) {
           keyState[VK_CAPITAL] = 0;
           SetKeyboardState(keyState);
-          if (committed || status.composing)
+          if (committed || m_toy->GetRimeStatus().composing)
             return 1;
           goto skip;
         }
@@ -117,7 +98,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                     LPWSTR lpCmdLine, int nCmdShow) {
   SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
   HR(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED));
-  m_toy = std::make_unique<RimeWithToy>(hInstance, commit_str);
+  m_toy = std::make_unique<RimeWithToy>(hInstance);
   // --------------------------------------------------------------------------
   hKeyboardHook =
       SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);

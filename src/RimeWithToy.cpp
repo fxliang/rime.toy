@@ -125,8 +125,8 @@ void RimeWithToy::BalloonMsg(const string &msg) {
   m_trayIcon->ShowBalloonTip(L"rime.toy", u8tow(msg), 500);
 }
 
-RimeWithToy::RimeWithToy(HINSTANCE hInstance, wstring &commit_str)
-    : m_hInstance(hInstance), m_commit_str(commit_str), m_disabled(false) {
+RimeWithToy::RimeWithToy(HINSTANCE hInstance)
+    : m_hInstance(hInstance), m_disabled(false) {
   m_ui = std::make_shared<UI>();
   const auto tooltip = L"rime.toy\n左键点击切换ASCII\n右键菜单可退出^_^";
   m_trayIcon = std::make_unique<TrayIcon>(hInstance, tooltip);
@@ -269,6 +269,21 @@ void RimeWithToy::UpdateUI() {
   m_option_name.clear();
 }
 
+bool RimeWithToy::CheckCommit() {
+  auto committed = !m_commit_str.empty();
+  if (!m_commit_str.empty()) {
+    inserting = true;
+    send_input_to_window(m_commit_str);
+    inserting = false;
+    m_commit_str.clear();
+    if (!m_ui->status().composing)
+      HideUI();
+    else {
+      UpdateUI();
+    }
+  }
+  return committed;
+}
 BOOL RimeWithToy::ShowMessage(Context &ctx, Status &status) {
   // show as auxiliary string
   std::wstring &tips(ctx.aux.str);
@@ -438,12 +453,8 @@ void RimeWithToy::HandleUICallback(size_t *select_index, size_t *hover_index,
     _HandleMousePageEvent(next_page, scroll_down);
   else if (select_index) {
     rime_api->select_candidate_on_current_page(m_session_id, *select_index);
-    INPUT inputs[2];
-    inputs[0].type = INPUT_KEYBOARD;
-    inputs[0].ki = {VK_SELECT, 0, 0, 0, 0};
-    inputs[1].type = INPUT_KEYBOARD;
-    inputs[1].ki = {VK_SELECT, 0, KEYEVENTF_KEYUP, 0, 0};
-    ::SendInput(sizeof(inputs) / sizeof(INPUT), inputs, sizeof(INPUT));
+    ProcessKeyEvent(0);
+    CheckCommit();
   } else if (hover_index) {
     rime_api->highlight_candidate_on_current_page(m_session_id, *hover_index);
     UpdateUI();
@@ -461,12 +472,6 @@ void RimeWithToy::DestroyUI() {
     rime_api->clear_composition(m_session_id);
     m_ui->Destroy();
   }
-}
-
-Status RimeWithToy::GetRimeStatus() {
-  Status status;
-  GetStatus(status);
-  return status;
 }
 
 void RimeWithToy::_LoadSchemaSpecificSettings(RimeSessionId id,
