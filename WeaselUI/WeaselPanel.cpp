@@ -210,7 +210,7 @@ void WeaselPanel::DoPaint() {
                                      rects[i].bottom;
       }
     }
-    if (!m_ctx.preedit.empty()) {
+    if (!m_layout->IsInlinePreedit() && !m_ctx.preedit.empty()) {
       if (m_istorepos)
         prc.OffsetRect(0, m_offsety_preedit);
       _DrawPreedit(m_ctx.preedit, prc);

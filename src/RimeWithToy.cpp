@@ -252,6 +252,7 @@ void RimeWithToy::UpdateUI() {
   Context ctx;
   GetStatus(status);
   GetContext(ctx, status);
+  m_ui->style().client_caps = m_ui->style().inline_preedit;
   if (status.composing) {
     m_ui->Update(ctx, status);
     m_ui->Show();
@@ -362,7 +363,36 @@ void RimeWithToy::GetContext(Context &context, const Status &status) {
   RIME_STRUCT(RimeContext, ctx);
   if (rime_api->get_context(m_session_id, &ctx)) {
     if (status.composing) {
+      auto style = m_ui->style();
       switch (m_ui->style().preedit_type) {
+      case UIStyle::PreeditType::PREVIEW_ALL: {
+        CandidateInfo cinfo;
+        GetCandidateInfo(cinfo, ctx);
+        std::string topush = string(ctx.composition.preedit) + "  [";
+        auto &candies = ctx.menu.candidates;
+        auto hilite = ctx.menu.highlighted_candidate_index;
+        for (auto i = 0; i < ctx.menu.num_candidates; i++) {
+          string label =
+              style.label_font_point > 0 ? wtou8(cinfo.labels[i].str) : "";
+          string comment =
+              style.comment_font_point > 0 ? wtou8(cinfo.comments[i].str) : "";
+          string mark_text =
+              style.mark_text.empty() ? "*" : wtou8(style.mark_text);
+          string prefix = (i != hilite) ? "" : mark_text;
+          topush += " " + prefix + label + (candies[i].text) + " " + comment;
+        }
+        context.preedit.str = u8tow(topush) + wstring(L"]");
+        if (ctx.composition.sel_start <= ctx.composition.sel_end) {
+          TextAttribute attr;
+          attr.range.start =
+              utf8towcslen(ctx.composition.preedit, ctx.composition.sel_start);
+          attr.range.end =
+              utf8towcslen(ctx.composition.preedit, ctx.composition.sel_end);
+          attr.range.cursor =
+              utf8towcslen(ctx.composition.preedit, ctx.composition.cursor_pos);
+          context.preedit.attributes.push_back(attr);
+        }
+      } break;
       case UIStyle::PreeditType::PREVIEW: {
         if (ctx.commit_text_preview) {
           string text = ctx.commit_text_preview;
