@@ -168,6 +168,10 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance)
     m_trayIcon->SetIcon(ascii ? m_ascii_icon : m_ime_icon);
     m_disabled = false;
   });
+  m_trayIcon->SetRefreshIconFunc([&]() {
+    auto status = GetRimeStatus();
+    m_trayIcon->SetIcon(status.ascii_mode ? m_ascii_icon : m_ime_icon);
+  });
   m_trayIcon->SetIcon(m_ime_icon);
   m_trayIconCallback = [&](const Status &sta) {
     m_trayIcon->SetIcon(sta.ascii_mode ? m_ascii_icon : m_ime_icon);

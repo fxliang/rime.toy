@@ -23,6 +23,7 @@ public:
   void SetOpenUserdDirFunc(const vhandler &func) { open_userdir = func; }
   void SetOpenLogDirFunc(const vhandler &func) { open_logdir = func; }
   void SetSyncFunc(const vhandler &func) { sync_data = func; }
+  void SetRefreshIconFunc(const vhandler &func) { refresh_icon = func; }
   bool debug() { return enable_debug; }
   void ShowBalloonTip(const std::wstring &title, const std::wstring &message,
                       DWORD timeout = 1000);
@@ -41,6 +42,7 @@ private:
   vhandler open_shareddir;
   vhandler open_logdir;
   vhandler sync_data;
+  vhandler refresh_icon;
   bool enable_debug;
   bool current_dark_mode;
 

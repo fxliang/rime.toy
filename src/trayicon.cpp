@@ -15,6 +15,7 @@
 #define MENU_RIME_TOY_EN 1009
 
 bool rime_toy_enabled = true;
+HICON icon_error = LoadIcon(NULL, IDI_ERROR);
 
 TrayIcon::TrayIcon(HINSTANCE hInstance, const std::wstring &tooltip)
     : hInst(hInstance), hMenu(NULL), deploy_func(nullptr),
@@ -31,6 +32,7 @@ TrayIcon::TrayIcon(HINSTANCE hInstance, const std::wstring &tooltip)
 }
 
 TrayIcon::~TrayIcon() {
+  DestroyIcon(icon_error);
   Hide();
   DestroyWindow(m_hWnd);
 }
@@ -124,7 +126,7 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
       SetForegroundWindow(hwnd);
       TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
     } else if (lParam == WM_LBUTTONUP) {
-      if (switch_ascii)
+      if (switch_ascii && rime_toy_enabled)
         switch_ascii();
     }
     break;
@@ -188,6 +190,10 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
       if (hMenu)
         CheckMenuItem(hMenu, MENU_RIME_TOY_EN,
                       rime_toy_enabled ? MF_CHECKED : MF_UNCHECKED);
+      if (rime_toy_enabled && refresh_icon)
+        refresh_icon();
+      else
+        SetIcon(icon_error);
       InvalidateRect(hwnd, NULL, true);
     }
     }
