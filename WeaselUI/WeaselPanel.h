@@ -39,7 +39,6 @@ private:
                       uint32_t back_color, uint32_t shadow_color,
                       uint32_t border_color, IsToRoundStruct roundInfo);
   CRect _GetInflatedCandRect(int i);
-
   void _CaptureRect(CRect &rect);
 
   void DoPaint();
@@ -51,6 +50,7 @@ private:
   LRESULT OnLeftClickUp(UINT uMsg, WPARAM wParam, LPARAM lParam);
   LRESULT OnLeftClickDown(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
+  LRESULT MsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
   static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
                                      LPARAM lParam);
 

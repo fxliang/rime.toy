@@ -839,43 +839,34 @@ LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
     self =
         reinterpret_cast<WeaselPanel *>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
   }
+  if (self)
+    return self->MsgHandler(hwnd, uMsg, wParam, lParam);
+  return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
+LRESULT WeaselPanel::MsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam,
+                                LPARAM lParam) {
   switch (uMsg) {
   case WM_PAINT:
-    if (self) {
-      self->DoPaint();
-    }
+    DoPaint();
     break;
   case WM_DESTROY:
-    if (self) {
-      self->OnDestroy();
-      return 0;
-    }
-    break;
+    OnDestroy();
+    return 0;
   case WM_MOUSEMOVE:
-    if (self)
-      self->OnMouseMove(uMsg, wParam, lParam);
+    OnMouseMove(uMsg, wParam, lParam);
     break;
   case WM_MOUSELEAVE:
-    if (self)
-      self->OnMouseLeave(uMsg, wParam, lParam);
+    OnMouseLeave(uMsg, wParam, lParam);
     break;
   case WM_MOUSEACTIVATE:
-    if (self)
-      return self->OnMouseActive(uMsg, wParam, lParam);
-    break;
-  // not ready yet
+    return OnMouseActive(uMsg, wParam, lParam);
   case WM_MOUSEWHEEL:
-    if (self)
-      return self->OnScroll(uMsg, wParam, lParam);
-    break;
+    return OnScroll(uMsg, wParam, lParam);
   case WM_LBUTTONUP:
-    if (self)
-      return self->OnLeftClickUp(uMsg, wParam, lParam);
-    break;
+    return OnLeftClickUp(uMsg, wParam, lParam);
   case WM_LBUTTONDOWN:
-    if (self)
-      return self->OnLeftClickDown(uMsg, wParam, lParam);
-    break;
+    return OnLeftClickDown(uMsg, wParam, lParam);
   }
   return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
