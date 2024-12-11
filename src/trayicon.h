@@ -5,6 +5,8 @@
 
 typedef std::function<void(void)> vhandler;
 
+extern bool rime_toy_enabled;
+
 class TrayIcon {
 public:
   TrayIcon(HINSTANCE hInstance, const std::wstring &tooltip);

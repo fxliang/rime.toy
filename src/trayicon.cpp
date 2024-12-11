@@ -1,4 +1,5 @@
 #include "trayicon.h"
+#include "keymodule.h"
 #include <resource.h>
 #include <shellapi.h>
 #include <utils.h>
@@ -11,6 +12,9 @@
 #define MENU_SHARED_DIR 1006
 #define MENU_USER_DIR 1007
 #define MENU_LOG_DIR 1008
+#define MENU_RIME_TOY_EN 1009
+
+bool rime_toy_enabled = true;
 
 TrayIcon::TrayIcon(HINSTANCE hInstance, const std::wstring &tooltip)
     : hInst(hInstance), hMenu(NULL), deploy_func(nullptr),
@@ -64,6 +68,10 @@ void TrayIcon::SetTooltip(const std::wstring &tooltip) {
 void TrayIcon::CreateContextMenu() {
   if (hMenu == NULL) {
     hMenu = CreatePopupMenu();
+    AppendMenu(hMenu,
+               MF_STRING | (rime_toy_enabled ? MF_CHECKED : MFS_UNCHECKED),
+               MENU_RIME_TOY_EN, L"使用rime.toy");
+    AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
     AppendMenu(hMenu, MF_STRING, MENU_LOG_DIR, L"日志目录");
     AppendMenu(hMenu, MF_STRING, MENU_SHARED_DIR, L"共享目录");
     AppendMenu(hMenu, MF_STRING, MENU_USER_DIR, L"用户目录");
@@ -172,6 +180,15 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
       if (sync_data)
         sync_data();
       break;
+    }
+    case MENU_RIME_TOY_EN: {
+      rime_toy_enabled = !rime_toy_enabled;
+      if (!rime_toy_enabled)
+        memset(weasel::keyState, 0, sizeof(weasel::keyState));
+      if (hMenu)
+        CheckMenuItem(hMenu, MENU_RIME_TOY_EN,
+                      rime_toy_enabled ? MF_CHECKED : MF_UNCHECKED);
+      InvalidateRect(hwnd, NULL, true);
     }
     }
   } break;

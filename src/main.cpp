@@ -29,6 +29,8 @@ void update_position(HWND hwnd) {
 static HWND hwnd_previous = nullptr;
 // ----------------------------------------------------------------------------
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
+  if (!rime_toy_enabled)
+    return CallNextHookEx(hKeyboardHook, nCode, wParam, lParam);
   HWND hwnd = GetForegroundWindow();
   if (hwnd != hwnd_previous) {
     hwnd_previous = hwnd;
@@ -72,7 +74,7 @@ skip:
 }
 
 LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
-  if (nCode == HC_ACTION && m_toy->UIHwnd()) {
+  if (rime_toy_enabled && nCode == HC_ACTION && m_toy->UIHwnd()) {
     HWND hwnd = GetForegroundWindow();
     if (hwnd != hwnd_previous) {
       hwnd_previous = hwnd;
