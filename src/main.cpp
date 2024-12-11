@@ -81,17 +81,6 @@ LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
       m_toy->DestroyUI();
       return CallNextHookEx(NULL, nCode, wParam, lParam);
     }
-    if (wParam == WM_MOUSEWHEEL) {
-      PostMessage(m_toy->UIHwnd(), WM_MOUSEWHEEL, wParam, lParam);
-    } else if (wParam == WM_MOUSEMOVE) {
-      PostMessage(m_toy->UIHwnd(), WM_MOUSEMOVE, wParam, lParam);
-    } else if (wParam == WM_MOUSEACTIVATE) {
-      PostMessage(m_toy->UIHwnd(), WM_MOUSEACTIVATE, wParam, lParam);
-    } else if (wParam == WM_MOUSELEAVE) {
-      PostMessage(m_toy->UIHwnd(), WM_MOUSELEAVE, wParam, lParam);
-    } else if (wParam == WM_LBUTTONUP) {
-      PostMessage(m_toy->UIHwnd(), WM_LBUTTONUP, wParam, lParam);
-    }
   }
   return CallNextHookEx(NULL, nCode, wParam, lParam);
 }

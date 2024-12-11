@@ -666,27 +666,35 @@ LRESULT WeaselPanel::OnMouseMove(UINT uMsg, WPARAM wParam, LPARAM lParam) {
   auto offsetX = m_layout ? m_layout->offsetX : 0;
   auto offsetY = m_layout ? m_layout->offsetY : 0;
   rc.InflateRect(-offsetX, -offsetY);
+  bool hovered = false;
+  bool hover_index_change = false;
   for (int i = 0; i < m_candidateCount; i++) {
     CRect rect = _GetInflatedCandRect(i);
     if (rect.PtInRect(point)) {
+      hovered = true;
       if (i != m_ctx.cinfo.highlighted) {
         if (m_style.hover_type == UIStyle::HoverType::HILITE) {
-          // todo: change highlighted and update ui
           if (m_uiCallback) {
             size_t hover_index = i;
             m_uiCallback(nullptr, &hover_index, nullptr, nullptr);
           }
         } else if (m_hoverIndex != i) {
           m_hoverIndex = i;
-          RedrawWindow();
+          hover_index_change = true;
         }
       } else if (m_style.hover_type == UIStyle::HoverType::SEMI_HILITE &&
                  m_hoverIndex != -1) {
         m_hoverIndex = -1;
-        RedrawWindow();
+        hover_index_change = true;
       }
     }
   }
+  if (!hovered) {
+    m_hoverIndex = -1;
+    hover_index_change = true;
+  }
+  if (hover_index_change)
+    RedrawWindow();
   return 0;
 }
 
