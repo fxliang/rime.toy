@@ -249,9 +249,9 @@ void HorizontalLayout::DoLayout() {
         !_roundInfo[candidates_count - 1].Hemispherical;
     for (auto i = 1; i < candidates_count; i++) {
       if (_roundInfo[i].Hemispherical) {
-        if (row_of_candidate[i] == row_cnt &&
-            row_of_candidate[i - 1] == row_cnt - 1) {
-          _roundInfo[i].IsBottomLeftNeedToRound = true;
+        if (row_of_candidate[i - 1] == row_of_candidate[i] - 1) {
+          if (row_of_candidate[i] == row_cnt)
+            _roundInfo[i].IsBottomLeftNeedToRound = true;
           if (row_of_candidate[i - 1] == 0)
             _roundInfo[i - 1].IsTopRightNeedToRound =
                 _style.inline_preedit || !_roundInfo[i - 1].Hemispherical;
