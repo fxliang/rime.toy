@@ -499,7 +499,7 @@ void WeaselPanel::_HighlightRect(const RECT &rect, float radius,
                                  uint32_t shadow_color, uint32_t border_color,
                                  IsToRoundStruct roundInfo) {
   if (roundInfo.Hemispherical)
-    radius = DPI_SCALE(m_style.round_corner_ex);
+    radius = DPI_SCALE(m_style.round_corner_ex) - DPI_SCALE(border) / 2.0f;
   // draw shadow
   if (COLORNOTTRANSPARENT(shadow_color) && m_style.shadow_radius)
     m_pD2D->FillGeometry(rect, shadow_color, radius, roundInfo, true);
@@ -509,10 +509,8 @@ void WeaselPanel::_HighlightRect(const RECT &rect, float radius,
   // draw border
   if (COLORNOTTRANSPARENT(border_color) && border) {
     float hb = -(float)border / 2;
-    CRect rc = rect;
-    rc.InflateRect(hb, hb);
     ComPtr<ID2D1PathGeometry> pGeometry;
-    HR(m_pD2D->CreateRoundedRectanglePath(rc, radius + hb, roundInfo,
+    HR(m_pD2D->CreateRoundedRectanglePath(rect, radius + hb, roundInfo,
                                           pGeometry));
     m_pD2D->SetBrushColor(border_color);
     m_pD2D->dc->DrawGeometry(pGeometry.Get(), m_pD2D->m_pBrush.Get(), border);
