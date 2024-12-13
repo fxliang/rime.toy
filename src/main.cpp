@@ -65,7 +65,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
           goto skip;
         }
       }
-      if (eat)
+      if (eat && !(ke.mask & ibus::RELEASE_MASK))
         return 1;
     }
   }
