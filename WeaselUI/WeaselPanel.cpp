@@ -641,25 +641,9 @@ HRESULT WeaselPanel::OnScroll(UINT uMsg, WPARAM wParam, LPARAM lParam) {
   return 0;
 }
 
-LRESULT WeaselPanel::OnMouseLeave(UINT uMsg, WPARAM wParam, LPARAM lParam) {
-  m_hoverIndex = -1;
-  m_mouse_entry = false;
-  RedrawWindow();
-  return 0;
-}
-
 LRESULT WeaselPanel::OnMouseMove(UINT uMsg, WPARAM wParam, LPARAM lParam) {
   if (m_style.hover_type == UIStyle::NONE)
     return 0;
-  if (m_mouse_entry == false) {
-    TRACKMOUSEEVENT tme;
-    tme.cbSize = sizeof(TRACKMOUSEEVENT);
-    tme.dwFlags = TME_LEAVE;
-    tme.dwHoverTime = 20; // unit: ms
-    tme.hwndTrack = m_hWnd;
-    TrackMouseEvent(&tme);
-  }
-  m_mouse_entry = true;
   CPoint point(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
   CRect rc;
   GetWindowRect(m_hWnd, &rc);
@@ -715,7 +699,6 @@ LRESULT WeaselPanel::OnLeftClickUp(UINT uMsg, WPARAM wParam, LPARAM lParam) {
   if (rect.PtInRect(point)) {
     size_t i = m_ctx.cinfo.highlighted;
     if (m_uiCallback) {
-      m_mouse_entry = false;
       m_uiCallback(&i, nullptr, nullptr, nullptr);
       if (!m_status.composing)
         DestroyWindow();
@@ -855,9 +838,6 @@ LRESULT WeaselPanel::MsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam,
     return 0;
   case WM_MOUSEMOVE:
     OnMouseMove(uMsg, wParam, lParam);
-    break;
-  case WM_MOUSELEAVE:
-    OnMouseLeave(uMsg, wParam, lParam);
     break;
   case WM_MOUSEACTIVATE:
     return OnMouseActive(uMsg, wParam, lParam);

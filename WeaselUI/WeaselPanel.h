@@ -46,7 +46,6 @@ private:
   HRESULT OnScroll(UINT uMsg, WPARAM wParam, LPARAM lParam);
   LRESULT OnMouseMove(UINT uMsg, WPARAM wParam, LPARAM lParam);
   LRESULT OnMouseActive(UINT uMsg, WPARAM wParam, LPARAM lParam);
-  LRESULT OnMouseLeave(UINT uMsg, WPARAM wParam, LPARAM lParam);
   LRESULT OnLeftClickUp(UINT uMsg, WPARAM wParam, LPARAM lParam);
   LRESULT OnLeftClickDown(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -72,7 +71,6 @@ private:
   int m_offsety_aux = 0;
   bool m_istorepos = false;
   bool m_sticky = false;
-  bool m_mouse_entry = false;
   float m_bar_scale = 1.0f;
   // ------------------------------------------------------------
   an<D2D> m_pD2D;
