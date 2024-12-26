@@ -93,6 +93,8 @@ void UI::Update(const Context &ctx, const Status &status) {
   Refresh();
 }
 void UI::Refresh() {
+  if (!pimpl_)
+    return;
   if (ctx_.empty())
     pimpl_->Hide();
   if (ctx_ != octx_)
@@ -127,14 +129,15 @@ void UI::Destroy(bool full) {
 }
 bool UI::Create(HWND parent) {
   if (pimpl_) {
-    return pimpl_->panel.Create(parent);
+    pimpl_->panel.Create(parent);
+    return true;
   }
   pimpl_ = new UIImpl(*this);
   if (!pimpl_)
     return false;
   return pimpl_->panel.Create(parent);
 }
-bool UI::GetIsReposition() { return pimpl_->panel.GetIsReposition(); }
+bool UI::GetIsReposition() { return pimpl_ && pimpl_->panel.GetIsReposition(); }
 
 HWND UI::hwnd() {
   if (pimpl_ && pimpl_->panel.IsWindow())

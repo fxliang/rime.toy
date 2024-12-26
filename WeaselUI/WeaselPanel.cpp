@@ -95,11 +95,15 @@ void WeaselPanel::_CreateLayout() {
 void WeaselPanel::Refresh() {
   if (m_hWnd) {
     if (m_ostyle != m_style) {
-      DEBUG << "style changed";
+      if (!m_pD2D)
+        m_pD2D = std::make_shared<D2D>(m_style, m_hWnd);
+      else {
+        m_pD2D->m_hWnd = m_hWnd;
+        m_pD2D->InitDpiInfo();
+        m_pD2D->InitDirect2D();
+        m_pD2D->InitDirectWriteResources();
+      }
       m_ostyle = m_style;
-      m_pD2D->m_style = m_style;
-      m_pD2D->InitDpiInfo();
-      m_pD2D->InitFontFormats();
     }
     bool should_show_icon =
         (m_status.ascii_mode || !m_status.composing || !m_ctx.aux.empty());
@@ -129,7 +133,7 @@ void WeaselPanel::Refresh() {
     m_layout->DoLayout();
     _ResizeWindow();
     _Reposition();
-    InvalidateRect(m_hWnd, NULL, TRUE); // 请求重绘
+    RedrawWindow();
   }
 }
 
@@ -149,7 +153,7 @@ BOOL WeaselPanel::Create(HWND parent) {
       CW_USEDEFAULT, 10, 10, parent, nullptr, GetModuleHandle(nullptr), this);
   if (m_hWnd) {
     if (!m_pD2D)
-      m_pD2D.reset(new D2D(m_style, m_hWnd));
+      m_pD2D = std::make_shared<D2D>(m_style, m_hWnd);
     else {
       m_pD2D->m_hWnd = m_hWnd;
       m_pD2D->InitDpiInfo();
@@ -512,6 +516,8 @@ void WeaselPanel::_HighlightRect(const RECT &rect, float radius,
 }
 
 void WeaselPanel::_Reposition() {
+  if (!m_layout)
+    return;
   RECT rcWorkArea;
   memset(&rcWorkArea, 0, sizeof(rcWorkArea));
 #ifdef TOY_FEATURE
@@ -667,7 +673,7 @@ LRESULT WeaselPanel::OnMouseMove(UINT uMsg, WPARAM wParam, LPARAM lParam) {
       }
     }
   }
-  if (!hovered) {
+  if (!hovered && m_hoverIndex >= 0) {
     m_hoverIndex = -1;
     hover_index_change = true;
   }
