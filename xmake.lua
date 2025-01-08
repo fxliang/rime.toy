@@ -45,7 +45,7 @@ target(project_name)
   local version_minor = "0"
   local version_patch = "5"
   local version = "\"" .. version_major .. "." .. version_minor .. "." .. version_patch .. "\""
-  add_defines("VERSION_INFO=="..version)
+  add_defines("VERSION_INFO="..version)
   -- generate src/rime.toy.rc before build if needed
   on_load(function (target)
     import("core.base.text")

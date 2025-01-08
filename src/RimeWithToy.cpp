@@ -81,7 +81,8 @@ void RimeWithToy::setup_rime() {
   traits.prebuilt_data_dir = traits.shared_data_dir;
   traits.distribution_name = "rime.toy";
   traits.distribution_code_name = "rime.toy";
-  traits.distribution_version = VERSION_STRING(VERSION_INFO);
+  // VERSION_INFO should be define in build system or by a #define
+  traits.distribution_version = VERSION_INFO;
   traits.app_name = "rime.toy";
   RimeApi *rime_api = rime_get_api();
   rime_api->setup(&traits);
