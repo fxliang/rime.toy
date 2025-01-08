@@ -15,12 +15,10 @@ target(project_name)
   add_deps('WeaselUI')
   if is_plat('windows') then
     add_cxflags("/utf-8")
-    if is_mode("debug") then
-      add_cxflags("/Zi")
-      add_cxflags("-Fd$(buildir)/$(targetname).pdb")
-      add_cxflags("/FS")
-      add_ldflags("/DEBUG", {force = true})
-    end
+    add_cxflags("/Zi")
+    add_cxflags("-Fd$(buildir)/$(targetname).pdb")
+    add_cxflags("/FS")
+    add_ldflags("/DEBUG", {force = true})
     add_ldflags("/SUBSYSTEM:WINDOWS")
   elseif is_plat('mingw') then
     add_ldflags('-static-libgcc -static-libstdc++ -static', {force=true})
@@ -34,7 +32,7 @@ target(project_name)
     local prjoutput = path.join(target:targetdir(), target:filename())
     print("copy " .. prjoutput .. " to $(projectdir)")
     os.trycp(prjoutput, "$(projectdir)")
-    if is_mode("debug") and is_plat('windows') then
+    if is_plat('windows') then
       os.trycp(path.join(target:targetdir(), target:name() .. ".pdb"), "$(projectdir)")
     end
     local rimelib=(is_arch('x86') and path.join("$(projectdir)", "lib/rime.dll")
