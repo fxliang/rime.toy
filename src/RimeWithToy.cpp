@@ -656,7 +656,6 @@ static Bool _RimeConfigGetColor32bWithFallback(RimeConfig *config,
       tmp = string(2, tmp[0]) + string(2, tmp[1]) + string(2, tmp[2]) +
             string(2, tmp[3]);
       value = std::stoul(tmp, 0, 16);
-      alpha(value);
       break;
     case 7:
     case 8: // color code with alpha
