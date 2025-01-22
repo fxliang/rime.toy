@@ -36,11 +36,6 @@ namespace weasel {
 
 bool _UpdateUIStyleColor(RimeConfig *config, UIStyle &style, string color);
 
-wstring _LoadIconSettingFromSchema(RimeConfig &config, const char *key,
-                                   const char *backup,
-                                   const std::filesystem::path &user_dir,
-                                   const std::filesystem::path &shared_dir);
-
 static fs::path data_path(string subdir) {
   wchar_t _path[MAX_PATH] = {0};
   GetModuleFileNameW(NULL, _path, _countof(_path));
@@ -514,8 +509,6 @@ void RimeWithToy::_LoadSchemaSpecificSettings(RimeSessionId id,
   RimeConfig config;
   if (!rime_api->schema_open(wtou8(schema_id).c_str(), &config))
     return;
-  const auto shared_dir = data_path("shared");
-  const auto user_dir = data_path("usr");
   UIStyle &style = m_ui->style();
   style = m_base_style;
   _UpdateUIStyle(&config, m_ui.get(), false);
@@ -559,10 +552,28 @@ void RimeWithToy::_LoadSchemaSpecificSettings(RimeSessionId id,
                                 &inline_preedit)) {
     style.inline_preedit = !!inline_preedit;
   }
-  style.current_zhung_icon = _LoadIconSettingFromSchema(
-      config, "schema/icon", "schema/zhung_icon", user_dir, shared_dir);
-  style.current_ascii_icon = _LoadIconSettingFromSchema(
-      config, "schema/ascii_icon", nullptr, user_dir, shared_dir);
+  const auto load_icon = [](RimeConfig &config, const char *key,
+                            const char *backup = nullptr) {
+    auto user_dir = data_path("usr");
+    auto shared_dir = data_path("shared");
+    RimeApi *api = rime_get_api();
+    const int BUF_SIZE = 255;
+    char buffer[BUF_SIZE + 1] = {0};
+    if (api->config_get_string(&config, key, buffer, BUF_SIZE) ||
+        (backup && api->config_get_string(&config, backup, buffer, BUF_SIZE))) {
+      wstring resource = string_to_wstring(buffer, CP_UTF8);
+      if (fs::is_regular_file(user_dir / resource))
+        return (user_dir / resource).wstring();
+      else if (fs::is_regular_file(shared_dir / resource))
+        return (shared_dir / resource).wstring();
+    }
+    return wstring();
+  };
+  style.current_zhung_icon =
+      load_icon(config, "schema/icon", "schema/zhung_icon");
+  style.current_ascii_icon = load_icon(config, "schema/ascii_icon");
+  style.current_full_icon = load_icon(config, "schema/full_icon");
+  style.current_half_icon = load_icon(config, "schema/half_icon");
   const int STATUS_ICON_SIZE = GetSystemMetrics(SM_CXICON);
   if (!style.current_zhung_icon.empty()) {
     m_ime_icon =
@@ -583,30 +594,6 @@ void RimeWithToy::_LoadSchemaSpecificSettings(RimeSessionId id,
 
 bool RimeWithToy::StartUI() { return m_ui->Create(nullptr); }
 // ----------------------------------------------------------------------------
-
-wstring _LoadIconSettingFromSchema(RimeConfig &config, const char *key,
-                                   const char *backup, const fs::path &user_dir,
-                                   const fs::path &shared_dir) {
-  RimeApi *rime_api = rime_get_api();
-  const int BUF_SIZE = 255;
-  char buffer[BUF_SIZE + 1] = {0};
-  if (rime_api->config_get_string(&config, key, buffer, BUF_SIZE) ||
-      (backup != NULL &&
-       rime_api->config_get_string(&config, backup, buffer, BUF_SIZE))) {
-    std::wstring resource = string_to_wstring(buffer, CP_UTF8);
-    DWORD dwAttrib = GetFileAttributes((user_dir / resource).c_str());
-    if (INVALID_FILE_ATTRIBUTES != dwAttrib &&
-        0 == (dwAttrib & FILE_ATTRIBUTE_DIRECTORY)) {
-      return (user_dir / resource).wstring();
-    }
-    dwAttrib = GetFileAttributes((shared_dir / resource).c_str());
-    if (INVALID_FILE_ATTRIBUTES != dwAttrib &&
-        0 == (dwAttrib & FILE_ATTRIBUTE_DIRECTORY)) {
-      return (shared_dir / resource).wstring();
-    }
-  }
-  return L"";
-}
 
 static inline COLORREF blend_colors(COLORREF fcolor, COLORREF bcolor) {
   return RGB((GetRValue(fcolor) * 2 + GetRValue(bcolor)) / 3,
