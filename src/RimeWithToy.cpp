@@ -612,7 +612,7 @@ static inline COLORREF blend_colors(COLORREF fcolor, COLORREF bcolor) {
   return RGB((GetRValue(fcolor) * 2 + GetRValue(bcolor)) / 3,
              (GetGValue(fcolor) * 2 + GetGValue(bcolor)) / 3,
              (GetBValue(fcolor) * 2 + GetBValue(bcolor)) / 3) |
-         ((((fcolor >> 24) + (bcolor >> 24) / 2) << 24));
+         ((((fcolor >> 24) * 2 + (bcolor >> 24)) / 3) << 24);
 }
 
 // convertions from color format to COLOR_ABGR
