@@ -25,7 +25,7 @@ target(project_name)
     add_ldflags("-municode -mwindows", {force = true})
   end
 
-  add_linkdirs(is_arch("x86") and "lib" or "lib64")
+  add_linkdirs(is_arch("x86", "i386") and "lib" or "lib64")
 
   -- copy build output to $(projectdir)
   after_build(function(target)
@@ -35,11 +35,11 @@ target(project_name)
     if is_plat('windows') then
       print("copy " .. path.join(target:targetdir(), target:name() .. ".pdb") .. " to $(projectdir)")
       os.trycp(path.join(target:targetdir(), target:name() .. ".pdb"), "$(projectdir)")
-      local rimepdb = path.join("$(projectdir)", is_arch("x86") and "lib/rime.pdb" or "lib64/rime.pdb")
+      local rimepdb = path.join("$(projectdir)", is_arch("x86", "i386") and "lib/rime.pdb" or "lib64/rime.pdb")
       print("copy " .. rimepdb .. " to $(projectdir)")
       os.trycp(rimepdb, "$(projectdir)")
     end
-    local rimelib = path.join("$(projectdir)", is_arch("x86") and "lib/rime.dll" or "lib64/rime.dll")
+    local rimelib = path.join("$(projectdir)", is_arch("x86", "i386") and "lib/rime.dll" or "lib64/rime.dll")
     print("copy " .. rimelib .. " to $(projectdir)")
     os.trycp(rimelib, "$(projectdir)")
   end)
@@ -51,6 +51,13 @@ target(project_name)
   add_defines("VERSION_INFO="..version)
   -- generate src/rime.toy.rc before build if needed
   on_load(function (target)
+    -- try kill rime.toy.exe if running
+    try {
+      function()
+        os.run('taskkill.exe /im '.. target:filename() .. ' /F')
+        print('killed rime.toy.exe before build done!')
+      end
+    } catch {}
     import("core.base.text")
     local rc_template = path.join(os.projectdir(), "src/rime.toy.rc.in")
     local rc_output = path.join(os.projectdir(), "src/rime.toy.rc")
