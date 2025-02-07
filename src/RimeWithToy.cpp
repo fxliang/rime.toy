@@ -297,7 +297,7 @@ BOOL RimeWithToy::ShowMessage(Context &ctx, Status &status) {
       tips = L"有错误，请查看日志 %TEMP%\\rime.toy\\rime.toy.*.INFO";
   } else if (m_message_type == "option") {
     if (!m_message_label.empty())
-      tips = string_to_wstring(m_message_label, CP_UTF8);
+      tips = u8tow(m_message_label);
     else if (m_message_value == "!ascii_mode") {
       tips = L"中文";
     } else if (m_message_value == "ascii_mode") {
@@ -512,11 +512,10 @@ void RimeWithToy::_LoadSchemaSpecificSettings(RimeSessionId id,
   UIStyle &style = m_ui->style();
   style = m_base_style;
   _UpdateUIStyle(&config, m_ui.get(), false);
+  // load schema color style config
   const int BUF_SIZE = 255;
   char buffer[BUF_SIZE + 1] = {0};
-  if (!m_current_dark_mode &&
-      rime_api->config_get_string(&config, "style/color_scheme", buffer,
-                                  BUF_SIZE)) {
+  const auto update_color_scheme = [&]() {
     std::string color_name(buffer);
     RimeConfigIterator preset = {0};
     if (rime_api->config_begin_map(
@@ -530,23 +529,11 @@ void RimeWithToy::_LoadSchemaSpecificSettings(RimeSessionId id,
         rime_api->config_close(&weaselconfig);
       }
     }
-  } else if (m_current_dark_mode &&
-             rime_api->config_get_string(&config, "style/color_scheme_dark",
-                                         buffer, BUF_SIZE)) {
-    std::string color_name(buffer);
-    RimeConfigIterator preset = {0};
-    if (rime_api->config_begin_map(
-            &preset, &config, ("preset_color_schemes/" + color_name).c_str())) {
-      _UpdateUIStyleColor(&config, style, color_name);
-      rime_api->config_end(&preset);
-    } else {
-      RimeConfig weaselconfig;
-      if (rime_api->config_open("weasel", &weaselconfig)) {
-        _UpdateUIStyleColor(&weaselconfig, style, color_name);
-        rime_api->config_close(&weaselconfig);
-      }
-    }
-  }
+  };
+  const char *key =
+      m_current_dark_mode ? "style/color_scheme_dark" : "style/color_scheme";
+  if (rime_api->config_get_string(&config, key, buffer, BUF_SIZE))
+    update_color_scheme();
   Bool inline_preedit = false;
   if (rime_api->config_get_bool(&config, "style/inline_preedit",
                                 &inline_preedit)) {
@@ -561,7 +548,7 @@ void RimeWithToy::_LoadSchemaSpecificSettings(RimeSessionId id,
     char buffer[BUF_SIZE + 1] = {0};
     if (api->config_get_string(&config, key, buffer, BUF_SIZE) ||
         (backup && api->config_get_string(&config, backup, buffer, BUF_SIZE))) {
-      wstring resource = string_to_wstring(buffer, CP_UTF8);
+      wstring resource = u8tow(buffer);
       if (fs::is_regular_file(user_dir / resource))
         return (user_dir / resource).wstring();
       else if (fs::is_regular_file(shared_dir / resource))
