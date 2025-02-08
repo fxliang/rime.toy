@@ -733,56 +733,39 @@ bool _UpdateUIStyleColor(RimeConfig *config, UIStyle &style, string color) {
         {string("abgr"), COLOR_ABGR}};
     _RimeParseStringOptWithFallback(config, (prefix + "/color_format"), fmt,
                                     _colorFmt, COLOR_ABGR);
-    _RimeGetColor(config, (prefix + "/back_color"), style.back_color, fmt,
-                  0xffffffff);
-    _RimeGetColor(config, (prefix + "/shadow_color"), style.shadow_color, fmt,
-                  TRANSPARENT_COLOR);
-    _RimeGetColor(config, (prefix + "/prevpage_color"), style.prevpage_color,
-                  fmt, TRANSPARENT_COLOR);
-    _RimeGetColor(config, (prefix + "/nextpage_color"), style.nextpage_color,
-                  fmt, TRANSPARENT_COLOR);
-    _RimeGetColor(config, (prefix + "/text_color"), style.text_color, fmt,
-                  0xff000000);
-    _RimeGetColor(config, (prefix + "/candidate_text_color"),
-                  style.candidate_text_color, fmt, style.text_color);
-    _RimeGetColor(config, (prefix + "/candidate_back_color"),
-                  style.candidate_back_color, fmt, TRANSPARENT_COLOR);
-    _RimeGetColor(config, (prefix + "/border_color"), style.border_color, fmt,
-                  style.text_color);
-    _RimeGetColor(config, (prefix + "/hilited_text_color"),
-                  style.hilited_text_color, fmt, style.text_color);
-    _RimeGetColor(config, (prefix + "/hilited_back_color"),
-                  style.hilited_back_color, fmt, style.back_color);
-    _RimeGetColor(config, (prefix + "/hilited_candidate_text_color"),
-                  style.hilited_candidate_text_color, fmt,
-                  style.hilited_text_color);
-    _RimeGetColor(config, (prefix + "/hilited_candidate_back_color"),
-                  style.hilited_candidate_back_color, fmt,
-                  style.hilited_back_color);
-    _RimeGetColor(config, (prefix + "/hilited_candidate_shadow_color"),
-                  style.hilited_candidate_shadow_color, fmt, TRANSPARENT_COLOR);
-    _RimeGetColor(config, (prefix + "/hilited_shadow_color"),
-                  style.hilited_shadow_color, fmt, TRANSPARENT_COLOR);
-    _RimeGetColor(config, (prefix + "/candidate_shadow_color"),
-                  style.candidate_shadow_color, fmt, TRANSPARENT_COLOR);
-    _RimeGetColor(config, (prefix + "/candidate_border_color"),
-                  style.candidate_border_color, fmt, TRANSPARENT_COLOR);
-    _RimeGetColor(config, (prefix + "/hilited_candidate_border_color"),
-                  style.hilited_candidate_border_color, fmt, TRANSPARENT_COLOR);
-    _RimeGetColor(
-        config, (prefix + "/label_color"), style.label_text_color, fmt,
-        blend_colors(style.candidate_text_color, style.candidate_back_color));
-    _RimeGetColor(config, (prefix + "/hilited_label_color"),
-                  style.hilited_label_text_color, fmt,
-                  blend_colors(style.hilited_candidate_text_color,
-                               style.hilited_candidate_back_color));
-    _RimeGetColor(config, (prefix + "/comment_text_color"),
-                  style.comment_text_color, fmt, style.label_text_color);
-    _RimeGetColor(config, (prefix + "/hilited_comment_text_color"),
-                  style.hilited_comment_text_color, fmt,
-                  style.hilited_label_text_color);
-    _RimeGetColor(config, (prefix + "/hilited_mark_color"),
-                  style.hilited_mark_color, fmt, TRANSPARENT_COLOR);
+#define COLOR(key, value, fallback)                                            \
+  _RimeGetColor(config, (prefix + "/" + key), value, fmt, fallback)
+    COLOR("back_color", style.back_color, 0xffffffff);
+    COLOR("shadow_color", style.shadow_color, 0);
+    COLOR("prevpage_color", style.prevpage_color, 0);
+    COLOR("nextpage_color", style.nextpage_color, 0);
+    COLOR("text_color", style.text_color, 0xff000000);
+    COLOR("candidate_text_color", style.candidate_text_color, style.text_color);
+    COLOR("candidate_back_color", style.candidate_back_color, 0);
+    COLOR("border_color", style.border_color, style.text_color);
+    COLOR("hilited_text_color", style.hilited_text_color, style.text_color);
+    COLOR("hilited_back_color", style.hilited_back_color, style.back_color);
+    COLOR("hilited_candidate_text_color", style.hilited_candidate_text_color,
+          style.hilited_text_color);
+    COLOR("hilited_candidate_back_color", style.hilited_candidate_back_color,
+          style.hilited_back_color);
+    COLOR("hilited_candidate_shadow_color",
+          style.hilited_candidate_shadow_color, 0);
+    COLOR("hilited_shadow_color", style.hilited_shadow_color, 0);
+    COLOR("candidate_shadow_color", style.candidate_shadow_color, 0);
+    COLOR("candidate_border_color", style.candidate_border_color, 0);
+    COLOR("hilited_candidate_border_color",
+          style.hilited_candidate_border_color, 0);
+    COLOR("label_color", style.label_text_color,
+          blend_colors(style.candidate_text_color, style.candidate_back_color));
+    COLOR("hilited_label_color", style.hilited_label_text_color,
+          blend_colors(style.candidate_text_color, style.candidate_back_color));
+    COLOR("comment_text_color", style.comment_text_color,
+          style.label_text_color);
+    COLOR("hilited_comment_text_color", style.hilited_comment_text_color,
+          style.hilited_label_text_color);
+    COLOR("hilited_mark_color", style.hilited_mark_color, 0);
+#undef COLOR
     return true;
   }
   return false;
