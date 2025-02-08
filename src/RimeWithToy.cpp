@@ -24,6 +24,8 @@ typedef enum { COLOR_ABGR = 0, COLOR_ARGB, COLOR_RGBA } ColorFormat;
 #define TRIMHEAD_REGEX std::regex("0x", std::regex::icase)
 #endif
 
+static RimeApi *rime_api = nullptr;
+
 #define OPEN(x)                                                                \
   ShellExecute(nullptr, _T("open"), data_path(x).c_str(), NULL, NULL,          \
                SW_SHOWNORMAL);
@@ -79,7 +81,6 @@ void RimeWithToy::setup_rime() {
   // VERSION_INFO should be define in build system or by a #define
   traits.distribution_version = VERSION_INFO;
   traits.app_name = "rime.toy";
-  RimeApi *rime_api = rime_get_api();
   rime_api->setup(&traits);
   rime_api->set_notification_handler(&on_message, this);
 }
@@ -123,6 +124,7 @@ void RimeWithToy::BalloonMsg(const string &msg) {
 
 RimeWithToy::RimeWithToy(HINSTANCE hInstance)
     : m_hInstance(hInstance), m_disabled(false) {
+  rime_api = rime_get_api();
   m_ui = std::make_shared<UI>();
   const auto tooltip = L"rime.toy\n左键点击切换ASCII\n右键菜单可退出^_^";
   m_trayIcon = std::make_unique<TrayIcon>(hInstance, tooltip);
@@ -184,7 +186,6 @@ void RimeWithToy::Initialize() {
   DEBUGIF(m_trayIcon->debug()) << L"RimeWithToy::Initialize() called";
   setup_rime();
   m_disabled = true;
-  rime_api = rime_get_api();
   rime_api->initialize(NULL);
   if (rime_api->start_maintenance(true))
     rime_api->join_maintenance_thread();
@@ -539,15 +540,14 @@ void RimeWithToy::_LoadSchemaSpecificSettings(RimeSessionId id,
                                 &inline_preedit)) {
     style.inline_preedit = !!inline_preedit;
   }
-  const auto load_icon = [](RimeConfig &config, const char *key,
-                            const char *backup = nullptr) {
+  const auto load_icon = [&](RimeConfig &config, const char *key,
+                             const char *backup = nullptr) {
     auto user_dir = data_path("usr");
     auto shared_dir = data_path("shared");
-    RimeApi *api = rime_get_api();
     const int BUF_SIZE = 255;
     char buffer[BUF_SIZE + 1] = {0};
-    if (api->config_get_string(&config, key, buffer, BUF_SIZE) ||
-        (backup && api->config_get_string(&config, backup, buffer, BUF_SIZE))) {
+    if (rime_api->config_get_string(&config, key, buffer, BUF_SIZE) ||
+        rime_api->config_get_string(&config, backup, buffer, BUF_SIZE)) {
       wstring resource = u8tow(buffer);
       if (fs::is_regular_file(user_dir / resource))
         return (user_dir / resource).wstring();
@@ -618,7 +618,6 @@ static inline int ConvertColorToAbgr(int color, ColorFormat fmt = COLOR_ABGR) {
 static Bool _RimeGetColor(RimeConfig *config, const string key, int &value,
                           const ColorFormat &fmt,
                           const unsigned int &fallback) {
-  RimeApi *rime_api = rime_get_api();
   char color[256] = {0};
   if (!rime_api->config_get_string(config, key.c_str(), color, 256)) {
     value = fallback;
@@ -670,7 +669,6 @@ static Bool _RimeGetColor(RimeConfig *config, const string key, int &value,
 template <typename T>
 void _RimeGetBool(RimeConfig *config, const char *key, bool cond, T &value,
                   const T &trueValue = true, const T &falseValue = false) {
-  RimeApi *rime_api = rime_get_api();
   Bool tempb = False;
   if (rime_api->config_get_bool(config, key, &tempb) || cond)
     value = (!!tempb) ? trueValue : falseValue;
@@ -680,7 +678,6 @@ template <typename T>
 void _RimeParseStringOptWithFallback(RimeConfig *config, const string &key,
                                      T &value, const std::map<string, T> &amap,
                                      const T &fallback) {
-  RimeApi *rime_api = rime_get_api();
   char str_buff[256] = {0};
   if (rime_api->config_get_string(config, key.c_str(), str_buff, 255)) {
     auto it = amap.find(string(str_buff));
@@ -694,7 +691,6 @@ void _RimeGetIntStr(RimeConfig *config, const char *key, T &value,
                     const char *fb_key = nullptr,
                     const void *fb_value = nullptr,
                     const std::function<void(T &)> &func = nullptr) {
-  RimeApi *rime_api = rime_get_api();
   if constexpr (std::is_same<T, int>::value) {
     if (!rime_api->config_get_int(config, key, &value) && fb_key != 0)
       rime_api->config_get_int(config, fb_key, &value);
@@ -715,7 +711,6 @@ void _RimeGetIntStr(RimeConfig *config, const char *key, T &value,
 // load color configs to style, by "style/color_scheme" or specific scheme name
 // "color" which is default empty
 bool _UpdateUIStyleColor(RimeConfig *config, UIStyle &style, string color) {
-  RimeApi *rime_api = rime_get_api();
   const int BUF_SIZE = 255;
   char buffer[BUF_SIZE + 1] = {0};
   string color_mark = "style/color_scheme";
@@ -773,7 +768,6 @@ bool _UpdateUIStyleColor(RimeConfig *config, UIStyle &style, string color) {
 
 // update ui's style parameters, ui has been check before referenced
 void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize) {
-  RimeApi *rime_api = rime_get_api();
   UIStyle &style(ui->style());
   const std::function<void(std::wstring &)> rmspace = [](std::wstring &str) {
     str = std::regex_replace(str, std::wregex(L"\\s*(,|:|^|$)\\s*"), L"$1");

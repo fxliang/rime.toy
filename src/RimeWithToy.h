@@ -64,7 +64,6 @@ private:
   HICON m_reload_icon;
   HINSTANCE m_hInstance;
   RimeSessionId m_session_id;
-  RimeApi *rime_api;
   an<UI> m_ui;
   wstring m_last_schema_id;
   wstring m_commit_str;
