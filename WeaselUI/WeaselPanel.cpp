@@ -99,8 +99,7 @@ void WeaselPanel::Refresh() {
         m_pD2D = std::make_shared<D2D>(m_style, m_hWnd);
         if (!m_style.font_face.empty())
           m_pD2D->InitDirectWriteResources();
-      }
-      else {
+      } else {
         m_pD2D->m_hWnd = m_hWnd;
         m_pD2D->InitDpiInfo();
         m_pD2D->InitDirect2D();

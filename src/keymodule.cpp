@@ -323,7 +323,6 @@ void update_keystates(WPARAM wParam, LPARAM lParam) {
   keyState[VK_MENU] = (keyState[VK_LMENU] | keyState[VK_RMENU]);
 }
 
-
 void send_input_to_window(const std::wstring &text) {
   std::vector<INPUT> inputs;
   for (const auto &ch : text) {
