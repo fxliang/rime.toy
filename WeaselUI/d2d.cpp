@@ -12,7 +12,6 @@ D2D::D2D(UIStyle &style, HWND hwnd)
     : m_style(style), m_hWnd(hwnd), m_dpiX(96.0f), m_dpiY(96.0f) {
   InitDpiInfo();
   InitDirect2D();
-  InitDirectWriteResources();
 }
 
 D2D::~D2D() {

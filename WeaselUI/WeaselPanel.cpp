@@ -95,15 +95,28 @@ void WeaselPanel::_CreateLayout() {
 void WeaselPanel::Refresh() {
   if (m_hWnd) {
     if (m_ostyle != m_style) {
-      if (!m_pD2D)
+      if (!m_pD2D) {
         m_pD2D = std::make_shared<D2D>(m_style, m_hWnd);
+        if (!m_style.font_face.empty())
+          m_pD2D->InitDirectWriteResources();
+      }
       else {
         m_pD2D->m_hWnd = m_hWnd;
         m_pD2D->InitDpiInfo();
         m_pD2D->InitDirect2D();
-        m_pD2D->InitDirectWriteResources();
+        if (!m_style.font_face.empty())
+          m_pD2D->InitDirectWriteResources();
       }
       m_ostyle = m_style;
+    } else {
+      if (m_pD2D) {
+        if (!m_style.font_face.empty() && !m_pD2D->pTextFormat)
+          m_pD2D->InitDirectWriteResources();
+      } else {
+        m_pD2D = std::make_shared<D2D>(m_style, m_hWnd);
+        if (!m_style.font_face.empty())
+          m_pD2D->InitDirectWriteResources();
+      }
     }
     bool should_show_icon =
         (m_status.ascii_mode || !m_status.composing || !m_ctx.aux.empty());
@@ -158,7 +171,8 @@ BOOL WeaselPanel::Create(HWND parent) {
       m_pD2D->m_hWnd = m_hWnd;
       m_pD2D->InitDpiInfo();
       m_pD2D->InitDirect2D();
-      m_pD2D->InitDirectWriteResources();
+      if (!m_style.font_face.empty())
+        m_pD2D->InitDirectWriteResources();
     }
     m_ostyle = m_style;
   }
