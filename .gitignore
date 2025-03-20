@@ -13,3 +13,5 @@ usr
 build
 .xmake
 .cache
+*.pdb
+src/rime.toy.rc

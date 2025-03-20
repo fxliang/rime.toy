@@ -323,7 +323,6 @@ void update_keystates(WPARAM wParam, LPARAM lParam) {
   keyState[VK_MENU] = (keyState[VK_LMENU] | keyState[VK_RMENU]);
 }
 
-bool inserting = false;
 
 void send_input_to_window(const std::wstring &text) {
   std::vector<INPUT> inputs;
@@ -342,9 +341,7 @@ void send_input_to_window(const std::wstring &text) {
   }
 
   if (!inputs.empty()) {
-    inserting = true;
     SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
-    inserting = false;
   }
 }
 } // namespace weasel

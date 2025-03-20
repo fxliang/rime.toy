@@ -274,9 +274,7 @@ void RimeWithToy::UpdateUI() {
 bool RimeWithToy::CheckCommit() {
   auto committed = !m_commit_str.empty();
   if (!m_commit_str.empty()) {
-    inserting = true;
     send_input_to_window(m_commit_str);
-    inserting = false;
     m_commit_str.clear();
     if (!m_ui->status().composing)
       HideUI();

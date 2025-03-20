@@ -235,7 +235,6 @@ struct KeyInfo {
   operator UINT32() { return *reinterpret_cast<UINT32 *>(this); }
 };
 
-extern bool inserting;
 extern BYTE keyState[256];
 void send_input_to_window(const std::wstring &text);
 void update_keystates(WPARAM wParam, LPARAM lParam);

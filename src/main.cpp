@@ -42,10 +42,12 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (SendMessage(hImcWnd, WM_IME_CONTROL, 5, 0))
       SendMessage(hImcWnd, WM_IME_CONTROL, 6, 0);
   }
-  if (nCode == HC_ACTION && !inserting) {
+  if (nCode == HC_ACTION) {
     // update keyState table
     update_keystates(wParam, lParam);
     KBDLLHOOKSTRUCT *pKeyboard = (KBDLLHOOKSTRUCT *)lParam;
+    if (!pKeyboard->vkCode)
+      goto skip;
     // get KBDLLHOOKSTRUCT info, generate keyinfo
     KeyInfo ki = parse_key(wParam, lParam);
     KeyEvent ke;
