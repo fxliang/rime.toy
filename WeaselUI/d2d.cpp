@@ -203,8 +203,10 @@ void D2D::InitFontFormats(const wstring &label_font_face,
     fontFaceStrVector[0] =
         std::regex_replace(fontFaceStrVector[0],
                            std::wregex(STYLEORWEIGHT, std::wregex::icase), L"");
-    if (font_point < 0)
-      font_point = -font_point;
+    if (font_point <= 0) {
+      _pTextFormat.Reset();
+      return;
+    }
     HR(m_pWriteFactory->CreateTextFormat(
         _mainFontFace.c_str(), NULL, DWRITE_FONT_WEIGHT_NORMAL,
         DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
