@@ -154,15 +154,15 @@ BOOL WeaselPanel::Create(HWND parent) {
     return !!m_hWnd;
   m_hoverIndex = -1;
   WNDCLASS wc = {};
-  wc.lpfnWndProc = WindowProc;
-  wc.hInstance = GetModuleHandle(nullptr);
+  wc.lpfnWndProc = WeaselPanel::WindowProc;
+  wc.hInstance = nullptr;
   wc.hCursor = LoadCursor(NULL, IDC_ARROW);
   wc.lpszClassName = L"WeaselPanel";
   RegisterClass(&wc);
   m_hWnd = CreateWindowEx(
       WS_EX_NOACTIVATE | WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOPMOST,
       L"WeaselPanel", L"WeaselPanel", WS_POPUP | WS_VISIBLE, CW_USEDEFAULT,
-      CW_USEDEFAULT, 10, 10, parent, nullptr, GetModuleHandle(nullptr), this);
+      CW_USEDEFAULT, 10, 10, parent, nullptr, nullptr, this);
   if (m_hWnd) {
     if (!m_pD2D)
       m_pD2D = std::make_shared<D2D>(m_style, m_hWnd);
@@ -658,11 +658,6 @@ LRESULT WeaselPanel::OnMouseMove(UINT uMsg, WPARAM wParam, LPARAM lParam) {
   if (m_style.hover_type == UIStyle::NONE)
     return 0;
   CPoint point(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-  CRect rc;
-  GetWindowRect(m_hWnd, &rc);
-  auto offsetX = m_layout ? m_layout->offsetX : 0;
-  auto offsetY = m_layout ? m_layout->offsetY : 0;
-  rc.InflateRect(-offsetX, -offsetY);
   bool hovered = false;
   bool hover_index_change = false;
   for (int i = 0; i < m_candidateCount; i++) {
@@ -826,7 +821,7 @@ VOID CALLBACK WeaselPanel::OnClickTimer(_In_ HWND hwnd, _In_ UINT uMsg,
 
 LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
                                          LPARAM lParam) {
-  WeaselPanel *self;
+  static WeaselPanel *self = nullptr;
   if (uMsg == WM_NCCREATE) {
     self = static_cast<WeaselPanel *>(
         reinterpret_cast<LPCREATESTRUCT>(lParam)->lpCreateParams);
