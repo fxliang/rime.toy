@@ -24,6 +24,7 @@ public:
   void SetOpenLogDirFunc(const vhandler &func) { open_logdir = func; }
   void SetSyncFunc(const vhandler &func) { sync_data = func; }
   void SetRefreshIconFunc(const vhandler &func) { refresh_icon = func; }
+  void SetQuitHandler(const vhandler &func) { quit_app = func; }
   bool debug() { return enable_debug; }
   void ShowBalloonTip(const std::wstring &title, const std::wstring &message,
                       DWORD timeout = 1000);
@@ -43,6 +44,7 @@ private:
   vhandler open_logdir;
   vhandler sync_data;
   vhandler refresh_icon;
+  vhandler quit_app;
   bool enable_debug;
   bool current_dark_mode;
 

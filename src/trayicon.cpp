@@ -147,6 +147,8 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
     switch (LOWORD(wParam)) {
     case MENU_QUIT: {
       Hide();
+      if (quit_app)
+        quit_app();
       PostQuitMessage(0);
       break;
     }
