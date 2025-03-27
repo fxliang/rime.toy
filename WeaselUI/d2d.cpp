@@ -208,9 +208,8 @@ void D2D::InitFontFormats(const wstring &label_font_face,
       return;
     }
     HR(m_pWriteFactory->CreateTextFormat(
-        _mainFontFace.c_str(), NULL, DWRITE_FONT_WEIGHT_NORMAL,
-        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-        font_point * m_dpiScaleFontPoint, L"",
+        _mainFontFace.c_str(), NULL, fontWeight, fontStyle,
+        DWRITE_FONT_STRETCH_NORMAL, font_point * m_dpiScaleFontPoint, L"",
         reinterpret_cast<IDWriteTextFormat **>(
             _pTextFormat.ReleaseAndGetAddressOf())));
 
