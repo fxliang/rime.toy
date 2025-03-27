@@ -133,8 +133,8 @@ std::vector<std::wstring> ws_split(const std::wstring &in,
       std::wsregex_token_iterator()};
 }
 
-static std::wstring _MatchWordsOutLowerCaseTrim1st(const std::wstring &wstr,
-                                                   const std::wstring &pat) {
+static std::wstring MatchWordsOutLowerCaseTrim1st(const std::wstring &wstr,
+                                                  const std::wstring &pat) {
   std::wstring mat = L"";
   std::wsmatch mc;
   std::wregex pattern(pat, std::wregex::icase);
@@ -190,6 +190,7 @@ void D2D::InitFontFormats(const wstring &label_font_face,
     const std::wstring _mainFontFace = L"_InvalidFontName_";
     DWRITE_FONT_WEIGHT fontWeight = DWRITE_FONT_WEIGHT_NORMAL;
     DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
+    DWRITE_FONT_STRETCH fontStretch = DWRITE_FONT_STRETCH_NORMAL;
     // convert percentage to float
     float linespacing =
         m_dpiScaleFontPoint * ((float)m_style.linespacing / 100.0f);
@@ -197,7 +198,7 @@ void D2D::InitFontFormats(const wstring &label_font_face,
     if (vertical_text)
       baseline = linespacing / 2;
 
-    _ParseFontFace(font_face, fontWeight, fontStyle);
+    ParseFontFace(font_face, fontWeight, fontStyle, fontStretch);
     // text font text format set up
     fontFaceStrVector = ws_split(font_face, L",");
     fontFaceStrVector[0] =
@@ -208,8 +209,8 @@ void D2D::InitFontFormats(const wstring &label_font_face,
       return;
     }
     HR(m_pWriteFactory->CreateTextFormat(
-        _mainFontFace.c_str(), NULL, fontWeight, fontStyle,
-        DWRITE_FONT_STRETCH_NORMAL, font_point * m_dpiScaleFontPoint, L"",
+        _mainFontFace.c_str(), NULL, fontWeight, fontStyle, fontStretch,
+        font_point * m_dpiScaleFontPoint, L"",
         reinterpret_cast<IDWriteTextFormat **>(
             _pTextFormat.ReleaseAndGetAddressOf())));
 
@@ -223,7 +224,7 @@ void D2D::InitFontFormats(const wstring &label_font_face,
 
     // _pTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
     _pTextFormat->SetWordWrapping(wrap);
-    _SetFontFallback(_pTextFormat, fontFaceStrVector);
+    SetFontFallback(_pTextFormat, fontFaceStrVector);
     if (m_style.linespacing && m_style.baseline)
       _pTextFormat->SetLineSpacing(DWRITE_LINE_SPACING_METHOD_UNIFORM,
                                    font_point * linespacing,
@@ -269,8 +270,8 @@ void D2D::InitDpiInfo() {
   m_dpiScaleLayout = m_dpiY / 96.0;
 }
 
-void D2D::_SetFontFallback(PtTextFormat textFormat,
-                           const std::vector<std::wstring> &fontVector) {
+void D2D::SetFontFallback(PtTextFormat textFormat,
+                          const std::vector<std::wstring> &fontVector) {
   ComPtr<IDWriteFontFallback> pSysFallback;
   HR(m_pWriteFactory->GetSystemFontFallback(
       pSysFallback.ReleaseAndGetAddressOf()));
@@ -325,14 +326,15 @@ void D2D::_SetFontFallback(PtTextFormat textFormat,
   decltype(fallbackFontsVector)().swap(fallbackFontsVector);
 }
 
-void D2D::_ParseFontFace(const std::wstring &fontFaceStr,
-                         DWRITE_FONT_WEIGHT &fontWeight,
-                         DWRITE_FONT_STYLE &fontStyle) {
-  const std::wstring patWeight(
+void D2D::ParseFontFace(const std::wstring &fontFaceStr,
+                        DWRITE_FONT_WEIGHT &fontWeight,
+                        DWRITE_FONT_STYLE &fontStyle,
+                        DWRITE_FONT_STRETCH &fontStretch) {
+  const wstring patWeight(
       L"(:thin|:extra_light|:ultra_light|:light|:semi_light|:medium|:demi_bold|"
       L":semi_bold|:bold|:extra_bold|:ultra_bold|:black|:heavy|:extra_black|:"
       L"ultra_black)");
-  const std::map<std::wstring, DWRITE_FONT_WEIGHT> _mapWeight = {
+  const std::map<wstring, DWRITE_FONT_WEIGHT> _mapWeight = {
       {L"thin", DWRITE_FONT_WEIGHT_THIN},
       {L"extra_light", DWRITE_FONT_WEIGHT_EXTRA_LIGHT},
       {L"ultra_light", DWRITE_FONT_WEIGHT_ULTRA_LIGHT},
@@ -349,20 +351,44 @@ void D2D::_ParseFontFace(const std::wstring &fontFaceStr,
       {L"extra_black", DWRITE_FONT_WEIGHT_EXTRA_BLACK},
       {L"normal", DWRITE_FONT_WEIGHT_NORMAL},
       {L"ultra_black", DWRITE_FONT_WEIGHT_ULTRA_BLACK}};
-  std::wstring weight = _MatchWordsOutLowerCaseTrim1st(fontFaceStr, patWeight);
-  auto it = _mapWeight.find(weight);
+  const wstring weight = MatchWordsOutLowerCaseTrim1st(fontFaceStr, patWeight);
+  const auto it = _mapWeight.find(weight);
   fontWeight =
       (it != _mapWeight.end()) ? it->second : DWRITE_FONT_WEIGHT_NORMAL;
 
-  const std::wstring patStyle(L"(:italic|:oblique|:normal)");
-  const std::map<std::wstring, DWRITE_FONT_STYLE> _mapStyle = {
+  const wstring patStyle(L"(:italic|:oblique|:normal)");
+  const std::map<wstring, DWRITE_FONT_STYLE> _mapStyle = {
       {L"italic", DWRITE_FONT_STYLE_ITALIC},
       {L"oblique", DWRITE_FONT_STYLE_OBLIQUE},
       {L"normal", DWRITE_FONT_STYLE_NORMAL},
   };
-  std::wstring style = _MatchWordsOutLowerCaseTrim1st(fontFaceStr, patStyle);
-  auto it2 = _mapStyle.find(style);
+  const wstring style = MatchWordsOutLowerCaseTrim1st(fontFaceStr, patStyle);
+  const auto it2 = _mapStyle.find(style);
   fontStyle = (it2 != _mapStyle.end()) ? it2->second : DWRITE_FONT_STYLE_NORMAL;
+
+  const wstring patStretch(L"(:undefined|:ultra_condensed|:extra_condensed|"
+                           L":condensed|:semi_condensed|"
+                           L":normal_stretch|:medium_stretch|:semi_expanded|"
+                           L":expanded|:extra_expanded|:ultra_expanded)");
+  const std::map<wstring, DWRITE_FONT_STRETCH> _mapStretch = {
+      {L"undefined", DWRITE_FONT_STRETCH_UNDEFINED},
+      {L"ultra_condensed", DWRITE_FONT_STRETCH_ULTRA_CONDENSED},
+      {L"extra_condensed", DWRITE_FONT_STRETCH_EXTRA_CONDENSED},
+      {L"condensed", DWRITE_FONT_STRETCH_CONDENSED},
+      {L"semi_condensed", DWRITE_FONT_STRETCH_SEMI_CONDENSED},
+      {L"normal_stretch", DWRITE_FONT_STRETCH_NORMAL},
+      {L"medium_stretch", DWRITE_FONT_STRETCH_MEDIUM},
+      {L"semi_expanded", DWRITE_FONT_STRETCH_SEMI_EXPANDED},
+      {L"expanded", DWRITE_FONT_STRETCH_EXPANDED},
+      {L"extra_expanded", DWRITE_FONT_STRETCH_EXTRA_EXPANDED},
+      {L"ultra_expanded", DWRITE_FONT_STRETCH_ULTRA_EXPANDED}};
+  const wstring stretch =
+      MatchWordsOutLowerCaseTrim1st(fontFaceStr, patStretch);
+  const auto it3 = _mapStretch.find(stretch);
+  fontStretch =
+      (it3 != _mapStretch.end()) ? it3->second : DWRITE_FONT_STRETCH_NORMAL;
+  if (DWRITE_FONT_STRETCH_UNDEFINED)
+    fontStretch = DWRITE_FONT_STRETCH_NORMAL;
 }
 
 void D2D::GetTextSize(const wstring &text, size_t nCount,

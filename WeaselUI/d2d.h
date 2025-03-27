@@ -45,11 +45,12 @@ struct D2D {
   void SetBrushColor(uint32_t color);
   void GetTextSize(const wstring &text, size_t nCount,
                    PtTextFormat &pTextFormat, LPSIZE lpSize);
-  void _SetFontFallback(PtTextFormat textFormat,
-                        const std::vector<std::wstring> &fontVector);
-  void _ParseFontFace(const std::wstring &fontFaceStr,
-                      DWRITE_FONT_WEIGHT &fontWeight,
-                      DWRITE_FONT_STYLE &fontStyle);
+  void SetFontFallback(PtTextFormat textFormat,
+                       const std::vector<std::wstring> &fontVector);
+  void ParseFontFace(const std::wstring &fontFaceStr,
+                     DWRITE_FONT_WEIGHT &fontWeight,
+                     DWRITE_FONT_STYLE &fontStyle,
+                     DWRITE_FONT_STRETCH &fontStretch);
   HRESULT GetBmpFromIcon(HICON hIcon, ComPtr<ID2D1Bitmap1> &pBitmap);
   HRESULT GetIconFromFile(const wstring &iconPath,
                           ComPtr<ID2D1Bitmap1> &pD2DBitmap);
