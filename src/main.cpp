@@ -93,7 +93,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   if (::GetLastError() == ERROR_ALREADY_EXISTS ||
       ::GetLastError() == ERROR_ACCESS_DENIED)
     return 0;
-  HANDLE hDeployerMutex = CreateMutex(NULL, TRUE, L"WeaselDeployerExclusiveMutex");
+  HANDLE hDeployerMutex =
+      CreateMutex(NULL, TRUE, L"WeaselDeployerExclusiveMutex");
   if (::GetLastError() == ERROR_ALREADY_EXISTS ||
       ::GetLastError() == ERROR_ACCESS_DENIED)
     return 0;
