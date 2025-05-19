@@ -658,7 +658,8 @@ static Bool _RimeGetColor(RimeConfig *config, const string key, int &value,
     if (!rime_api->config_get_int(config, key.c_str(), &tmp)) {
       value = fallback;
       return False;
-    }
+    } else
+      value = tmp;
     alpha(value);
   }
   value = ConvertColorToAbgr(value, fmt);
@@ -753,7 +754,8 @@ bool _UpdateUIStyleColor(RimeConfig *config, UIStyle &style, string color) {
     COLOR("label_color", style.label_text_color,
           blend_colors(style.candidate_text_color, style.candidate_back_color));
     COLOR("hilited_label_color", style.hilited_label_text_color,
-          blend_colors(style.candidate_text_color, style.candidate_back_color));
+          blend_colors(style.hilited_candidate_text_color,
+                       style.hilited_candidate_back_color));
     COLOR("comment_text_color", style.comment_text_color,
           style.label_text_color);
     COLOR("hilited_comment_text_color", style.hilited_comment_text_color,
