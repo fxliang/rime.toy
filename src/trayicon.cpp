@@ -29,11 +29,6 @@ TrayIcon::TrayIcon(HINSTANCE hInstance, const std::wstring &tooltip)
   nid.uCallbackMessage = WM_USER + 1;
   wcsncpy_s(nid.szTip, tooltip.c_str(), _countof(nid.szTip) - 1);
   nid.szTip[_countof(nid.szTip) - 1] = L'\0'; // 确保以空字符结尾
-  if (rime_toy_enabled && m_hMutex == NULL) {
-    m_hMutex = CreateMutex(NULL, TRUE, L"WeaselDeployerExclusiveMutex");
-  } else {
-    CloseHandle(m_hMutex);
-  }
 }
 
 TrayIcon::~TrayIcon() {
@@ -201,11 +196,6 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
         refresh_icon();
       else
         SetIcon(icon_error);
-      if (rime_toy_enabled && m_hMutex == NULL) {
-        m_hMutex = CreateMutex(NULL, TRUE, L"WeaselDeployerExclusiveMutex");
-      } else {
-        CloseHandle(m_hMutex);
-      }
       InvalidateRect(hwnd, NULL, true);
     }
     }

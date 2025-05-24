@@ -47,7 +47,6 @@ private:
   vhandler quit_app;
   bool enable_debug;
   bool current_dark_mode;
-  HANDLE m_hMutex;
 
   void CreateContextMenu();
   void CreateHwnd();

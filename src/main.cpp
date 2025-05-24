@@ -93,6 +93,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   if (::GetLastError() == ERROR_ALREADY_EXISTS ||
       ::GetLastError() == ERROR_ACCESS_DENIED)
     return 0;
+  HANDLE hDeployerMutex =
+      CreateMutex(NULL, TRUE, L"WeaselDeployerExclusiveMutex");
+  if (::GetLastError() == ERROR_ALREADY_EXISTS ||
+      ::GetLastError() == ERROR_ACCESS_DENIED)
+    return 0;
   SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
   HR(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED));
   m_toy = std::make_unique<RimeWithToy>(hInstance);
