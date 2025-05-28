@@ -696,4 +696,42 @@ HRESULT D2D::FillGeometry(const CRect &rect, uint32_t color, uint32_t radius,
   }
   return S_OK;
 }
+
+static uint32_t revert_color(uint32_t &color) {
+  // Revert color to D2D1 format
+  uint32_t a = (color >> 24) & 0xFF;
+  uint32_t b = (color >> 16) & 0xFF;
+  uint32_t g = (color >> 8) & 0xFF;
+  uint32_t r = color & 0xFF;
+  uint32_t color_ret =
+      ((255 - r) << 16) | ((255 - g) << 8) | ((255 - b) << 0) | (a << 24);
+  return color_ret;
+}
+
+HRESULT D2D::DrawTextLayout(ComPtr<IDWriteTextLayout> pTextLayout, float x,
+                            float y, uint32_t color, bool shadow) {
+  if (shadow) {
+    SetBrushColor(revert_color(color));
+    ComPtr<ID2D1BitmapRenderTarget> bitmapRenderTarget;
+    HR(dc->CreateCompatibleRenderTarget(&bitmapRenderTarget));
+    bitmapRenderTarget->BeginDraw();
+    bitmapRenderTarget->DrawTextLayout(
+        {x, y}, pTextLayout.Get(), m_pBrush.Get(),
+        D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
+    bitmapRenderTarget->EndDraw();
+    ComPtr<ID2D1Bitmap> bitmap;
+    HR(bitmapRenderTarget->GetBitmap(&bitmap));
+    //// Create a Gaussian blur effect
+    ComPtr<ID2D1Effect> blurEffect;
+    HR(dc->CreateEffect(CLSID_D2D1GaussianBlur, &blurEffect));
+    blurEffect->SetInput(0, bitmap.Get());
+    blurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION, 4.0f);
+    // Draw the blurred rounded rectangle onto the main render target
+    dc->DrawImage(blurEffect.Get());
+    SetBrushColor(color);
+  }
+  dc->DrawTextLayout({x, y}, pTextLayout.Get(), m_pBrush.Get(),
+                     D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
+  return S_OK;
+}
 } // namespace weasel

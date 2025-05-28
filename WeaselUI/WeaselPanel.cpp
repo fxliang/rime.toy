@@ -500,9 +500,7 @@ void WeaselPanel::_TextOut(CRect &rc, const wstring &text, size_t cch,
   if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT && omt.top > 0)
     offsety += omt.top;
 
-  m_pD2D->dc->DrawTextLayout({offsetx, offsety}, pTextLayout.Get(),
-                             m_pD2D->m_pBrush.Get(),
-                             D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
+  m_pD2D->DrawTextLayout(pTextLayout, offsetx, offsety, color, false);
 }
 
 void WeaselPanel::_HighlightRect(const RECT &rect, float radius,

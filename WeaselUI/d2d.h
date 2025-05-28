@@ -60,6 +60,8 @@ struct D2D {
                                      ComPtr<ID2D1PathGeometry> &pPathGeometry);
   HRESULT FillGeometry(const CRect &rect, uint32_t color, uint32_t radius,
                        IsToRoundStruct roundInfo, bool to_blur = false);
+  HRESULT DrawTextLayout(ComPtr<IDWriteTextLayout> pTextLayout, float x,
+                         float y, uint32_t color, bool shadow = false);
   ComPtr<ID3D11Device> direct3dDevice;
   ComPtr<IDXGIDevice> dxgiDevice;
   ComPtr<IDXGIFactory2> dxFactory;
