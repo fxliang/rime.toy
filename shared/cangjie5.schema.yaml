@@ -4,7 +4,7 @@
 schema:
   schema_id: cangjie5
   name: 倉頡五代
-  version: "0.30"
+  version: "1.2.test"
   author:
     - 發明人 朱邦復先生
   description: |
@@ -12,20 +12,23 @@ schema:
     碼表源自倉頡之友發佈的《五倉世紀版》
     www.chinesecj.com
   dependencies:
-    - luna_quanpin
+    - luna_pinyin
 
 switches:
   - name: ascii_mode
     reset: 0
-    states: [ 中文, 西文 ]
+    states: [ 中文, ABC ]
+    abbrev: [ 中, Ａ ]
   - name: full_shape
-    states: [ 半角, 全角 ]
+    states: [ 半寬文字, 全寬文字 ]
   - name: simplification
-    states: [ 漢字, 汉字 ]
+    states: [ 傳統漢字, 简化字 ]
+    abbrev: [ 繁, 简 ]
   - name: extended_charset
-    states: [ 常用, 增廣 ]
+    states: [ 常用字彙, 增廣字彙 ]
   - name: ascii_punct
-    states: [ 。，, ．， ]
+    states: [ 中文標點, 西文標點 ]
+    abbrev: [ '。', '．' ]
 
 engine:
   processors:
@@ -54,8 +57,8 @@ engine:
 
 speller:
   alphabet: zyxwvutsrqponmlkjihgfedcba
-  delimiter: " ;"
-  #max_code_length: 5  # 五碼頂字上屏
+  delimiter: " ;'"
+  #max_code_length: 5
 
 translator:
   dictionary: cangjie5
@@ -75,11 +78,10 @@ translator:
 
 abc_segmentor:
   extra_tags:
-    - reverse_lookup  # 與拼音（反查碼）混打
+    - reverse_lookup
 
 reverse_lookup:
   dictionary: luna_pinyin
-  prism: luna_quanpin
   prefix: "`"
   suffix: "'"
   tips: 〔拼音〕
@@ -90,11 +92,8 @@ reverse_lookup:
   comment_format:
     - "xlit|abcdefghijklmnopqrstuvwxyz|日月金木水火土竹戈十大中一弓人心手口尸廿山女田難卜符|"
 
-simplifier:
-  tips: all  # 簡化字模式下提示對應的傳統漢字
-
 punctuator:
-  import_preset: symbols
+  import_preset: default
 
 key_binder:
   import_preset: default
@@ -102,5 +101,4 @@ key_binder:
 recognizer:
   import_preset: default
   patterns:
-    punct: '^/([0-9]0?|[A-Za-z]+)$'
-    reverse_lookup: "`[a-z]*'?$|[a-z]+'$"
+    reverse_lookup: "`[a-z]*'?$"
