@@ -1,6 +1,6 @@
 param([string]$zipFileName = "rime.toy.zip")
 # 定义要打包的文件和目录
-$itemsToArchive = @("shared", "rime.toy.exe", "rime.toy.pdb", "rime.dll", "rime.pdb", "rime.toy.json", "LICENSE.txt", "README.md")
+$itemsToArchive = @("shared", "rime.toy.exe", "rime.toy.pdb", "rime.dll", "rime.pdb", "rime.toy.json", "restart_rime.toy.bat", "LICENSE.txt", "README.md")
 # 删除已存在的压缩包（如果存在）
 if (Test-Path $zipFileName) {
   Remove-Item $zipFileName

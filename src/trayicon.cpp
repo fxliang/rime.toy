@@ -3,6 +3,7 @@
 #include <resource.h>
 #include <shellapi.h>
 #include <utils.h>
+#include <windows.h>
 #include <winuser.h>
 
 #define MENU_QUIT 1002
@@ -13,6 +14,7 @@
 #define MENU_USER_DIR 1007
 #define MENU_LOG_DIR 1008
 #define MENU_RIME_TOY_EN 1009
+#define MENU_RESTART 1010
 
 bool rime_toy_enabled = true;
 HICON icon_error = LoadIcon(NULL, IDI_ERROR);
@@ -82,6 +84,7 @@ void TrayIcon::CreateContextMenu() {
                MENU_DEBUG, L"调试信息");
     AppendMenu(hMenu, MF_STRING, MENU_SYNC, L"同步数据");
     AppendMenu(hMenu, MF_STRING, MENU_DEPLOY, L"重新部署");
+    AppendMenu(hMenu, MF_STRING, MENU_RESTART, L"重启rime.toy");
     AppendMenu(hMenu, MF_STRING, MENU_QUIT, L"退出");
   }
 }
@@ -198,8 +201,28 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
         SetIcon(icon_error);
       InvalidateRect(hwnd, NULL, true);
     }
+    case MENU_RESTART: {
+      // call restart_rime.toy.bat in the same directory as this exe
+      wchar_t exePath[MAX_PATH];
+      GetModuleFileName(NULL, exePath, MAX_PATH);
+      std::wstring exeDir(exePath);
+      exeDir = exeDir.substr(0, exeDir.find_last_of(L"\\"));
+      std::wstring batPath = exeDir + L"\\restart_rime.toy.bat";
+      if (std::filesystem::exists(batPath)) {
+        STARTUPINFOW si = {sizeof(si)};
+        PROCESS_INFORMATION pi;
+        if (CreateProcessW(batPath.c_str(), NULL, NULL, NULL, FALSE,
+                           CREATE_NO_WINDOW, NULL, exeDir.c_str(), &si, &pi)) {
+          CloseHandle(pi.hProcess);
+          CloseHandle(pi.hThread);
+          exit(0);
+          break;
+        }
+      }
     }
-  } break;
+    }
+    break;
+  }
   }
 }
 
