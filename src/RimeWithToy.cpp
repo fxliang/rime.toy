@@ -1,9 +1,13 @@
 #include "RimeWithToy.h"
 #include "key_table.h"
 #include <filesystem>
+#include <fstream>
 #include <map>
+#include <nlohmann/json.hpp>
 #include <regex>
 #include <resource.h>
+
+using json = nlohmann::json;
 
 #define VERSION_STRING(x) #x
 
@@ -55,11 +59,31 @@ string RimeWithToy::m_message_value;
 string RimeWithToy::m_message_label;
 string RimeWithToy::m_option_name;
 
+static fs::path shared_path, usr_path, log_path;
+
 void RimeWithToy::setup_rime() {
   RIME_STRUCT(RimeTraits, traits);
-  auto shared_path = data_path("shared");
-  auto usr_path = data_path("usr");
-  auto log_path = data_path("log");
+  shared_path = data_path("shared");
+  usr_path = data_path("usr");
+  log_path = data_path("log");
+  auto json_file = data_path("rime.toy.json");
+  if (fs::exists(json_file)) {
+    // read rime.toy.json to get shared_path, usr_path, log_path
+    try {
+      std::ifstream ifs(json_file);
+      json j;
+      ifs >> j;
+      if (j.contains("shared_data_dir"))
+        shared_path = fs::absolute(j["shared_data_dir"].get<std::string>());
+      if (j.contains("user_data_dir")) {
+        usr_path = fs::absolute(j["user_data_dir"].get<std::string>());
+      }
+      if (j.contains("log_dir"))
+        log_path = fs::absolute(j["log_dir"].get<std::string>());
+    } catch (const std::exception &e) {
+      DEBUG << "Failed to read rime.toy.json: " << e.what();
+    }
+  }
   if (!fs::exists(shared_path))
     fs::create_directory(shared_path);
   if (!fs::exists(usr_path))
@@ -152,9 +176,9 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance)
     if (m_ui)
       m_ui->Refresh();
   });
-  m_trayIcon->SetOpenSharedDirFunc([&]() { OPEN("shared"); });
-  m_trayIcon->SetOpenUserdDirFunc([&]() { OPEN("usr"); });
-  m_trayIcon->SetOpenLogDirFunc([&]() { OPEN("log"); });
+  m_trayIcon->SetOpenSharedDirFunc([&]() { OPEN(shared_path.string()); });
+  m_trayIcon->SetOpenUserdDirFunc([&]() { OPEN(usr_path.string()); });
+  m_trayIcon->SetOpenLogDirFunc([&]() { OPEN(log_path.string()); });
   m_trayIcon->SetSyncFunc([&]() {
     m_disabled = true;
     m_trayIcon->SetIcon(m_reload_icon);

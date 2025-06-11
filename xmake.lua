@@ -13,6 +13,8 @@ target(project_name)
   "dwrite", 'dxgi', 'd3d11', 'dcomp', "oleaut32", "uiautomationcore", "ole32",
   "oleacc", "imm32", "advapi32")
   add_deps('WeaselUI')
+  add_requires("nlohmann_json")
+  add_packages("nlohmann_json")
   if is_plat('windows') then
     add_cxflags("/utf-8")
     add_cxflags("/Zi")
