@@ -77,7 +77,7 @@ jobs:
       - name: Build rime.toy
         id: build_rime_toy
         run: |
-          xmake f -a ${{ matrix.arch }} && xmake
+          xmake f -a ${{ matrix.arch }} -y && xmake -y
 
       - name: Compress zip
         run: |
