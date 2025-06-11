@@ -29,6 +29,7 @@ typedef enum { COLOR_ABGR = 0, COLOR_ARGB, COLOR_RGBA } ColorFormat;
 #endif
 
 static RimeApi *rime_api = nullptr;
+PositionType position_type = PositionType::kMousePos;
 
 #define OPEN(x)                                                                \
   ShellExecute(nullptr, _T("open"), data_path(x).c_str(), NULL, NULL,          \
@@ -80,6 +81,25 @@ void RimeWithToy::setup_rime() {
       }
       if (j.contains("log_dir"))
         log_path = fs::absolute(j["log_dir"].get<std::string>());
+      if (j.contains("position_type")) {
+        auto pos_type = j["position_type"].get<std::string>();
+        if (pos_type == "top_center")
+          position_type = PositionType::kTopCenter;
+        else if (pos_type == "top_left")
+          position_type = PositionType::kTopLeft;
+        else if (pos_type == "top_right")
+          position_type = PositionType::kTopRight;
+        else if (pos_type == "bottom_left")
+          position_type = PositionType::kBottomLeft;
+        else if (pos_type == "bottom_right")
+          position_type = PositionType::kBottomRight;
+        else if (pos_type == "bottom_center")
+          position_type = PositionType::kBottomCenter;
+        else if (pos_type == "center")
+          position_type = PositionType::kCenter;
+        else
+          position_type = PositionType::kMousePos;
+      }
     } catch (const std::exception &e) {
       DEBUG << "Failed to read rime.toy.json: " << e.what();
     }

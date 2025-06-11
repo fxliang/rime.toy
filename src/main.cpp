@@ -13,6 +13,7 @@ using namespace weasel;
 HHOOK hKeyboardHook = NULL;
 HHOOK hMouseHook = NULL;
 std::unique_ptr<RimeWithToy> m_toy;
+extern PositionType position_type;
 
 void update_position(HWND hwnd) {
   POINT pt;
@@ -22,6 +23,43 @@ void update_position(HWND hwnd) {
       GetWindowRect(hwnd, &rect);
     pt.x = rect.left + (rect.right - rect.left) / 2 - 150;
     pt.y = rect.bottom - (rect.bottom - rect.top) / 2 - 100;
+  }
+  if (position_type != PositionType::kMousePos) {
+    HMONITOR hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO mi;
+    RECT rcWork;
+    mi.cbSize = sizeof(MONITORINFO);
+    HWND panel = m_toy->UIHwnd();
+    RECT rcPanel;
+    if (panel)
+      GetWindowRect(panel, &rcPanel);
+    if (GetMonitorInfo(hMonitor, &mi)) {
+      rcWork = mi.rcWork;
+      int panelWidth = rcPanel.right - rcPanel.left;
+      if (position_type == PositionType::kTopLeft) {
+        pt.x = rcWork.left;
+        pt.y = rcWork.top;
+      } else if (position_type == PositionType::kTopCenter) {
+        pt.x = rcWork.left + (rcWork.right - rcWork.left - panelWidth) / 2;
+        pt.y = rcWork.top;
+      } else if (position_type == PositionType::kTopRight) {
+        pt.x = rcWork.right;
+        pt.y = rcWork.top;
+      } else if (position_type == PositionType::kBottomLeft) {
+        pt.x = rcWork.left;
+        pt.y = rcWork.bottom;
+      } else if (position_type == PositionType::kBottomCenter) {
+        pt.x = rcWork.left + (rcWork.right - rcWork.left - panelWidth) / 2;
+        pt.y = rcWork.bottom;
+      } else if (position_type == PositionType::kBottomRight) {
+        pt.x = rcWork.right;
+        pt.y = rcWork.bottom;
+      } else if (position_type == PositionType::kCenter) {
+        int panelHeight = rcPanel.bottom - rcPanel.top;
+        pt.x = rcWork.left + (rcWork.right - rcWork.left - panelWidth) / 2;
+        pt.y = rcWork.top + (rcWork.bottom - rcWork.top - panelHeight) / 2;
+      }
+    }
   }
   m_toy->UpdateInputPosition({pt.x, 0, 0, pt.y});
 };

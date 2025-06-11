@@ -1,4 +1,6 @@
 {
   "shared_data_dir": "shared",
-  "user_data_dir": "usr"
+  "user_data_dir": "usr",
+  "log_dir": "log",
+  "position_type": "mouse"
 }

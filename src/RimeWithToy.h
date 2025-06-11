@@ -9,6 +9,17 @@
 #include <rime_api.h>
 #include <utils.h>
 
+enum class PositionType {
+  kMousePos,
+  kCenter,
+  kTopLeft,
+  kTopCenter,
+  kTopRight,
+  kBottomLeft,
+  kBottomCenter,
+  kBottomRight
+};
+
 namespace weasel {
 
 class RimeWithToy {
