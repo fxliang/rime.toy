@@ -9,7 +9,7 @@ if (Test-Path $zipFileName) {
 # 打包文件和目录
 foreach ($item in $itemsToArchive) {
   if (Test-Path $item) {
-    Compress-Archive -Path $item -Update -DestinationPath $zipFileName -Update
+    Compress-Archive -Path $item -Update -DestinationPath $zipFileName
   } else {
     Write-Host "Warning: $item does not exist and will not be included in the archive."
   }
@@ -17,7 +17,7 @@ foreach ($item in $itemsToArchive) {
 $pdbZipFileName = [System.IO.Path]::ChangeExtension($zipFileName, ".pdbs.zip")
 foreach ($pdbFile in $pdbFiles) {
   if (Test-Path $pdbFile) {
-    Compress-Archive -Path $pdbFile -Update -DestinationPath $pdbZipFileName -Update
+    Compress-Archive -Path $pdbFile -Update -DestinationPath $pdbZipFileName
   } else {
     Write-Host "Warning: $pdbFile does not exist and will not be included in the PDB archive."
   }
