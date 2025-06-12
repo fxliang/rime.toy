@@ -87,7 +87,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rime.toy.${{ matrix.arch }}
-          path: ./rime.toy.${{ matrix.arch }}.zip
+          path: |
+            ./rime.toy.${{ matrix.arch }}.zip
+            ./rime.toy.${{ matrix.arch }}.pdbs.zip
 
   create_release:
     needs: build
@@ -118,4 +120,6 @@ jobs:
           title: "Nightly Build"
           files: |
             ./artifacts/rime.toy.x64.zip
+            ./artifacts/rime.toy.x64.pdbs.zip
             ./artifacts/rime.toy.x86.zip
+            ./artifacts/rime.toy.x86.pdbs.zip
