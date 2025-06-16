@@ -200,6 +200,7 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
       else
         SetIcon(icon_error);
       InvalidateRect(hwnd, NULL, true);
+      break;
     }
     case MENU_RESTART: {
       // call restart_rime.toy.bat in the same directory as this exe
@@ -216,9 +217,9 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
           CloseHandle(pi.hProcess);
           CloseHandle(pi.hThread);
           exit(0);
-          break;
         }
       }
+      break;
     }
     }
     break;
