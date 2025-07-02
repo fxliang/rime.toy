@@ -25,6 +25,7 @@ public:
   void SetSyncFunc(const vhandler &func) { sync_data = func; }
   void SetRefreshIconFunc(const vhandler &func) { refresh_icon = func; }
   void SetQuitHandler(const vhandler &func) { quit_app = func; }
+  void RefreshIcon();
   bool debug() { return enable_debug; }
   void ShowBalloonTip(const std::wstring &title, const std::wstring &message,
                       DWORD timeout = 1000);

@@ -195,10 +195,7 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
       if (hMenu)
         CheckMenuItem(hMenu, MENU_RIME_TOY_EN,
                       rime_toy_enabled ? MF_CHECKED : MF_UNCHECKED);
-      if (rime_toy_enabled && refresh_icon)
-        refresh_icon();
-      else
-        SetIcon(icon_error);
+      RefreshIcon();
       InvalidateRect(hwnd, NULL, true);
       break;
     }
@@ -225,6 +222,13 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
     break;
   }
   }
+}
+
+void TrayIcon::RefreshIcon() {
+  if (rime_toy_enabled && refresh_icon)
+    refresh_icon();
+  else
+    SetIcon(icon_error);
 }
 
 LRESULT CALLBACK TrayIcon::WndProc(HWND hwnd, UINT msg, WPARAM wParam,

@@ -186,7 +186,7 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance)
     Finalize();
     Initialize();
     BOOL ascii = rime_api->get_option(m_session_id, "ascii_mode");
-    m_trayIcon->SetIcon(ascii ? m_ascii_icon : m_ime_icon);
+    m_trayIcon->RefreshIcon();
     m_disabled = false;
   });
   m_trayIcon->SetSwichAsciiFunc([&]() { SwitchAsciiMode(); });
