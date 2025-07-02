@@ -18,7 +18,7 @@ on:
 
 jobs:
   lint:
-    runs-on: windows-2019
+    runs-on: windows-latest
     steps:
       - name: Checkout last commit
         uses: actions/checkout@v4
@@ -52,7 +52,7 @@ jobs:
 
   build:
     needs: lint
-    runs-on: windows-2019
+    runs-on: windows-latest
     strategy:
       matrix:
         arch: [x64, x86]
@@ -93,7 +93,7 @@ jobs:
 
   create_release:
     needs: build
-    runs-on: windows-2019
+    runs-on: windows-latest
     steps:
       - name: Checkout last commit
         uses: actions/checkout@v4
