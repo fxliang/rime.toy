@@ -18,11 +18,12 @@ target(project_name)
   if is_plat('windows') then
     add_cxflags("/utf-8")
     add_cxflags("/Zi")
-    add_cxflags("-Fd$(buildir)/$(targetname).pdb")
     add_cxflags("/FS")
+    add_cxflags("-Fd$(buildir)/$(targetname).pdb")
     add_ldflags("/DEBUG", {force = true})
     add_ldflags("/SUBSYSTEM:WINDOWS")
   elseif is_plat('mingw') then
+    add_cxflags("-g", {force = true})
     add_ldflags('-static-libgcc -static-libstdc++ -static', {force=true})
     add_ldflags("-municode -mwindows", {force = true})
   end
