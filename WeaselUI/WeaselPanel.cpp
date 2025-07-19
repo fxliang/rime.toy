@@ -489,6 +489,14 @@ void WeaselPanel::_TextOut(CRect &rc, const wstring &text, size_t cch,
       text.c_str(), cch, pTextFormat.Get(), rc.Width(), rc.Height(),
       reinterpret_cast<IDWriteTextLayout **>(pTextLayout.GetAddressOf()));
   if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
+    DWRITE_FLOW_DIRECTION flow = m_style.vertical_text_left_to_right
+                                     ? DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
+                                     : DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT;
+    pTextLayout->SetReadingDirection(DWRITE_READING_DIRECTION_TOP_TO_BOTTOM);
+    pTextLayout->SetFlowDirection(flow);
+  } else {
+    pTextLayout->SetReadingDirection(DWRITE_READING_DIRECTION_LEFT_TO_RIGHT);
+    pTextLayout->SetFlowDirection(DWRITE_FLOW_DIRECTION_TOP_TO_BOTTOM);
   }
   float offsetx = (float)rc.left;
   float offsety = (float)rc.top;
@@ -501,6 +509,11 @@ void WeaselPanel::_TextOut(CRect &rc, const wstring &text, size_t cch,
     offsety += omt.top;
 
   m_pD2D->DrawTextLayout(pTextLayout, offsetx, offsety, color, false);
+  // draw rectangle for debug
+  // m_pD2D->dc->DrawRectangle(
+  //     D2D1::RectF((float)rc.left, (float)rc.top, (float)rc.right,
+  //                 (float)rc.bottom),
+  //     m_pD2D->m_pBrush.Get(), 1.0f); // 1.0f is the border width
 }
 
 void WeaselPanel::_HighlightRect(const RECT &rect, float radius,

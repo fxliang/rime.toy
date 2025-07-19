@@ -596,10 +596,6 @@ HRESULT
 D2D::CreateRoundedRectanglePath(const RECT &rc, float radius,
                                 const IsToRoundStruct &roundInfo,
                                 ComPtr<ID2D1PathGeometry> &pPathGeometry) {
-  D2D1_RECT_F rectf{(float)rc.left, (float)rc.top, (float)rc.right,
-                    (float)rc.bottom};
-  radius = MIN(radius, (rc.right - rc.left) / 2.0f);
-  radius = MIN(radius, (rc.bottom - rc.top) / 2.0f);
 #define PT2F(x, y) D2D1::Point2F(x, y)
   // 创建路径几何对象
   HRESULT hr =
@@ -610,53 +606,67 @@ D2D::CreateRoundedRectanglePath(const RECT &rc, float radius,
   hr = pPathGeometry->Open(pSink.ReleaseAndGetAddressOf());
   FAILEDACTION(hr, return hr);
   pSink->SetFillMode(D2D1_FILL_MODE_WINDING);
-  const float good_radius = 0.382f * radius;
-  // 从左上角开始
-  if (roundInfo.IsTopLeftNeedToRound) {
-    pSink->BeginFigure(PT2F(rectf.left + radius, rectf.top),
+  // if radius is 0, return a rectangle path
+  if (radius <= 0.0f) {
+    pSink->BeginFigure(D2D1::Point2F((float)rc.left, (float)rc.top),
                        D2D1_FIGURE_BEGIN_FILLED);
-  } else
-    pSink->BeginFigure(PT2F(rectf.left, rectf.top), D2D1_FIGURE_BEGIN_FILLED);
-  // 顶边
-  pSink->AddLine(PT2F(rectf.right - radius, rectf.top));
-  // 右上角圆角
-  if (roundInfo.IsTopRightNeedToRound) {
-    D2D1_BEZIER_SEGMENT seg{PT2F(rectf.right - good_radius, rectf.top),
-                            PT2F(rectf.right, rectf.top + good_radius),
-                            PT2F(rectf.right, rectf.top + radius)};
-    pSink->AddBezier(seg);
-  } else
-    pSink->AddLine(PT2F(rectf.right, rectf.top));
-  // 右边
-  pSink->AddLine(PT2F(rectf.right, rectf.bottom - radius));
-  // 右下角圆角
-  if (roundInfo.IsBottomRightNeedToRound) {
-    D2D1_BEZIER_SEGMENT seg{PT2F(rectf.right, rectf.bottom - good_radius),
-                            PT2F(rectf.right - good_radius, rectf.bottom),
-                            PT2F(rectf.right - radius, rectf.bottom)};
-    pSink->AddBezier(seg);
-  } else
-    pSink->AddLine(PT2F(rectf.right, rectf.bottom));
-  // 底边
-  pSink->AddLine(PT2F(rectf.left + radius, rectf.bottom));
-  // 左下角圆角
-  if (roundInfo.IsBottomLeftNeedToRound) {
-    D2D1_BEZIER_SEGMENT seg{PT2F(rectf.left + good_radius, rectf.bottom),
-                            PT2F(rectf.left, rectf.bottom - good_radius),
-                            PT2F(rectf.left, rectf.bottom - radius)};
-    pSink->AddBezier(seg);
-  } else
-    pSink->AddLine(PT2F(rectf.left, rectf.bottom));
-  // 左边
-  pSink->AddLine(PT2F(rectf.left, rectf.top + radius));
-  // 左上角圆角
-  if (roundInfo.IsTopLeftNeedToRound) {
-    D2D1_BEZIER_SEGMENT seg{PT2F(rectf.left, rectf.top + good_radius),
-                            PT2F(rectf.left + good_radius, rectf.top),
-                            PT2F(rectf.left + radius, rectf.top)};
-    pSink->AddBezier(seg);
+    pSink->AddLine(D2D1::Point2F((float)rc.right, (float)rc.top));
+    pSink->AddLine(D2D1::Point2F((float)rc.right, (float)rc.bottom));
+    pSink->AddLine(D2D1::Point2F((float)rc.left, (float)rc.bottom));
+    pSink->AddLine(D2D1::Point2F((float)rc.left, (float)rc.top));
   } else {
-    pSink->AddLine(PT2F(rectf.left, rectf.top));
+    D2D1_RECT_F rectf{(float)rc.left, (float)rc.top, (float)rc.right,
+                      (float)rc.bottom};
+    radius = MIN(radius, (rc.right - rc.left) / 2.0f);
+    radius = MIN(radius, (rc.bottom - rc.top) / 2.0f);
+    const float good_radius = 0.382f * radius;
+    // 从左上角开始
+    if (roundInfo.IsTopLeftNeedToRound) {
+      pSink->BeginFigure(PT2F(rectf.left + radius, rectf.top),
+                         D2D1_FIGURE_BEGIN_FILLED);
+    } else
+      pSink->BeginFigure(PT2F(rectf.left, rectf.top), D2D1_FIGURE_BEGIN_FILLED);
+    // 顶边
+    pSink->AddLine(PT2F(rectf.right - radius, rectf.top));
+    // 右上角圆角
+    if (roundInfo.IsTopRightNeedToRound) {
+      D2D1_BEZIER_SEGMENT seg{PT2F(rectf.right - good_radius, rectf.top),
+                              PT2F(rectf.right, rectf.top + good_radius),
+                              PT2F(rectf.right, rectf.top + radius)};
+      pSink->AddBezier(seg);
+    } else
+      pSink->AddLine(PT2F(rectf.right, rectf.top));
+    // 右边
+    pSink->AddLine(PT2F(rectf.right, rectf.bottom - radius));
+    // 右下角圆角
+    if (roundInfo.IsBottomRightNeedToRound) {
+      D2D1_BEZIER_SEGMENT seg{PT2F(rectf.right, rectf.bottom - good_radius),
+                              PT2F(rectf.right - good_radius, rectf.bottom),
+                              PT2F(rectf.right - radius, rectf.bottom)};
+      pSink->AddBezier(seg);
+    } else
+      pSink->AddLine(PT2F(rectf.right, rectf.bottom));
+    // 底边
+    pSink->AddLine(PT2F(rectf.left + radius, rectf.bottom));
+    // 左下角圆角
+    if (roundInfo.IsBottomLeftNeedToRound) {
+      D2D1_BEZIER_SEGMENT seg{PT2F(rectf.left + good_radius, rectf.bottom),
+                              PT2F(rectf.left, rectf.bottom - good_radius),
+                              PT2F(rectf.left, rectf.bottom - radius)};
+      pSink->AddBezier(seg);
+    } else
+      pSink->AddLine(PT2F(rectf.left, rectf.bottom));
+    // 左边
+    pSink->AddLine(PT2F(rectf.left, rectf.top + radius));
+    // 左上角圆角
+    if (roundInfo.IsTopLeftNeedToRound) {
+      D2D1_BEZIER_SEGMENT seg{PT2F(rectf.left, rectf.top + good_radius),
+                              PT2F(rectf.left + good_radius, rectf.top),
+                              PT2F(rectf.left + radius, rectf.top)};
+      pSink->AddBezier(seg);
+    } else {
+      pSink->AddLine(PT2F(rectf.left, rectf.top));
+    }
   }
   // 闭合路径
   pSink->EndFigure(D2D1_FIGURE_END_CLOSED);
