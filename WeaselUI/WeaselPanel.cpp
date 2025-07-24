@@ -562,7 +562,9 @@ void WeaselPanel::_Reposition() {
   }
   CRect rcWindow;
   GetWindowRect(m_hWnd, &rcWindow);
-  rcWorkArea.right -= rcWindow.Width();
+  if (!(m_style.layout_type == UIStyle::LAYOUT_VERTICAL &&
+        !m_style.vertical_text_left_to_right))
+    rcWorkArea.right -= rcWindow.Width();
   rcWorkArea.bottom -= rcWindow.Height();
   int x = m_inputPos.left;
   int y = m_inputPos.bottom;
@@ -580,9 +582,9 @@ void WeaselPanel::_Reposition() {
                    m_style.layout_type == UIStyle::LAYOUT_VERTICAL);
     y = rcWorkArea.bottom;
   }
-  if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT &&
-      !m_style.vertical_text_left_to_right)
-    x -= rcWindow.Width();
+  // if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT &&
+  //     !m_style.vertical_text_left_to_right && x > rcWorkArea.left)
+  //   x -= rcWindow.Width();
 #define LIMIT(p, min, max)                                                     \
   if (p < min)                                                                 \
     p = min;                                                                   \
