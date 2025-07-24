@@ -580,11 +580,16 @@ void WeaselPanel::_Reposition() {
                    m_style.layout_type == UIStyle::LAYOUT_VERTICAL);
     y = rcWorkArea.bottom;
   }
-  if (y < rcWorkArea.top)
-    y = rcWorkArea.top;
   if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT &&
       !m_style.vertical_text_left_to_right)
     x -= rcWindow.Width();
+#define LIMIT(p, min, max)                                                     \
+  if (p < min)                                                                 \
+    p = min;                                                                   \
+  if (p > max)                                                                 \
+    p = max;
+  LIMIT(x, rcWorkArea.left, rcWorkArea.right);
+  LIMIT(y, rcWorkArea.top, rcWorkArea.bottom);
   m_inputPos.bottom = y;
 
   SetWindowPos(m_hWnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
