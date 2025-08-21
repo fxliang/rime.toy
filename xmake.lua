@@ -19,7 +19,7 @@ target(project_name)
     add_cxflags("/utf-8")
     add_cxflags("/Zi")
     add_cxflags("/FS")
-    add_cxflags("-Fd$(buildir)/$(targetname).pdb")
+    add_cxflags("-Fd$(builddir)/$(targetname).pdb")
     add_ldflags("/DEBUG", {force = true})
     add_ldflags("/SUBSYSTEM:WINDOWS")
   elseif is_plat('mingw') then
