@@ -179,7 +179,7 @@ BOOL WeaselPanel::Create(HWND parent) {
 }
 
 void WeaselPanel::DoPaint() {
-  if (!m_pD2D)
+  if (!m_pD2D || !m_layout)
     return;
   auto hr = m_pD2D->direct3dDevice->GetDeviceRemovedReason();
   FAILEDACTION(hr, DEBUG << StrzHr(hr), m_pD2D->InitDirect2D());
