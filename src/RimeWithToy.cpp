@@ -111,10 +111,8 @@ void RimeWithToy::setup_rime() {
                 return;
               m_disabled = true;
               m_trayIcon->SetIcon(m_reload_icon);
-              self_monitor_updating = true;
               Finalize();
               Initialize();
-              self_monitor_updating = false;
               BOOL ascii = rime_api->get_option(m_session_id, "ascii_mode");
               m_trayIcon->SetIcon(ascii ? m_ascii_icon : m_ime_icon);
               m_disabled = false;
@@ -204,7 +202,7 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance)
   m_reload_icon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_RELOAD));
   m_trayIcon->SetIcon(m_reload_icon);
   m_trayIcon->Show();
-  Initialize();
+  Initialize(true);
   m_trayIcon->SetDeployFunc([&]() {
     DEBUGIF(m_trayIcon->debug()) << L"Deploy Menu clicked";
     DEBUGIF(m_disabled) << "Deploy job running, skip this request";
@@ -256,9 +254,9 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance)
     });
 }
 
-void RimeWithToy::Initialize() {
+void RimeWithToy::Initialize(bool first_time) {
   DEBUGIF(m_trayIcon->debug()) << L"RimeWithToy::Initialize() called";
-  if (!self_monitor_updating)
+  if (first_time)
     setup_rime();
   m_disabled = true;
   rime_api->initialize(NULL);

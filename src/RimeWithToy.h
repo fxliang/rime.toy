@@ -114,7 +114,7 @@ class RimeWithToy {
 public:
   RimeWithToy(HINSTANCE hInstance);
   ~RimeWithToy();
-  void Initialize();
+  void Initialize(bool first_time = false);
   void Finalize();
   BOOL ProcessKeyEvent(KeyEvent keyEvent);
   void UpdateUI();
