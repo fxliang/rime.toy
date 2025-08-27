@@ -1,6 +1,5 @@
 #include "RimeWithToy.h"
 #include "key_table.h"
-#include <filesystem>
 #include <fstream>
 #include <map>
 #include <nlohmann/json.hpp>
@@ -61,6 +60,7 @@ string RimeWithToy::m_message_label;
 string RimeWithToy::m_option_name;
 
 static fs::path shared_path, usr_path, log_path;
+static bool self_monitor_updating = false;
 
 void RimeWithToy::setup_rime() {
   RIME_STRUCT(RimeTraits, traits);
@@ -75,14 +75,14 @@ void RimeWithToy::setup_rime() {
       json j;
       ifs >> j;
       if (j.contains("shared_data_dir"))
-        shared_path = fs::absolute(j["shared_data_dir"].get<std::string>());
+        shared_path = fs::absolute(j["shared_data_dir"].get<string>());
       if (j.contains("user_data_dir")) {
-        usr_path = fs::absolute(j["user_data_dir"].get<std::string>());
+        usr_path = fs::absolute(j["user_data_dir"].get<string>());
       }
       if (j.contains("log_dir"))
-        log_path = fs::absolute(j["log_dir"].get<std::string>());
+        log_path = fs::absolute(j["log_dir"].get<string>());
       if (j.contains("position_type")) {
-        auto pos_type = j["position_type"].get<std::string>();
+        auto pos_type = j["position_type"].get<string>();
         if (pos_type == "top_center")
           position_type = PositionType::kTopCenter;
         else if (pos_type == "top_left")
@@ -99,6 +99,29 @@ void RimeWithToy::setup_rime() {
           position_type = PositionType::kCenter;
         else
           position_type = PositionType::kMousePos;
+      }
+      if (j.contains("watch_files")) {
+        // read watch_files array to vector<string>
+        auto files = j["watch_files"].get<std::vector<string>>();
+        m_file_monitor = std::make_unique<SimpleFileMonitor>(
+            files, [&](const path &file_path) -> void {
+              DEBUGIF(m_trayIcon->debug())
+                  << file_path << " file changed, redeploying";
+              if (m_disabled)
+                return;
+              m_disabled = true;
+              m_trayIcon->SetIcon(m_reload_icon);
+              self_monitor_updating = true;
+              Finalize();
+              Initialize();
+              self_monitor_updating = false;
+              BOOL ascii = rime_api->get_option(m_session_id, "ascii_mode");
+              m_trayIcon->SetIcon(ascii ? m_ascii_icon : m_ime_icon);
+              m_disabled = false;
+            });
+        // init m_monitor_thread
+        m_monitor_thread =
+            std::thread([&]() { m_file_monitor->startMonitoring(2); });
       }
     } catch (const std::exception &e) {
       DEBUG << "Failed to read rime.toy.json: " << e.what();
@@ -166,6 +189,12 @@ void RimeWithToy::BalloonMsg(const string &msg) {
   m_trayIcon->ShowBalloonTip(L"rime.toy", u8tow(msg), 500);
 }
 
+RimeWithToy::~RimeWithToy() {
+  m_file_monitor->stopMonitoring();
+  if (m_monitor_thread.joinable())
+    m_monitor_thread.join();
+}
+
 RimeWithToy::RimeWithToy(HINSTANCE hInstance)
     : m_hInstance(hInstance), m_disabled(false) {
   rime_api = rime_get_api();
@@ -229,7 +258,8 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance)
 
 void RimeWithToy::Initialize() {
   DEBUGIF(m_trayIcon->debug()) << L"RimeWithToy::Initialize() called";
-  setup_rime();
+  if (!self_monitor_updating)
+    setup_rime();
   m_disabled = true;
   rime_api->initialize(NULL);
   if (rime_api->start_maintenance(true))
@@ -412,7 +442,7 @@ void RimeWithToy::GetContext(Context &context, const Status &status) {
       case UIStyle::PreeditType::PREVIEW_ALL: {
         CandidateInfo cinfo;
         GetCandidateInfo(cinfo, ctx);
-        std::string topush = string(ctx.composition.preedit) + "  [";
+        string topush = string(ctx.composition.preedit) + "  [";
         auto &candies = ctx.menu.candidates;
         auto hilite = ctx.menu.highlighted_candidate_index;
         for (auto i = 0; i < ctx.menu.num_candidates; i++) {
@@ -560,7 +590,7 @@ void RimeWithToy::_LoadSchemaSpecificSettings(RimeSessionId id,
   const int BUF_SIZE = 255;
   char buffer[BUF_SIZE + 1] = {0};
   const auto update_color_scheme = [&]() {
-    std::string color_name(buffer);
+    string color_name(buffer);
     RimeConfigIterator preset = {0};
     if (rime_api->config_begin_map(
             &preset, &config, ("preset_color_schemes/" + color_name).c_str())) {
