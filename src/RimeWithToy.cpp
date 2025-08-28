@@ -34,18 +34,16 @@ PositionType position_type = PositionType::kMousePos;
   ShellExecute(nullptr, _T("open"), data_path(x).c_str(), NULL, NULL,          \
                SW_SHOWNORMAL);
 
-namespace fs = std::filesystem;
-
 int expand_ibus_modifier(int m) { return (m & 0xff) | ((m & 0xff00) << 16); }
 
 namespace weasel {
 
 bool _UpdateUIStyleColor(RimeConfig *config, UIStyle &style, string color);
 
-static fs::path data_path(string subdir) {
+static path data_path(string subdir) {
   wchar_t _path[MAX_PATH] = {0};
   GetModuleFileNameW(NULL, _path, _countof(_path));
-  return fs::path(_path).remove_filename().append(subdir);
+  return path(_path).remove_filename().append(subdir);
 }
 
 static wstring GetLabelText(const wstring label, const wchar_t *format) {
@@ -59,8 +57,8 @@ string RimeWithToy::m_message_value;
 string RimeWithToy::m_message_label;
 string RimeWithToy::m_option_name;
 
-static fs::path shared_path, usr_path, log_path;
-static bool self_monitor_updating = false;
+static path shared_path, usr_path, log_path;
+#define CONDDEBUG DEBUGIF(m_trayIcon->debug())
 
 void RimeWithToy::setup_rime() {
   RIME_STRUCT(RimeTraits, traits);
@@ -101,42 +99,32 @@ void RimeWithToy::setup_rime() {
           position_type = PositionType::kMousePos;
       }
       if (j.contains("watch_files")) {
-        // read watch_files array to vector<string>
-        auto files = j["watch_files"].get<std::vector<string>>();
-        m_file_monitor = std::make_unique<SimpleFileMonitor>(
-            files, [&](const path &file_path) -> void {
-              DEBUGIF(m_trayIcon->debug())
-                  << file_path << " file changed, redeploying";
-              if (m_disabled)
-                return;
-              m_disabled = true;
-              m_trayIcon->SetIcon(m_reload_icon);
-              Finalize();
-              Initialize();
-              BOOL ascii = rime_api->get_option(m_session_id, "ascii_mode");
-              m_trayIcon->SetIcon(ascii ? m_ascii_icon : m_ime_icon);
-              m_disabled = false;
-            });
-        // init m_monitor_thread
-        m_monitor_thread =
-            std::thread([&]() { m_file_monitor->startMonitoring(2); });
+        const auto files = j["watch_files"].get<std::vector<string>>();
+        if (m_file_monitor) {
+          m_file_monitor->SetWatchFiles(files);
+        } else {
+          m_file_monitor = std::make_unique<SimpleFileMonitor>(
+              files, [&](const path &file_path) -> void {
+                CONDDEBUG << file_path << " file changed, redeploying";
+                m_trayIcon->Deploy();
+              });
+        }
       }
     } catch (const std::exception &e) {
       DEBUG << "Failed to read rime.toy.json: " << e.what();
     }
   }
-  if (!fs::exists(shared_path))
-    fs::create_directory(shared_path);
-  if (!fs::exists(usr_path))
-    fs::create_directory(usr_path);
-  if (!fs::exists(log_path))
-    fs::create_directory(log_path);
-  DEBUGIF(m_trayIcon->debug())
-      << "shared_path: " << shared_path << ", usr_path: " << usr_path
-      << ", log_path: " << log_path;
-  static auto shared_dir = shared_path.u8string();
-  static auto usr_dir = usr_path.u8string();
-  static auto log_dir = log_path.u8string();
+#define CREATE_DIR_IF_NOT_EXIST(p)                                             \
+  if (!fs::exists(p))                                                          \
+  fs::create_directory(p)
+  CREATE_DIR_IF_NOT_EXIST(shared_path);
+  CREATE_DIR_IF_NOT_EXIST(usr_path);
+  CREATE_DIR_IF_NOT_EXIST(log_path);
+  CONDDEBUG << "shared_path: " << shared_path << ", usr_path: " << usr_path
+            << ", log_path: " << log_path;
+  const auto shared_dir = shared_path.u8string();
+  const auto usr_dir = usr_path.u8string();
+  const auto log_dir = log_path.u8string();
   traits.shared_data_dir = reinterpret_cast<const char *>(shared_dir.c_str());
   traits.user_data_dir = reinterpret_cast<const char *>(usr_dir.c_str());
   traits.log_dir = reinterpret_cast<const char *>(log_dir.c_str());
@@ -187,12 +175,6 @@ void RimeWithToy::BalloonMsg(const string &msg) {
   m_trayIcon->ShowBalloonTip(L"rime.toy", u8tow(msg), 500);
 }
 
-RimeWithToy::~RimeWithToy() {
-  m_file_monitor->stopMonitoring();
-  if (m_monitor_thread.joinable())
-    m_monitor_thread.join();
-}
-
 RimeWithToy::RimeWithToy(HINSTANCE hInstance)
     : m_hInstance(hInstance), m_disabled(false) {
   rime_api = rime_get_api();
@@ -202,9 +184,9 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance)
   m_reload_icon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_RELOAD));
   m_trayIcon->SetIcon(m_reload_icon);
   m_trayIcon->Show();
-  Initialize(true);
+  Initialize();
   m_trayIcon->SetDeployFunc([&]() {
-    DEBUGIF(m_trayIcon->debug()) << L"Deploy Menu clicked";
+    CONDDEBUG << L"Deploy Menu clicked";
     DEBUGIF(m_disabled) << "Deploy job running, skip this request";
     if (m_disabled)
       return;
@@ -229,7 +211,7 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance)
   m_trayIcon->SetSyncFunc([&]() {
     m_disabled = true;
     m_trayIcon->SetIcon(m_reload_icon);
-    DEBUGIF(m_trayIcon->debug()) << L"Sync Menu clicked";
+    CONDDEBUG << L"Sync Menu clicked";
     if (!rime_api->sync_user_data())
       BalloonMsg("同步用户数据失败");
     Initialize();
@@ -254,10 +236,9 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance)
     });
 }
 
-void RimeWithToy::Initialize(bool first_time) {
-  DEBUGIF(m_trayIcon->debug()) << L"RimeWithToy::Initialize() called";
-  if (first_time)
-    setup_rime();
+void RimeWithToy::Initialize() {
+  CONDDEBUG << L"RimeWithToy::Initialize() called";
+  setup_rime();
   m_disabled = true;
   rime_api->initialize(NULL);
   if (rime_api->start_maintenance(true))
@@ -269,7 +250,7 @@ void RimeWithToy::Initialize(bool first_time) {
     _UpdateUIStyle(&config, m_ui.get(), true);
     rime_api->config_close(&config);
   } else
-    DEBUGIF(m_trayIcon->debug()) << L"open weasel config failed";
+    CONDDEBUG << L"open weasel config failed";
   m_base_style = m_ui->style();
   m_current_dark_mode = IsUserDarkMode();
   Status &status = m_ui->status();
@@ -280,13 +261,13 @@ void RimeWithToy::Initialize(bool first_time) {
 }
 
 void RimeWithToy::Finalize() {
-  DEBUGIF(m_trayIcon->debug()) << L"RimeWithToy::Finalize() called";
+  CONDDEBUG << L"RimeWithToy::Finalize() called";
   rime_api->destroy_session(m_session_id);
   rime_api->finalize();
 }
 
 void RimeWithToy::SwitchAsciiMode() {
-  DEBUGIF(m_trayIcon->debug()) << L"RimeWithToy::SwitchAsciiMode() called";
+  CONDDEBUG << L"RimeWithToy::SwitchAsciiMode() called";
   BOOL ascii = rime_api->get_option(m_session_id, "ascii_mode");
   rime_api->set_option(m_session_id, "ascii_mode", !ascii);
   Status status;
@@ -299,7 +280,7 @@ BOOL RimeWithToy::ProcessKeyEvent(KeyEvent keyEvent) {
   if (m_disabled)
     return False;
   auto reprstr = repr(keyEvent.keycode, expand_ibus_modifier(keyEvent.mask));
-  DEBUGIF(m_trayIcon->debug()) << "RimeWithToy::ProcessKeyEvent " << reprstr;
+  CONDDEBUG << "RimeWithToy::ProcessKeyEvent " << reprstr;
   if (m_ui->GetIsReposition()) {
     if (keyEvent.keycode == ibus::Up)
       keyEvent.keycode = ibus::Down;

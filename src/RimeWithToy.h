@@ -18,7 +18,7 @@
 
 using std::string;
 namespace fs = std::filesystem;
-using path = std::filesystem::path;
+using path = fs::path;
 
 enum class PositionType {
   kMousePos,
@@ -38,14 +38,24 @@ typedef std::function<void(const path &)> EvtHandler;
 class SimpleFileMonitor {
 public:
   SimpleFileMonitor(const std::vector<string> &paths, EvtHandler handler)
-      : filePaths(paths), isMonitoring(false), onChange(handler) {
-    initializeFileTimes();
+      : isMonitoring(false), onChange(handler) {
+    SetWatchFiles(paths);
+    monitorThread = std::thread([&]() { startMonitoring(2); });
   }
-  void initializeFileTimes() {
+  ~SimpleFileMonitor() {
+    isMonitoring = false;
+    if (monitorThread.joinable())
+      monitorThread.join();
+  }
+  void SetWatchFiles(const std::vector<string> &paths) {
+    filePaths = paths;
+    fileTimes.clear();
     for (const auto &path : filePaths) {
       getFileModificationTime(path);
     }
   }
+
+private:
   bool getFileModificationTime(const string &filePath) {
     HANDLE hFile = CreateFileA(filePath.c_str(), GENERIC_READ,
                                FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
@@ -91,30 +101,23 @@ public:
     isMonitoring = true;
     while (isMonitoring) {
       for (const auto &path : filePaths) {
-        if (checkFileModification(path)) {
-          if (onChange) {
-            onChange(path);
-          }
-        }
+        if (checkFileModification(path) && onChange)
+          onChange(path);
       }
-
       std::this_thread::sleep_for(std::chrono::seconds(checkIntervalSeconds));
     }
   }
-  void stopMonitoring() { isMonitoring = false; }
-
-private:
   std::vector<string> filePaths;
   std::map<string, FILETIME> fileTimes;
   bool isMonitoring;
   EvtHandler onChange;
+  std::thread monitorThread;
 };
 
 class RimeWithToy {
 public:
   RimeWithToy(HINSTANCE hInstance);
-  ~RimeWithToy();
-  void Initialize(bool first_time = false);
+  void Initialize();
   void Finalize();
   BOOL ProcessKeyEvent(KeyEvent keyEvent);
   void UpdateUI();
@@ -171,7 +174,6 @@ private:
   bool m_disabled;
   bool m_current_dark_mode;
   std::unique_ptr<SimpleFileMonitor> m_file_monitor;
-  std::thread m_monitor_thread;
 };
 
 void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize);

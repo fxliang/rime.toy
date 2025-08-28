@@ -29,6 +29,10 @@ public:
   bool debug() { return enable_debug; }
   void ShowBalloonTip(const std::wstring &title, const std::wstring &message,
                       DWORD timeout = 1000);
+  void Deploy() {
+    if (deploy_func)
+      deploy_func();
+  }
 
 private:
   void OnBalloonTimeout();
