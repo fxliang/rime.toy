@@ -1,5 +1,6 @@
 #include "trayicon.h"
 #include "keymodule.h"
+#include <filesystem>
 #include <resource.h>
 #include <shellapi.h>
 #include <utils.h>
@@ -15,6 +16,7 @@
 #define MENU_LOG_DIR 1008
 #define MENU_RIME_TOY_EN 1009
 #define MENU_RESTART 1010
+#define MENU_EXE_DIR 1011
 
 bool rime_toy_enabled = true;
 HICON icon_error = LoadIcon(NULL, IDI_ERROR);
@@ -79,6 +81,7 @@ void TrayIcon::CreateContextMenu() {
     AppendMenu(hMenu, MF_STRING, MENU_LOG_DIR, L"日志目录");
     AppendMenu(hMenu, MF_STRING, MENU_SHARED_DIR, L"共享目录");
     AppendMenu(hMenu, MF_STRING, MENU_USER_DIR, L"用户目录");
+    AppendMenu(hMenu, MF_STRING, MENU_EXE_DIR, L"程序目录");
     AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
     AppendMenu(hMenu, MF_STRING | (enable_debug ? MF_CHECKED : MFS_UNCHECKED),
                MENU_DEBUG, L"调试信息");
@@ -176,6 +179,15 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
     case MENU_USER_DIR: {
       if (open_userdir)
         open_userdir();
+      break;
+    }
+    case MENU_EXE_DIR: {
+      wchar_t exePath[MAX_PATH] = {0};
+      GetModuleFileName(NULL, exePath, MAX_PATH);
+      std::wstring exeDir(exePath);
+      exeDir = exeDir.substr(0, exeDir.find_last_of(L"\\"));
+      if (std::filesystem::exists(exeDir))
+        ShellExecute(NULL, L"open", exeDir.c_str(), NULL, NULL, SW_SHOW);
       break;
     }
     case MENU_LOG_DIR: {
