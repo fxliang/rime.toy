@@ -66,7 +66,7 @@ void WeaselPanel::MoveTo(RECT rc) {
 }
 
 void WeaselPanel::_ResizeWindow() {
-  CSize size = m_layout->GetContentSize();
+  CSize &size = m_layout->GetContentSize();
   SetWindowPos(m_hWnd, 0, 0, 0, size.cx, size.cy,
                SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOREDRAW);
   m_pD2D->OnResize(size.cx, size.cy);
@@ -186,13 +186,13 @@ void WeaselPanel::DoPaint() {
   m_pD2D->dc->BeginDraw();
   m_pD2D->dc->Clear(D2D1::ColorF({0.0f, 0.0f, 0.0f, 0.0f}));
   if (!hide_candidates) {
-    auto rc = m_layout->GetContentRect();
+    CRect &rc = m_layout->GetContentRect();
     IsToRoundStruct roundInfo;
     _HighlightRect(rc, DPI_SCALE(m_style.round_corner_ex),
                    DPI_SCALE(m_style.border), m_style.back_color,
                    m_style.shadow_color, m_style.border_color, roundInfo);
-    auto prc = m_layout->GetPreeditRect();
-    auto arc = m_layout->GetAuxiliaryRect();
+    CRect &prc = m_layout->GetPreeditRect();
+    CRect &arc = m_layout->GetAuxiliaryRect();
     // if vertical auto reverse triggered
     if (m_istorepos) {
       std::vector<CRect> rects(m_candidateCount);
@@ -222,14 +222,10 @@ void WeaselPanel::DoPaint() {
       }
     }
     if (!m_layout->IsInlinePreedit() && !m_ctx.preedit.empty()) {
-      if (m_istorepos)
-        prc.OffsetRect(0, m_offsety_preedit);
-      _DrawPreedit(m_ctx.preedit, prc);
+      _DrawPreedit(m_ctx.preedit, true);
     }
     if (!m_ctx.aux.empty()) {
-      if (m_istorepos)
-        arc.OffsetRect(0, m_offsety_aux);
-      _DrawPreedit(m_ctx.aux, arc);
+      _DrawPreedit(m_ctx.aux, false);
     }
     if (m_candidateCount) {
       _DrawCandidates();
@@ -266,68 +262,69 @@ void WeaselPanel::DoPaint() {
   HR(m_pD2D->swapChain->Present(1, 0)); // sync
 }
 
-bool WeaselPanel::_DrawPreedit(const Text &text, CRect &rc) {
+bool WeaselPanel::_DrawPreedit(const Text &text, bool isPreedit) {
   bool drawn = false;
   wstring const &t = text.str;
   PtTextFormat &pTextFormat = m_pD2D->pPreeditFormat;
 
   if (!t.empty()) {
-    TextRange range = m_layout->GetPreeditRange();
+    const TextRange &range = m_layout->GetPreeditRange();
     if (range.start < range.end) {
       auto before_str = t.substr(0, range.start);
       auto hilited_str = t.substr(range.start, range.end - range.start);
       auto after_str = t.substr(range.end);
-      auto beforeSz = m_layout->GetBeforeSize();
-      auto hilitedSz = m_layout->GetHiliteSize();
-      auto afterSz = m_layout->GetAfterSize();
-      int x = rc.left, y = rc.top;
-      if (range.start > 0) {
-        CRect rc_before;
-        if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
-          rc_before = CRect(rc.left, y, rc.right, y + beforeSz.cy);
-        else
-          rc_before = CRect(x, rc.top, rc.left + beforeSz.cx, rc.bottom);
+
+      // Use precomputed rectangles - make copies when we need to modify them
+      CRect rc_before = isPreedit ? m_layout->GetPreeditBeforeRect()
+                                  : m_layout->GetAuxBeforeRect();
+      CRect rc_hi = isPreedit ? m_layout->GetPreeditHiliteRect()
+                              : m_layout->GetAuxHiliteRect();
+      CRect rc_after = isPreedit ? m_layout->GetPreeditAfterRect()
+                                 : m_layout->GetAuxAfterRect();
+
+      // Apply m_istorepos offset if needed
+      if (m_istorepos) {
+        int offsetY = isPreedit ? m_offsety_preedit : m_offsety_aux;
+        rc_before.OffsetRect(0, offsetY);
+        rc_hi.OffsetRect(0, offsetY);
+        rc_after.OffsetRect(0, offsetY);
+      }
+
+      // Use DPI_SCALE macro for consistency with other code
+      auto padx = DPI_SCALE(m_style.hilite_padding_x);
+      auto pady = DPI_SCALE(m_style.hilite_padding_y);
+
+      if (range.start > 0 && !rc_before.IsRectNull()) {
         _TextOut(rc_before, before_str, before_str.length(), m_style.text_color,
                  pTextFormat);
-        if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
-          y += beforeSz.cy + DPI_SCALE(m_style.hilite_spacing);
-        else
-          x += beforeSz.cx + DPI_SCALE(m_style.hilite_spacing);
       }
-      {
+      if (!rc_hi.IsRectNull()) {
         // zzz[yyy]
-        CRect rc_hi;
-        auto padx = m_style.hilite_padding_x * m_pD2D->m_dpiScaleLayout;
-        auto pady = m_style.hilite_padding_y * m_pD2D->m_dpiScaleLayout;
-        if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
-          rc_hi = CRect(rc.left, y, rc.right, y + hilitedSz.cy);
-        else
-          rc_hi = CRect(x, rc.top, x + hilitedSz.cx, rc.bottom);
         CRect rc_hib = rc_hi;
         rc_hib.InflateRect(padx, pady);
-        IsToRoundStruct roundInfo = m_layout->GetTextRoundInfo();
+        const IsToRoundStruct &roundInfo = m_layout->GetTextRoundInfo();
         _HighlightRect(rc_hib, DPI_SCALE(m_style.round_corner),
                        DPI_SCALE(m_style.border), m_style.hilited_back_color,
                        m_style.hilited_shadow_color, 0, roundInfo);
         _TextOut(rc_hi, hilited_str, hilited_str.length(),
                  m_style.hilited_text_color, pTextFormat);
-        if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
-          y += rc_hi.Height() + DPI_SCALE(m_style.hilite_spacing);
-        else
-          x += rc_hi.Width() + DPI_SCALE(m_style.hilite_spacing);
       }
-      if (range.end < static_cast<int>(t.length())) {
+      if (range.end < static_cast<int>(t.length()) && !rc_after.IsRectNull()) {
         // zzz[yyy]xxx
-        CRect rc_after;
-        if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
-          rc_after = CRect(rc.left, y, rc.right, y + afterSz.cy);
-        else
-          rc_after = CRect(x, rc.top, x + afterSz.cx, rc.bottom);
         _TextOut(rc_after, after_str, after_str.length(), m_style.text_color,
                  pTextFormat);
       }
     } else {
-      CRect rcText(rc.left, rc.top, rc.right, rc.bottom);
+      // No highlighted text, use the base rectangle from layout
+      CRect rcText =
+          isPreedit ? m_layout->GetPreeditRect() : m_layout->GetAuxiliaryRect();
+
+      // Apply m_istorepos offset if needed
+      if (m_istorepos) {
+        int offsetY = isPreedit ? m_offsety_preedit : m_offsety_aux;
+        rcText.OffsetRect(0, offsetY);
+      }
+
       _TextOut(rcText, t.c_str(), t.length(), m_style.text_color, pTextFormat);
     }
     if (m_candidateCount && !m_style.inline_preedit &&
@@ -335,13 +332,13 @@ bool WeaselPanel::_DrawPreedit(const Text &text, CRect &rc) {
         COLORNOTTRANSPARENT(m_style.nextpage_color)) {
       const std::wstring pre = L"<";
       const std::wstring next = L">";
-      CRect prc = m_layout->GetPrepageRect();
+      CRect &prc = m_layout->GetPrepageRect();
       // clickable color / disabled color
       int color =
           m_ctx.cinfo.currentPage ? m_style.prevpage_color : m_style.text_color;
       _TextOut(prc, pre.c_str(), pre.length(), color, pTextFormat);
 
-      CRect nrc = m_layout->GetNextpageRect();
+      CRect &nrc = m_layout->GetNextpageRect();
       // clickable color / disabled color
       color = m_ctx.cinfo.is_last_page ? m_style.text_color
                                        : m_style.nextpage_color;
@@ -356,8 +353,8 @@ CRect WeaselPanel::_GetInflatedCandRect(int i) {
   CRect rc = m_layout->GetCandidateRect(i);
   if (m_istorepos)
     rc.OffsetRect(0, m_offsetys[i]);
-  const auto padx = m_style.hilite_padding_x * m_pD2D->m_dpiScaleLayout;
-  const auto pady = m_style.hilite_padding_y * m_pD2D->m_dpiScaleLayout;
+  const auto padx = DPI_SCALE(m_style.hilite_padding_x);
+  const auto pady = DPI_SCALE(m_style.hilite_padding_y);
   rc.InflateRect(padx, pady);
   return rc;
 }
@@ -370,12 +367,12 @@ bool WeaselPanel::_DrawCandidates() {
   PtTextFormat &txtFormat = m_pD2D->pTextFormat;
   PtTextFormat &labeltxtFormat = m_pD2D->pLabelFormat;
   PtTextFormat &commenttxtFormat = m_pD2D->pCommentFormat;
-  auto padx = m_style.hilite_padding_x * m_pD2D->m_dpiScaleLayout;
-  auto pady = m_style.hilite_padding_y * m_pD2D->m_dpiScaleLayout;
+  auto padx = DPI_SCALE(m_style.hilite_padding_x);
+  auto pady = DPI_SCALE(m_style.hilite_padding_y);
   const auto hilitefunc = [&](int i, uint32_t back_color, uint32_t shadow_color,
                               uint32_t border_color, uint32_t border = 0) {
     auto rect = _GetInflatedCandRect(i);
-    IsToRoundStruct roundInfo = m_layout->GetRoundInfo(i);
+    const IsToRoundStruct &roundInfo = m_layout->GetRoundInfo(i);
     _HighlightRect(rect, DPI_SCALE(m_style.round_corner), DPI_SCALE(border),
                    back_color, shadow_color, border_color, roundInfo);
   };
@@ -479,10 +476,7 @@ void WeaselPanel::_TextOut(CRect &rc, const wstring &text, size_t cch,
                            uint32_t color, PtTextFormat &pTextFormat) {
   if (!pTextFormat.Get())
     return;
-  if (m_pD2D->m_pBrush == nullptr) {
-  } else {
-    m_pD2D->SetBrushColor(color);
-  }
+  m_pD2D->SetBrushColor(color);
 
   ComPtr<IDWriteTextLayout> pTextLayout;
   m_pD2D->m_pWriteFactory->CreateTextLayout(
@@ -519,7 +513,7 @@ void WeaselPanel::_TextOut(CRect &rc, const wstring &text, size_t cch,
 void WeaselPanel::_HighlightRect(const RECT &rect, float radius,
                                  uint32_t border, uint32_t back_color,
                                  uint32_t shadow_color, uint32_t border_color,
-                                 IsToRoundStruct roundInfo) {
+                                 const IsToRoundStruct &roundInfo) {
   if (roundInfo.Hemispherical)
     radius = DPI_SCALE(m_style.round_corner_ex) - DPI_SCALE(border) / 2.0f;
   // draw shadow
@@ -725,8 +719,8 @@ LRESULT WeaselPanel::OnLeftClickDown(UINT uMsg, WPARAM wParam, LPARAM lParam) {
   if (hide_candidates)
     return 0;
   CPoint point(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-  auto padx = m_style.hilite_padding_x * m_pD2D->m_dpiScaleLayout;
-  auto pady = m_style.hilite_padding_y * m_pD2D->m_dpiScaleLayout;
+  auto padx = DPI_SCALE(m_style.hilite_padding_x);
+  auto pady = DPI_SCALE(m_style.hilite_padding_y);
   // capture
   if (m_style.click_to_capture) {
     CRect rcw;

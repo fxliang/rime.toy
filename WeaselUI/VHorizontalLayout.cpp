@@ -159,13 +159,11 @@ void VHorizontalLayout::DoLayout() {
                                                    _style.hilite_spacing);
       // define  _candidateRects
       _candidateRects[i].left =
-          MIN(_candidateLabelRects[i].left, _candidateTextRects[i].left);
-      _candidateRects[i].left =
-          MIN(_candidateRects[i].left, _candidateCommentRects[i].left);
+          MIN(_candidateLabelRects[i].left, _candidateTextRects[i].left,
+              _candidateCommentRects[i].left);
       _candidateRects[i].right =
-          MAX(_candidateLabelRects[i].right, _candidateTextRects[i].right);
-      _candidateRects[i].right =
-          MAX(_candidateRects[i].right, _candidateCommentRects[i].right);
+          MAX(_candidateLabelRects[i].right, _candidateTextRects[i].right,
+              _candidateCommentRects[i].right);
       _candidateRects[i].top = _candidateLabelRects[i].top - base_offset;
       _candidateRects[i].bottom =
           _candidateCommentRects[i].top + max_comment_heihgt;
@@ -245,6 +243,15 @@ void VHorizontalLayout::DoLayout() {
   // background rect prepare for Hemispherical calculation
   CopyRect(_bgRect, _contentRect);
   _bgRect.DeflateRect(offsetX + 1, offsetY + 1);
+
+  // Precompute preedit sub-rectangles
+  _PrecomputePreeditRects(_preeditRect, _context.preedit, _preeditBeforeRect,
+                          _preeditHiliteRect, _preeditAfterRect);
+
+  // Precompute auxiliary sub-rectangles
+  _PrecomputePreeditRects(_auxiliaryRect, _context.aux, _auxBeforeRect,
+                          _auxHiliteRect, _auxAfterRect);
+
   // prepare round info
   _PrepareRoundInfo();
 
@@ -390,12 +397,9 @@ void VHorizontalLayout::DoLayoutWithWrap() {
       } else
         max_height_of_cols = MAX(max_height_of_cols, h);
       minleft_of_cols[col_cnt] = width;
-      width_of_cols[col_cnt] =
-          MAX(width_of_cols[col_cnt], _candidateLabelRects[i].Width());
-      width_of_cols[col_cnt] =
-          MAX(width_of_cols[col_cnt], _candidateTextRects[i].Width());
-      width_of_cols[col_cnt] =
-          MAX(width_of_cols[col_cnt], _candidateCommentRects[i].Width());
+      width_of_cols[col_cnt] = MAX(
+          width_of_cols[col_cnt], _candidateLabelRects[i].Width(),
+          _candidateTextRects[i].Width(), _candidateCommentRects[i].Width());
       col_of_candidate[i] = col_cnt;
     }
 
@@ -592,6 +596,14 @@ void VHorizontalLayout::DoLayoutWithWrap() {
       }
     }
   }
+
+  // Precompute preedit sub-rectangles
+  _PrecomputePreeditRects(_preeditRect, _context.preedit, _preeditBeforeRect,
+                          _preeditHiliteRect, _preeditAfterRect);
+
+  // Precompute auxiliary sub-rectangles
+  _PrecomputePreeditRects(_auxiliaryRect, _context.aux, _auxBeforeRect,
+                          _auxHiliteRect, _auxAfterRect);
 
   // truely draw content size calculation
   _contentRect.DeflateRect(offsetX, offsetY);

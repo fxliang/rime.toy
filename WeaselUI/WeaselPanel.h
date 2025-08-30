@@ -29,7 +29,7 @@ public:
 private:
   void RedrawWindow() { InvalidateRect(m_hWnd, nullptr, true); }
   void _CreateLayout();
-  bool _DrawPreedit(const Text &text, CRect &rc);
+  bool _DrawPreedit(const Text &text, bool isPreedit);
   bool _DrawCandidates();
   void _ResizeWindow();
   void _Reposition();
@@ -37,7 +37,7 @@ private:
                 ComPtr<IDWriteTextFormat1> &pTextFormat);
   void _HighlightRect(const RECT &rect, float radius, uint32_t border,
                       uint32_t back_color, uint32_t shadow_color,
-                      uint32_t border_color, IsToRoundStruct roundInfo);
+                      uint32_t border_color, const IsToRoundStruct &roundInfo);
   CRect _GetInflatedCandRect(int i);
   void _CaptureRect(CRect &rect);
 

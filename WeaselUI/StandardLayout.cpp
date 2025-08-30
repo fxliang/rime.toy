@@ -1,13 +1,8 @@
 #include "StandardLayout.h"
 
-using namespace weasel;
+#define DPI_SCALE(t) (int)(t * _pD2D->m_dpiScaleLayout)
 
-wstring StandardLayout::GetLabelText(const vector<Text> &labels, int id,
-                                     const wchar_t *format) const {
-  wchar_t buffer[128];
-  swprintf_s<128>(buffer, format, labels.at(id).str.c_str());
-  return std::wstring(buffer);
-}
+using namespace weasel;
 
 CSize StandardLayout::GetPreeditSize(const Text &text,
                                      ComPtr<IDWriteTextFormat1> &pTextFormat) {
@@ -30,17 +25,13 @@ CSize StandardLayout::GetPreeditSize(const Text &text,
       _pD2D->GetTextSize(after_str, after_str.length(), pTextFormat, &_aftersz);
       auto width_max = 0, height_max = 0;
       if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
-        width_max = MAX(width_max, _beforesz.cx);
-        width_max = MAX(width_max, _hilitedsz.cx);
-        width_max = MAX(width_max, _aftersz.cx);
+        width_max = MAX(width_max, _beforesz.cx, _hilitedsz.cx, _aftersz.cx);
         height_max += _beforesz.cy + (_beforesz.cy > 0) * _style.hilite_spacing;
         height_max +=
             _hilitedsz.cy + (_hilitedsz.cy > 0) * _style.hilite_spacing;
         height_max += _aftersz.cy;
       } else {
-        height_max = MAX(height_max, _beforesz.cy);
-        height_max = MAX(height_max, _hilitedsz.cy);
-        height_max = MAX(height_max, _aftersz.cy);
+        height_max = MAX(height_max, _beforesz.cy, _hilitedsz.cy, _aftersz.cy);
         width_max += _beforesz.cx + (_beforesz.cx > 0) * _style.hilite_spacing;
         width_max +=
             _hilitedsz.cx + (_hilitedsz.cx > 0) * _style.hilite_spacing;
@@ -326,5 +317,54 @@ void StandardLayout::_PrepareRoundInfo() {
         }
       }
     }
+  }
+}
+
+void StandardLayout::_PrecomputePreeditRects(const CRect &baseRect,
+                                             const Text &text,
+                                             CRect &beforeRect,
+                                             CRect &hiliteRect,
+                                             CRect &afterRect) {
+  beforeRect = hiliteRect = afterRect = CRect(0, 0, 0, 0);
+
+  if (baseRect.left >= baseRect.right || baseRect.top >= baseRect.bottom ||
+      text.str.empty() || _range.start >= _range.end)
+    return;
+
+  int x = baseRect.left, y = baseRect.top;
+
+  // Before part
+  if (_range.start > 0 && _beforesz.cx > 0 && _beforesz.cy > 0) {
+    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+      beforeRect = CRect(baseRect.left, y, baseRect.right, y + _beforesz.cy);
+    else
+      beforeRect = CRect(x, baseRect.top, x + _beforesz.cx, baseRect.bottom);
+
+    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+      y += _beforesz.cy + DPI_SCALE(_style.hilite_spacing);
+    else
+      x += _beforesz.cx + DPI_SCALE(_style.hilite_spacing);
+  }
+
+  // Highlighted part
+  if (_hilitedsz.cx > 0 && _hilitedsz.cy > 0) {
+    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+      hiliteRect = CRect(baseRect.left, y, baseRect.right, y + _hilitedsz.cy);
+    else
+      hiliteRect = CRect(x, baseRect.top, x + _hilitedsz.cx, baseRect.bottom);
+
+    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+      y += _hilitedsz.cy + DPI_SCALE(_style.hilite_spacing);
+    else
+      x += _hilitedsz.cx + DPI_SCALE(_style.hilite_spacing);
+  }
+
+  // After part
+  if (_range.end < static_cast<int>(text.str.length()) && _aftersz.cx > 0 &&
+      _aftersz.cy > 0) {
+    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+      afterRect = CRect(baseRect.left, y, baseRect.right, y + _aftersz.cy);
+    else
+      afterRect = CRect(x, baseRect.top, x + _aftersz.cx, baseRect.bottom);
   }
 }

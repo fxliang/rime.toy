@@ -21,28 +21,30 @@ public:
   Layout(const UIStyle &style, const Context &context, const Status &status,
          an<D2D> &pD2D);
   virtual void DoLayout() = 0;
-  virtual CSize GetContentSize() const = 0;
-  virtual CRect GetPreeditRect() const = 0;
-  virtual CRect GetAuxiliaryRect() const = 0;
-  virtual CRect GetHighlightRect() const = 0;
-  virtual CRect GetCandidateLabelRect(int id) const = 0;
-  virtual CRect GetCandidateTextRect(int id) const = 0;
-  virtual CRect GetCandidateCommentRect(int id) const = 0;
-  virtual CRect GetCandidateRect(int id) const = 0;
-  virtual CRect GetStatusIconRect() const = 0;
-  virtual CRect GetContentRect() const = 0;
-  virtual CRect GetPrepageRect() const = 0;
-  virtual CRect GetNextpageRect() const = 0;
-  virtual CSize GetBeforeSize() const = 0;
-  virtual CSize GetHiliteSize() const = 0;
-  virtual CSize GetAfterSize() const = 0;
-  virtual TextRange GetPreeditRange() const = 0;
-  virtual wstring GetLabelText(const vector<Text> &labels, int id,
-                               const wchar_t *format) const = 0;
+  virtual CSize &GetContentSize() = 0;
+  virtual CRect &GetPreeditRect() = 0;
+  virtual CRect &GetAuxiliaryRect() = 0;
+  virtual CRect &GetHighlightRect() = 0;
+  virtual CRect &GetCandidateLabelRect(int id) = 0;
+  virtual CRect &GetCandidateTextRect(int id) = 0;
+  virtual CRect &GetCandidateCommentRect(int id) = 0;
+  virtual CRect &GetCandidateRect(int id) = 0;
+  virtual CRect &GetStatusIconRect() = 0;
+  virtual CRect &GetContentRect() = 0;
+  virtual CRect &GetPrepageRect() = 0;
+  virtual CRect &GetNextpageRect() = 0;
+  virtual const TextRange &GetPreeditRange() const = 0;
   virtual bool IsInlinePreedit() const = 0;
   virtual bool ShouldDisplayStatusIcon() const = 0;
-  virtual IsToRoundStruct GetRoundInfo(int id) = 0;
-  virtual IsToRoundStruct GetTextRoundInfo() = 0;
+  virtual const IsToRoundStruct &GetRoundInfo(int id) = 0;
+  virtual const IsToRoundStruct &GetTextRoundInfo() = 0;
+  // Precomputed preedit sub-rectangles for optimization
+  virtual CRect &GetPreeditBeforeRect() = 0;
+  virtual CRect &GetPreeditHiliteRect() = 0;
+  virtual CRect &GetPreeditAfterRect() = 0;
+  virtual CRect &GetAuxBeforeRect() = 0;
+  virtual CRect &GetAuxHiliteRect() = 0;
+  virtual CRect &GetAuxAfterRect() = 0;
 
   int offsetX = 0;
   int offsetY = 0;

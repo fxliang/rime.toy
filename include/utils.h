@@ -63,8 +63,17 @@ inline int utf8towcslen(const char *utf8_str, int utf8_len) {
 #define wtoacp(x) wstring_to_string(x)
 #define u8tow(x) string_to_wstring(x, CP_UTF8)
 #define acptow(x) string_to_wstring(x, CP_ACP)
-#define MAX(x, y) ((x > y) ? x : y)
-#define MIN(x, y) ((x < y) ? x : y)
+
+template <typename T> T MAX(T a) { return a; }
+template <typename T, typename... Args> T MAX(T a, Args... args) {
+  T max_rest = MAX(args...);
+  return a > max_rest ? a : max_rest;
+}
+template <typename T> T MIN(T a) { return a; }
+template <typename T, typename... Args> T MIN(T a, Args... args) {
+  T min_rest = MIN(args...);
+  return a < min_rest ? a : min_rest;
+}
 
 class DebugStream {
 public:

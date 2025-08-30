@@ -151,47 +151,38 @@ void HorizontalLayout::DoLayout() {
         max_width_of_rows = MAX(max_width_of_rows, w);
       // calculate height of current row is the max of three rects
       mintop_of_rows[row_cnt] = height;
-      height_of_rows[row_cnt] =
-          MAX(height_of_rows[row_cnt], _candidateLabelRects[i].Height());
-      height_of_rows[row_cnt] =
-          MAX(height_of_rows[row_cnt], _candidateTextRects[i].Height());
-      height_of_rows[row_cnt] =
-          MAX(height_of_rows[row_cnt], _candidateCommentRects[i].Height());
+      height_of_rows[row_cnt] = MAX(
+          height_of_rows[row_cnt], _candidateLabelRects[i].Height(),
+          _candidateTextRects[i].Height(), _candidateCommentRects[i].Height());
       // set row info of current candidate
       row_of_candidate[i] = row_cnt;
     }
 
     // reposition for alignment, exp when rect height not equal to
     // height_of_rows
-    for (auto i = 0; i < candidates_count && i < MAX_CANDIDATES_COUNT; ++i) {
-      int base_left = (i == id) ? _candidateLabelRects[i].left - base_offset
-                                : _candidateLabelRects[i].left;
-      _candidateRects[i].SetRect(base_left, mintop_of_rows[row_of_candidate[i]],
-                                 _candidateCommentRects[i].right,
-                                 mintop_of_rows[row_of_candidate[i]] +
-                                     height_of_rows[row_of_candidate[i]]);
-      int ol = 0, ot = 0, oc = 0;
-      if (_style.align_type == UIStyle::ALIGN_CENTER) {
-        ol = (height_of_rows[row_of_candidate[i]] -
-              _candidateLabelRects[i].Height()) /
-             2;
-        ot = (height_of_rows[row_of_candidate[i]] -
-              _candidateTextRects[i].Height()) /
-             2;
-        oc = (height_of_rows[row_of_candidate[i]] -
-              _candidateCommentRects[i].Height()) /
-             2;
-      } else if (_style.align_type == UIStyle::ALIGN_BOTTOM) {
-        ol = (height_of_rows[row_of_candidate[i]] -
-              _candidateLabelRects[i].Height());
-        ot = (height_of_rows[row_of_candidate[i]] -
-              _candidateTextRects[i].Height());
-        oc = (height_of_rows[row_of_candidate[i]] -
-              _candidateCommentRects[i].Height());
+    if (_style.align_type != UIStyle::ALIGN_TOP) {
+      for (auto i = 0; i < candidates_count && i < MAX_CANDIDATES_COUNT; ++i) {
+        int base_left = (i == id) ? _candidateLabelRects[i].left - base_offset
+                                  : _candidateLabelRects[i].left;
+        const int height_of_current_raw = height_of_rows[row_of_candidate[i]];
+        _candidateRects[i].SetRect(
+            base_left, mintop_of_rows[row_of_candidate[i]],
+            _candidateCommentRects[i].right,
+            mintop_of_rows[row_of_candidate[i]] + height_of_current_raw);
+        int ol = 0, ot = 0, oc = 0;
+        if (_style.align_type == UIStyle::ALIGN_CENTER) {
+          ol = (height_of_current_raw - _candidateLabelRects[i].Height()) / 2;
+          ot = (height_of_current_raw - _candidateTextRects[i].Height()) / 2;
+          oc = (height_of_current_raw - _candidateCommentRects[i].Height()) / 2;
+        } else if (_style.align_type == UIStyle::ALIGN_BOTTOM) {
+          ol = (height_of_current_raw - _candidateLabelRects[i].Height());
+          ot = (height_of_current_raw - _candidateTextRects[i].Height());
+          oc = (height_of_current_raw - _candidateCommentRects[i].Height());
+        }
+        _candidateLabelRects[i].OffsetRect(0, ol);
+        _candidateTextRects[i].OffsetRect(0, ot);
+        _candidateCommentRects[i].OffsetRect(0, oc);
       }
-      _candidateLabelRects[i].OffsetRect(0, ol);
-      _candidateTextRects[i].OffsetRect(0, ot);
-      _candidateCommentRects[i].OffsetRect(0, oc);
     }
     height = mintop_of_rows[row_cnt] + height_of_rows[row_cnt] - offsetY;
     width = MAX(width, max_width_of_rows);
@@ -262,6 +253,15 @@ void HorizontalLayout::DoLayout() {
       }
     }
   }
+
+  // Precompute preedit sub-rectangles
+  _PrecomputePreeditRects(_preeditRect, _context.preedit, _preeditBeforeRect,
+                          _preeditHiliteRect, _preeditAfterRect);
+
+  // Precompute auxiliary sub-rectangles
+  _PrecomputePreeditRects(_auxiliaryRect, _context.aux, _auxBeforeRect,
+                          _auxHiliteRect, _auxAfterRect);
+
   // truely draw content size calculation
   _contentRect.DeflateRect(offsetX, offsetY);
 }

@@ -61,9 +61,6 @@ void weasel::FullScreenLayout::DoLayout() {
   _nextPageRect = m_layout->GetNextpageRect();
   _nextPageRect.OffsetRect(offsetx, offsety);
   _range = m_layout->GetPreeditRange();
-  _beforesz = m_layout->GetBeforeSize();
-  _hilitedsz = m_layout->GetHiliteSize();
-  _aftersz = m_layout->GetAfterSize();
 
   for (auto i = 0, n = (int)_context.cinfo.candies.size();
        i < n && i < MAX_CANDIDATES_COUNT; ++i) {
@@ -78,6 +75,22 @@ void weasel::FullScreenLayout::DoLayout() {
   }
   _statusIconRect = m_layout->GetStatusIconRect();
   _statusIconRect.OffsetRect(offsetx, offsety);
+
+  // Get precomputed preedit sub-rectangles from m_layout and apply offset
+  _preeditBeforeRect = m_layout->GetPreeditBeforeRect();
+  _preeditBeforeRect.OffsetRect(offsetx, offsety);
+  _preeditHiliteRect = m_layout->GetPreeditHiliteRect();
+  _preeditHiliteRect.OffsetRect(offsetx, offsety);
+  _preeditAfterRect = m_layout->GetPreeditAfterRect();
+  _preeditAfterRect.OffsetRect(offsetx, offsety);
+
+  // Get precomputed auxiliary sub-rectangles from m_layout and apply offset
+  _auxBeforeRect = m_layout->GetAuxBeforeRect();
+  _auxBeforeRect.OffsetRect(offsetx, offsety);
+  _auxHiliteRect = m_layout->GetAuxHiliteRect();
+  _auxHiliteRect.OffsetRect(offsetx, offsety);
+  _auxAfterRect = m_layout->GetAuxAfterRect();
+  _auxAfterRect.OffsetRect(offsetx, offsety);
 
   _contentSize.SetSize(workArea.Width(), workArea.Height());
   _contentRect.SetRect(0, 0, workArea.Width(), workArea.Height());

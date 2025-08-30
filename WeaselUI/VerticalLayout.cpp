@@ -85,7 +85,7 @@ void weasel::VerticalLayout::DoLayout() {
     if (i > 0)
       height += _style.candidate_spacing;
 
-    int w = real_margin_x + base_offset, max_height_curren_candidate = 0;
+    int w = real_margin_x + base_offset, h = 0;
     int candidate_width = base_offset, comment_width = 0;
     /* Label */
     auto &label = labels.at(i).str;
@@ -94,7 +94,7 @@ void weasel::VerticalLayout::DoLayout() {
                                     height + size.cy);
     _candidateLabelRects[i].OffsetRect(offsetX, offsetY);
     w += (size.cx + space) * labelFontValid;
-    max_height_curren_candidate = MAX(max_height_curren_candidate, size.cy);
+    h = MAX(h, size.cy);
     candidate_width += (size.cx + space) * labelFontValid;
 
     /* Text */
@@ -104,7 +104,7 @@ void weasel::VerticalLayout::DoLayout() {
                                    height + size.cy);
     _candidateTextRects[i].OffsetRect(offsetX, offsetY);
     w += size.cx * textFontValid;
-    max_height_curren_candidate = MAX(max_height_curren_candidate, size.cy);
+    h = MAX(h, size.cy);
     candidate_width += size.cx * textFontValid;
     max_candidate_width = MAX(max_candidate_width, candidate_width);
 
@@ -123,24 +123,25 @@ void weasel::VerticalLayout::DoLayout() {
                                         height + size.cy);
       _candidateCommentRects[i].OffsetRect(offsetX, offsetY);
       w += size.cx * cmtFontValid;
-      max_height_curren_candidate = MAX(max_height_curren_candidate, size.cy);
+      h = MAX(h, size.cy);
       comment_width += size.cx * cmtFontValid;
       max_comment_width = MAX(max_comment_width, comment_width);
     }
-    int ol = 0, ot = 0, oc = 0;
-    if (_style.align_type == UIStyle::ALIGN_CENTER) {
-      ol = (max_height_curren_candidate - _candidateLabelRects[i].Height()) / 2;
-      ot = (max_height_curren_candidate - _candidateTextRects[i].Height()) / 2;
-      oc = (max_height_curren_candidate - _candidateCommentRects[i].Height()) /
-           2;
-    } else if (_style.align_type == UIStyle::ALIGN_BOTTOM) {
-      ol = (max_height_curren_candidate - _candidateLabelRects[i].Height());
-      ot = (max_height_curren_candidate - _candidateTextRects[i].Height());
-      oc = (max_height_curren_candidate - _candidateCommentRects[i].Height());
+    if (_style.align_type != UIStyle::ALIGN_TOP) {
+      int ol = 0, ot = 0, oc = 0;
+      if (_style.align_type == UIStyle::ALIGN_CENTER) {
+        ol = (h - _candidateLabelRects[i].Height()) / 2;
+        ot = (h - _candidateTextRects[i].Height()) / 2;
+        oc = (h - _candidateCommentRects[i].Height()) / 2;
+      } else if (_style.align_type == UIStyle::ALIGN_BOTTOM) {
+        ol = (h - _candidateLabelRects[i].Height());
+        ot = (h - _candidateTextRects[i].Height());
+        oc = (h - _candidateCommentRects[i].Height());
+      }
+      _candidateLabelRects[i].OffsetRect(0, ol);
+      _candidateTextRects[i].OffsetRect(0, ot);
+      _candidateCommentRects[i].OffsetRect(0, oc);
     }
-    _candidateLabelRects[i].OffsetRect(0, ol);
-    _candidateTextRects[i].OffsetRect(0, ot);
-    _candidateCommentRects[i].OffsetRect(0, oc);
 
     int hlTop = _candidateTextRects[i].top;
     int hlBot = _candidateTextRects[i].bottom;
@@ -157,7 +158,7 @@ void weasel::VerticalLayout::DoLayout() {
                                width - real_margin_x + offsetX, hlBot);
 
     width = MAX(width, w);
-    height += max_height_curren_candidate;
+    height += h;
   }
   /* comments are left-aligned to the right of the longest candidate who has a
    * comment */
@@ -225,6 +226,15 @@ void weasel::VerticalLayout::DoLayout() {
       _nextPageRect.OffsetRect(-STATUS_ICON_SIZE, 0);
     }
   }
+
+  // Precompute preedit sub-rectangles
+  _PrecomputePreeditRects(_preeditRect, _context.preedit, _preeditBeforeRect,
+                          _preeditHiliteRect, _preeditAfterRect);
+
+  // Precompute auxiliary sub-rectangles
+  _PrecomputePreeditRects(_auxiliaryRect, _context.aux, _auxBeforeRect,
+                          _auxHiliteRect, _auxAfterRect);
+
   if (_style.vertical_right_to_left) {
     for (auto i = 0; i < candidates_count && i < MAX_CANDIDATES_COUNT; ++i) {
       size_t left = _candidateRects[i].left;
@@ -242,6 +252,7 @@ void weasel::VerticalLayout::DoLayout() {
   // background rect prepare for Hemispherical calculation
   CopyRect(_bgRect, _contentRect);
   _bgRect.DeflateRect(offsetX + 1, offsetY + 1);
+
   _PrepareRoundInfo();
 
   // truely draw content size calculation
