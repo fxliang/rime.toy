@@ -225,6 +225,18 @@ void weasel::VerticalLayout::DoLayout() {
       _nextPageRect.OffsetRect(-STATUS_ICON_SIZE, 0);
     }
   }
+  if (_style.vertical_right_to_left) {
+    for (auto i = 0; i < candidates_count && i < MAX_CANDIDATES_COUNT; ++i) {
+      size_t left = _candidateRects[i].left;
+      size_t right = _candidateRects[i].right;
+      auto &labelRect = _candidateLabelRects[i];
+      auto &textRect = _candidateTextRects[i];
+      auto &commentRect = _candidateCommentRects[i];
+      labelRect.OffsetRect(right - labelRect.right, 0);
+      textRect.OffsetRect(labelRect.left - _style.spacing - textRect.right, 0);
+      commentRect.OffsetRect(left - commentRect.left, 0);
+    }
+  }
   // calc roundings start
   _contentRect.SetRect(0, 0, _contentSize.cx, _contentSize.cy);
   // background rect prepare for Hemispherical calculation

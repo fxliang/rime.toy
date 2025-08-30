@@ -290,6 +290,7 @@ struct UIStyle {
   int client_caps;
   int baseline;
   int linespacing;
+  bool vertical_right_to_left; // for vertical layout, right to left text
 
   UIStyle()
       : font_face(), label_font_face(), comment_font_face(), font_point(0),
@@ -307,10 +308,10 @@ struct UIStyle {
         hilite_spacing(0), hilite_padding_x(0), hilite_padding_y(0),
         round_corner(0), round_corner_ex(0), shadow_radius(0),
         shadow_offset_x(0), shadow_offset_y(0), vertical_auto_reverse(false),
-        text_color(0), candidate_text_color(0), candidate_back_color(0),
-        candidate_shadow_color(0), candidate_border_color(0),
-        label_text_color(0), comment_text_color(0), back_color(0),
-        shadow_color(0), border_color(0), hilited_text_color(0),
+        vertical_right_to_left(false), text_color(0), candidate_text_color(0),
+        candidate_back_color(0), candidate_shadow_color(0),
+        candidate_border_color(0), label_text_color(0), comment_text_color(0),
+        back_color(0), shadow_color(0), border_color(0), hilited_text_color(0),
         hilited_back_color(0), hilited_shadow_color(0),
         hilited_candidate_text_color(0), hilited_candidate_back_color(0),
         hilited_candidate_shadow_color(0), hilited_candidate_border_color(0),
@@ -325,6 +326,7 @@ struct UIStyle {
         vertical_text_with_wrap != st.vertical_text_with_wrap ||
         paging_on_scroll != st.paging_on_scroll || font_face != st.font_face ||
         label_font_face != st.label_font_face ||
+        vertical_right_to_left != st.vertical_right_to_left ||
         comment_font_face != st.comment_font_face ||
         hover_type != st.hover_type || font_point != st.font_point ||
         label_font_point != st.label_font_point ||

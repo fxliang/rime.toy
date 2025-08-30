@@ -853,6 +853,8 @@ void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize) {
                style.inline_preedit);
   _RimeGetBool(config, "style/vertical_auto_reverse", initialize,
                style.vertical_auto_reverse);
+  _RimeGetBool(config, "style/vertical_right_to_left", initialize,
+               style.vertical_right_to_left);
   const std::map<string, UIStyle::PreeditType> _preeditMap = {
       {string("composition"), UIStyle::COMPOSITION},
       {string("preview"), UIStyle::PREVIEW},
