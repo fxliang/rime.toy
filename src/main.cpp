@@ -2,6 +2,7 @@
 // Distrobuted under GPLv3 https://www.gnu.org/licenses/gpl-3.0.en.html
 #include "RimeWithToy.h"
 #include "keymodule.h"
+#include "cursor_tracker.h"
 #include <ShellScalingApi.h>
 #include <WeaselIPCData.h>
 #include <WeaselUI.h>
@@ -13,16 +14,36 @@ using namespace weasel;
 HHOOK hKeyboardHook = NULL;
 HHOOK hMouseHook = NULL;
 std::unique_ptr<RimeWithToy> m_toy;
+std::unique_ptr<weasel::CursorTracker> g_cursor_tracker;
 extern PositionType position_type;
 
 void update_position(HWND hwnd) {
   POINT pt;
-  if (!GetCursorPos(&pt)) {
-    RECT rect;
-    if (hwnd)
-      GetWindowRect(hwnd, &rect);
-    pt.x = rect.left + (rect.right - rect.left) / 2 - 150;
-    pt.y = rect.bottom - (rect.bottom - rect.top) / 2 - 100;
+  bool cursor_found = false;
+  
+  // 尝试使用光标跟踪器获取真实光标位置
+  if (g_cursor_tracker && g_cursor_tracker->IsEnabled()) {
+    auto cursor_pos = g_cursor_tracker->GetCursorPosition(hwnd);
+    if (cursor_pos.valid) {
+      pt = cursor_pos.point;
+      cursor_found = true;
+      
+      // 调试输出
+      DEBUG << L"Cursor found using method: " << (int)cursor_pos.method
+            << L" at (" << pt.x << L", " << pt.y << L")";
+    }
+  }
+  
+  // 回退到原有逻辑：鼠标位置或窗口中心
+  if (!cursor_found) {
+    if (!GetCursorPos(&pt)) {
+      RECT rect;
+      if (hwnd)
+        GetWindowRect(hwnd, &rect);
+      pt.x = rect.left + (rect.right - rect.left) / 2 - 150;
+      pt.y = rect.bottom - (rect.bottom - rect.top) / 2 - 100;
+    }
+    DEBUG << L"Using fallback position: (" << pt.x << L", " << pt.y << L")";
   }
   if (position_type != PositionType::kMousePos) {
     HMONITOR hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
@@ -138,6 +159,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     return 0;
   SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
   HR(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED));
+  
+  // 初始化光标跟踪器
+  g_cursor_tracker = std::make_unique<weasel::CursorTracker>();
+  #ifdef _DEBUG
+  g_cursor_tracker->EnableDebugOutput(true);
+  #endif
+  
   m_toy = std::make_unique<RimeWithToy>(hInstance);
   // --------------------------------------------------------------------------
   hKeyboardHook =
@@ -160,6 +188,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   m_toy->Finalize();
   UnhookWindowsHookEx(hKeyboardHook);
   UnhookWindowsHookEx(hMouseHook);
+  
+  // 清理光标跟踪器
+  g_cursor_tracker.reset();
+  
   CoUninitialize();
   return 0;
 }
