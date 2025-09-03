@@ -1,8 +1,11 @@
 #include "cursor_tracker.h"
 #include "accessibility_helper.h"
 #include <algorithm>
+#include <cctype>
 #include <imm.h>
+#include <locale>
 #include <oleacc.h>
+#include <psapi.h>
 
 namespace weasel {
 
@@ -50,27 +53,48 @@ CursorPosition CursorTracker::GetCursorPosition(HWND targetWindow) {
   result.targetWindow = targetWindow;
   result.timestamp = now;
 
-  // 按优先级尝试各种检测方法
-  if (TryGetGUIThreadInfo(targetWindow, result.point)) {
-    result.method = CursorDetectionMethod::GUI_THREAD_INFO;
-    result.valid = true;
-    DebugLog(L"Cursor found using GetGUIThreadInfo");
-  } else if (TryGetIMEComposition(targetWindow, result.point)) {
-    result.method = CursorDetectionMethod::IME_COMPOSITION;
-    result.valid = true;
-    DebugLog(L"Cursor found using IME Composition");
-  } else if (TryGetCaretPos(targetWindow, result.point)) {
-    result.method = CursorDetectionMethod::CARET_POS;
-    result.valid = true;
-    DebugLog(L"Cursor found using GetCaretPos");
-  } else if (TryGetAccessibility(targetWindow, result.point)) {
-    result.method = CursorDetectionMethod::ACCESSIBILITY;
-    result.valid = true;
-    DebugLog(L"Cursor found using Accessibility");
-  } else if (TryGetMousePosition(result.point)) {
-    result.method = CursorDetectionMethod::MOUSE_FALLBACK;
-    result.valid = true;
-    DebugLog(L"Fallback to mouse position");
+  // 检测应用类型并使用相应的检测策略
+  ApplicationType appType = DetectApplicationType(targetWindow);
+  DebugLog(L"Detected application type: " + std::to_wstring((int)appType));
+
+  // 根据应用类型选择最佳检测方法
+  if (TryDetectByApplicationType(targetWindow, result.point, appType)) {
+    // 验证检测结果
+    if (ValidateDetectionResult(result.point, targetWindow, appType)) {
+      result.valid = true;
+      DebugLog(L"Cursor found using app-specific method");
+    } else {
+      DebugLog(L"App-specific detection result invalid, trying fallback");
+      // 如果应用特定方法失败，尝试鼠标位置
+      if (TryGetMousePosition(result.point)) {
+        result.method = CursorDetectionMethod::MOUSE_FALLBACK;
+        result.valid = true;
+        DebugLog(L"Using mouse position as fallback");
+      }
+    }
+  } else {
+    // 应用特定检测失败，使用原有的通用检测链
+    if (TryGetGUIThreadInfo(targetWindow, result.point)) {
+      result.method = CursorDetectionMethod::GUI_THREAD_INFO;
+      result.valid = true;
+      DebugLog(L"Cursor found using GetGUIThreadInfo");
+    } else if (TryGetIMEComposition(targetWindow, result.point)) {
+      result.method = CursorDetectionMethod::IME_COMPOSITION;
+      result.valid = true;
+      DebugLog(L"Cursor found using IME Composition");
+    } else if (TryGetCaretPos(targetWindow, result.point)) {
+      result.method = CursorDetectionMethod::CARET_POS;
+      result.valid = true;
+      DebugLog(L"Cursor found using GetCaretPos");
+    } else if (TryGetAccessibility(targetWindow, result.point)) {
+      result.method = CursorDetectionMethod::ACCESSIBILITY;
+      result.valid = true;
+      DebugLog(L"Cursor found using Accessibility");
+    } else if (TryGetMousePosition(result.point)) {
+      result.method = CursorDetectionMethod::MOUSE_FALLBACK;
+      result.valid = true;
+      DebugLog(L"Fallback to mouse position");
+    }
   }
 
   if (result.valid) {
@@ -342,6 +366,223 @@ void CursorTracker::DebugLog(const std::wstring &message) {
   if (debug_output_) {
     DEBUG << L"[CursorTracker] " << message;
   }
+}
+
+ApplicationType CursorTracker::DetectApplicationType(HWND hwnd) {
+  if (!hwnd)
+    return ApplicationType::UNKNOWN;
+
+  wchar_t className[256] = {0};
+  wchar_t windowTitle[256] = {0};
+  wchar_t processName[256] = {0};
+
+  GetClassName(hwnd, className, 255);
+  GetWindowText(hwnd, windowTitle, 255);
+
+  // 获取进程名
+  DWORD processId;
+  GetWindowThreadProcessId(hwnd, &processId);
+  HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+                                FALSE, processId);
+  if (hProcess) {
+    GetModuleBaseName(hProcess, NULL, processName, 255);
+    CloseHandle(hProcess);
+  }
+
+  std::wstring classStr(className);
+  std::wstring titleStr(windowTitle);
+  std::wstring procStr(processName);
+
+  // 转换为小写进行比较
+  std::transform(classStr.begin(), classStr.end(), classStr.begin(),
+                 ::towlower);
+  std::transform(titleStr.begin(), titleStr.end(), titleStr.begin(),
+                 ::towlower);
+  std::transform(procStr.begin(), procStr.end(), procStr.begin(), ::towlower);
+
+  // 终端应用检测
+  if (procStr.find(L"windowsterminal") != std::wstring::npos ||
+      procStr.find(L"conhost") != std::wstring::npos ||
+      procStr.find(L"cmd") != std::wstring::npos ||
+      procStr.find(L"powershell") != std::wstring::npos ||
+      classStr.find(L"consolewindowclass") != std::wstring::npos) {
+    return ApplicationType::TERMINAL;
+  }
+
+  // 浏览器应用检测
+  if (procStr.find(L"chrome") != std::wstring::npos ||
+      procStr.find(L"msedge") != std::wstring::npos ||
+      procStr.find(L"firefox") != std::wstring::npos ||
+      procStr.find(L"iexplore") != std::wstring::npos ||
+      classStr.find(L"chrome") != std::wstring::npos ||
+      classStr.find(L"mozilla") != std::wstring::npos) {
+    return ApplicationType::BROWSER;
+  }
+
+  // 文件管理器检测
+  if (procStr.find(L"explorer") != std::wstring::npos ||
+      classStr.find(L"cabinetwclass") != std::wstring::npos ||
+      classStr.find(L"explorerframe") != std::wstring::npos) {
+    return ApplicationType::FILE_MANAGER;
+  }
+
+  // Office 应用检测
+  if (procStr.find(L"winword") != std::wstring::npos ||
+      procStr.find(L"excel") != std::wstring::npos ||
+      procStr.find(L"powerpnt") != std::wstring::npos ||
+      procStr.find(L"outlook") != std::wstring::npos) {
+    return ApplicationType::OFFICE;
+  }
+
+  return ApplicationType::STANDARD_WIN32;
+}
+
+bool CursorTracker::TryDetectByApplicationType(HWND hwnd, POINT &pt,
+                                               ApplicationType appType) {
+  switch (appType) {
+  case ApplicationType::TERMINAL:
+    return TryTerminalSpecific(hwnd, pt);
+
+  case ApplicationType::BROWSER:
+    return TryBrowserSpecific(hwnd, pt);
+
+  case ApplicationType::FILE_MANAGER:
+    return TryFileManagerSpecific(hwnd, pt);
+
+  case ApplicationType::OFFICE:
+    // Office 应用优先使用 IME 检测
+    return TryGetIMEComposition(hwnd, pt) || TryGetGUIThreadInfo(hwnd, pt);
+
+  case ApplicationType::STANDARD_WIN32:
+    // 标准应用使用完整检测链
+    return TryGetGUIThreadInfo(hwnd, pt) || TryGetIMEComposition(hwnd, pt);
+
+  default:
+    return false;
+  }
+}
+
+bool CursorTracker::ValidateDetectionResult(const POINT &pt, HWND hwnd,
+                                            ApplicationType appType) {
+  // 检查 (0,0) 位置 - 通常是无效的
+  if (pt.x == 0 && pt.y == 0) {
+    DebugLog(L"Invalid position (0,0) detected");
+    return false;
+  }
+
+  // 检查是否在合理的屏幕范围内
+  if (!IsPositionValid(pt, hwnd)) {
+    DebugLog(L"Position outside valid screen area");
+    return false;
+  }
+
+  // 对于终端应用，允许更宽松的验证
+  if (appType == ApplicationType::TERMINAL) {
+    return true;
+  }
+
+  // 检查位置是否在窗口范围内（允许一定的偏移）
+  RECT windowRect;
+  if (GetWindowRect(hwnd, &windowRect)) {
+    // 扩展窗口边界，允许候选窗口显示在窗口外
+    InflateRect(&windowRect, 200, 200);
+
+    if (!PtInRect(&windowRect, pt)) {
+      DebugLog(L"Position too far from window bounds");
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool CursorTracker::TryTerminalSpecific(HWND hwnd, POINT &pt) {
+  // 终端应用的特殊处理
+  // 1. 首先尝试获取控制台光标位置
+  CONSOLE_SCREEN_BUFFER_INFO csbi;
+  HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+
+  if (hConsole != INVALID_HANDLE_VALUE &&
+      GetConsoleScreenBufferInfo(hConsole, &csbi)) {
+    // 获取控制台窗口位置
+    RECT consoleRect;
+    if (GetWindowRect(hwnd, &consoleRect)) {
+      // 估算字符位置
+      int charWidth = 8;   // 估算字符宽度
+      int charHeight = 16; // 估算字符高度
+
+      pt.x = consoleRect.left + csbi.dwCursorPosition.X * charWidth + 10;
+      pt.y = consoleRect.top + csbi.dwCursorPosition.Y * charHeight + 30;
+
+      DebugLog(L"Terminal cursor from console API: (" + std::to_wstring(pt.x) +
+               L", " + std::to_wstring(pt.y) + L")");
+      return true;
+    }
+  }
+
+  // 2. 如果控制台 API 失败，使用鼠标位置
+  if (TryGetMousePosition(pt)) {
+    DebugLog(L"Terminal using mouse position fallback");
+    return true;
+  }
+
+  return false;
+}
+
+bool CursorTracker::TryBrowserSpecific(HWND hwnd, POINT &pt) {
+  // 浏览器应用的特殊处理
+  // 1. 优先使用无障碍接口
+  if (TryGetAccessibility(hwnd, pt)) {
+    DebugLog(L"Browser cursor from accessibility API");
+    return true;
+  }
+
+  // 2. 尝试 GUI 线程信息，但需要额外验证
+  if (TryGetGUIThreadInfo(hwnd, pt)) {
+    // 对于浏览器，GUI 线程信息可能不准确，需要额外调整
+    RECT windowRect;
+    if (GetWindowRect(hwnd, &windowRect)) {
+      // 如果位置在窗口顶部区域（可能是地址栏），进行调整
+      if (pt.y < windowRect.top + 100) {
+        pt.y = windowRect.top + 80; // 调整到地址栏下方
+      }
+    }
+    DebugLog(L"Browser cursor from GUI thread info (adjusted)");
+    return true;
+  }
+
+  // 3. 最后使用鼠标位置
+  if (TryGetMousePosition(pt)) {
+    DebugLog(L"Browser using mouse position fallback");
+    return true;
+  }
+
+  return false;
+}
+
+bool CursorTracker::TryFileManagerSpecific(HWND hwnd, POINT &pt) {
+  // 文件管理器的特殊处理
+  // 避免使用 IME 检测，因为可能干扰正常检测
+
+  // 1. 优先使用 GUI 线程信息
+  if (TryGetGUIThreadInfo(hwnd, pt)) {
+    DebugLog(L"File manager cursor from GUI thread info");
+    return true;
+  }
+
+  // 2. 尝试无障碍接口
+  if (TryGetAccessibility(hwnd, pt)) {
+    DebugLog(L"File manager cursor from accessibility API");
+    return true;
+  }
+
+  // 3. 使用鼠标位置作为回退
+  if (TryGetMousePosition(pt)) {
+    DebugLog(L"File manager using mouse position fallback");
+    return true;
+  }
+
+  return false;
 }
 
 } // namespace weasel
