@@ -1,4 +1,5 @@
 #include "cursor_tracker.h"
+#include "accessibility_helper.h"
 #include <algorithm>
 #include <imm.h>
 #include <oleacc.h>
@@ -133,16 +134,73 @@ bool CursorTracker::TryGetIMEComposition(HWND hwnd, POINT &pt) {
   if (!hIMC)
     return false;
 
-  COMPOSITIONFORM cf = {};
   bool success = false;
 
+  // 方法1: 获取合成窗口位置 (最准确)
+  COMPOSITIONFORM cf = {};
   if (ImmGetCompositionWindow(hIMC, &cf)) {
     pt.x = cf.ptCurrentPos.x;
     pt.y = cf.ptCurrentPos.y + 20; // 合成位置下方
 
-    // 转换为屏幕坐标
-    if (ClientToScreen(hwnd, &pt)) {
-      success = IsPositionValid(pt, hwnd);
+    if (ClientToScreen(hwnd, &pt) && IsPositionValid(pt, hwnd)) {
+      success = true;
+      DebugLog(L"IME position from CompositionWindow: (" +
+               std::to_wstring(pt.x) + L", " + std::to_wstring(pt.y) + L")");
+    }
+  }
+
+  // 方法2: 获取候选窗口位置 (如果方法1失败)
+  if (!success) {
+    CANDIDATEFORM candidateForm = {};
+    if (ImmGetCandidateWindow(hIMC, 0, &candidateForm)) {
+      pt.x = candidateForm.ptCurrentPos.x;
+      pt.y = candidateForm.ptCurrentPos.y - 5; // 候选窗口上方
+
+      if (ClientToScreen(hwnd, &pt) && IsPositionValid(pt, hwnd)) {
+        success = true;
+        DebugLog(L"IME position from CandidateWindow: (" +
+                 std::to_wstring(pt.x) + L", " + std::to_wstring(pt.y) + L")");
+      }
+    }
+  }
+
+  // 方法3: 获取状态窗口位置 (最后尝试)
+  if (!success) {
+    POINT statusPos;
+    if (ImmGetStatusWindowPos(hIMC, &statusPos)) {
+      pt.x = statusPos.x;
+      pt.y = statusPos.y + 30; // 状态窗口下方
+
+      if (IsPositionValid(pt, hwnd)) {
+        success = true;
+        DebugLog(L"IME position from StatusWindow: (" + std::to_wstring(pt.x) +
+                 L", " + std::to_wstring(pt.y) + L")");
+      }
+    }
+  }
+
+  // 方法4: 尝试获取输入上下文的字体信息来推算位置
+  if (!success) {
+    LOGFONT logFont;
+    if (ImmGetCompositionFont(hIMC, &logFont)) {
+      // 使用字体高度来估算合适的偏移
+      int fontHeight = abs(logFont.lfHeight);
+      if (fontHeight == 0)
+        fontHeight = 16; // 默认字体高度
+
+      // 获取窗口客户区左上角作为基准点
+      RECT clientRect;
+      if (GetClientRect(hwnd, &clientRect)) {
+        pt.x = clientRect.left + 10;
+        pt.y = clientRect.top + fontHeight + 5;
+
+        if (ClientToScreen(hwnd, &pt) && IsPositionValid(pt, hwnd)) {
+          success = true;
+          DebugLog(L"IME position estimated from font info: (" +
+                   std::to_wstring(pt.x) + L", " + std::to_wstring(pt.y) +
+                   L")");
+        }
+      }
     }
   }
 
@@ -168,8 +226,20 @@ bool CursorTracker::TryGetCaretPos(HWND hwnd, POINT &pt) {
 }
 
 bool CursorTracker::TryGetAccessibility(HWND hwnd, POINT &pt) {
-  // 无障碍接口实现 - 第二阶段完善
-  // 这里先返回 false，后续实现
+  // 延迟初始化无障碍助手
+  if (!accessibility_helper_) {
+    accessibility_helper_ = std::make_unique<AccessibilityHelper>();
+    if (debug_output_) {
+      accessibility_helper_->EnableDebugOutput(true);
+    }
+  }
+
+  if (accessibility_helper_->GetCaretPosition(hwnd, pt)) {
+    DebugLog(L"Cursor found using Accessibility API at (" +
+             std::to_wstring(pt.x) + L", " + std::to_wstring(pt.y) + L")");
+    return IsPositionValid(pt, hwnd);
+  }
+
   return false;
 }
 

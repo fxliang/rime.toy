@@ -7,6 +7,11 @@
 #include <utils.h>
 #include <windows.h>
 
+// 前向声明
+namespace weasel {
+class AccessibilityHelper;
+}
+
 namespace weasel {
 
 enum class CursorDetectionMethod {
@@ -80,6 +85,9 @@ private:
   // 状态数据
   CursorPosition cached_position_; // 缓存的光标位置
   HWND last_target_window_;        // 上次的目标窗口
+
+  // 无障碍接口助手
+  std::unique_ptr<AccessibilityHelper> accessibility_helper_;
 
   // 性能统计
   mutable int call_count_;      // 调用次数
