@@ -283,8 +283,8 @@ bool CursorTracker::IsPositionValid(const POINT &pt, HWND hwnd) {
   int virtualScreenHeight = GetSystemMetrics(SM_CYVIRTUALSCREEN);
 
   RECT virtualScreenRect = {virtualScreenX, virtualScreenY,
-                          virtualScreenX + virtualScreenWidth,
-                          virtualScreenY + virtualScreenHeight};
+                            virtualScreenX + virtualScreenWidth,
+                            virtualScreenY + virtualScreenHeight};
 
   // 允许一定的边界外区域
   InflateRect(&virtualScreenRect, 100, 100);
