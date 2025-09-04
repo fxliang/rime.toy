@@ -267,12 +267,30 @@ bool AccessibilityHelper::TryMSAA(HWND hwnd, POINT &pt) {
 }
 
 bool AccessibilityHelper::IsValidPosition(const POINT &pt) {
-  // 检查位置是否在合理的屏幕范围内
-  int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-  int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+  // 1. 拒绝接近原点的垃圾值
+  if (pt.x <= 10 && pt.y <= 10) {
+    return false;
+  }
 
-  return (pt.x >= -100 && pt.x <= screenWidth + 100 && pt.y >= -100 &&
-          pt.y <= screenHeight + 100);
+  // 2. 确保点在某个有效的显示器上
+  if (MonitorFromPoint(pt, MONITOR_DEFAULTTONULL) == NULL) {
+    return false;
+  }
+
+  // 3. 检查是否在虚拟屏幕的合理范围内 (可选，但可以防止极端异常值)
+  int virtualScreenX = GetSystemMetrics(SM_XVIRTUALSCREEN);
+  int virtualScreenY = GetSystemMetrics(SM_YVIRTUALSCREEN);
+  int virtualScreenWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+  int virtualScreenHeight = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+
+  RECT virtualScreenRect = {virtualScreenX, virtualScreenY,
+                          virtualScreenX + virtualScreenWidth,
+                          virtualScreenY + virtualScreenHeight};
+
+  // 允许一定的边界外区域
+  InflateRect(&virtualScreenRect, 100, 100);
+
+  return PtInRect(&virtualScreenRect, pt);
 }
 
 } // namespace weasel

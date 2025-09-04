@@ -266,22 +266,30 @@ bool CursorTracker::TryGetAccessibility(HWND hwnd, POINT &pt) {
 bool CursorTracker::TryGetMousePosition(POINT &pt) { return GetCursorPos(&pt); }
 
 bool CursorTracker::IsPositionValid(const POINT &pt, HWND hwnd) {
-  // 检查位置是否在屏幕范围内
-  int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-  int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-
-  if (pt.x < -100 || pt.x > screenWidth + 100 || pt.y < -100 ||
-      pt.y > screenHeight + 100) {
+  // 1. 拒绝接近原点的垃圾值
+  if (pt.x <= 10 && pt.y <= 10) {
     return false;
   }
 
-  // 检查是否在多显示器环境中的有效区域
-  HMONITOR hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONULL);
-  if (!hMonitor) {
+  // 2. 确保点在某个有效的显示器上
+  if (MonitorFromPoint(pt, MONITOR_DEFAULTTONULL) == NULL) {
     return false;
   }
 
-  return true;
+  // 3. 检查是否在虚拟屏幕的合理范围内 (可选，但可以防止极端异常值)
+  int virtualScreenX = GetSystemMetrics(SM_XVIRTUALSCREEN);
+  int virtualScreenY = GetSystemMetrics(SM_YVIRTUALSCREEN);
+  int virtualScreenWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+  int virtualScreenHeight = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+
+  RECT virtualScreenRect = {virtualScreenX, virtualScreenY,
+                          virtualScreenX + virtualScreenWidth,
+                          virtualScreenY + virtualScreenHeight};
+
+  // 允许一定的边界外区域
+  InflateRect(&virtualScreenRect, 100, 100);
+
+  return PtInRect(&virtualScreenRect, pt);
 }
 
 bool CursorTracker::ShouldUpdatePosition(const CursorPosition &newPos) {
