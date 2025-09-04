@@ -29,8 +29,8 @@ void update_position(HWND hwnd) {
       cursor_found = true;
 
       // 调试输出
-      DEBUG << L"Cursor found using method: " << (int)cursor_pos.method
-            << L" at (" << pt.x << L", " << pt.y << L")";
+      DEBUG << "Cursor found using method: " << (int)cursor_pos.method
+            << " at (" << pt.x << ", " << pt.y << ")";
     }
   }
 
@@ -43,7 +43,7 @@ void update_position(HWND hwnd) {
       pt.x = rect.left + (rect.right - rect.left) / 2 - 150;
       pt.y = rect.bottom - (rect.bottom - rect.top) / 2 - 100;
     }
-    DEBUG << L"Using fallback position: (" << pt.x << L", " << pt.y << L")";
+    DEBUG << "Using fallback position: (" << pt.x << ", " << pt.y << ")";
   }
   if (position_type != PositionType::kMousePos) {
     HMONITOR hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
