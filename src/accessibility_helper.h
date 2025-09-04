@@ -23,9 +23,6 @@ public:
   bool GetCaretPosition(HWND hwnd, POINT &pt);
   bool IsInitialized() const { return m_initialized; }
 
-  // 调试接口
-  void EnableDebugOutput(bool enable) { debug_output_ = enable; }
-
 private:
   // 各种无障碍检测方法
   bool TryUIAutomation(HWND hwnd, POINT &pt);
@@ -34,7 +31,6 @@ private:
   bool TryAccessibleObjectFromWindow(HWND hwnd, POINT &pt);
 
   // 辅助方法
-  void DebugLog(const std::wstring &message);
   bool IsValidPosition(const POINT &pt);
 
   // UI Automation 相关方法
@@ -48,7 +44,6 @@ private:
 
   // 状态标志
   bool m_initialized;
-  bool debug_output_;
 
   // 性能统计
   mutable int call_count_;

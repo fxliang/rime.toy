@@ -63,7 +63,6 @@ public:
   void SetCacheTimeout(int milliseconds) { cache_timeout_ms_ = milliseconds; }
 
   // 调试接口
-  void EnableDebugOutput(bool enable) { debug_output_ = enable; }
   const CursorPosition &GetLastPosition() const { return cached_position_; }
 
 private:
@@ -78,7 +77,6 @@ private:
   bool IsPositionValid(const POINT &pt, HWND hwnd);
   bool ShouldUpdatePosition(const CursorPosition &newPos);
   void UpdateCache(const CursorPosition &pos);
-  void DebugLog(const std::wstring &message);
 
   // 位置调整方法
   void AdjustPositionForWindow(POINT &pt, HWND hwnd);
@@ -101,7 +99,6 @@ private:
   bool enabled_;         // 是否启用光标跟踪
   int update_threshold_; // 位置变化阈值(像素)
   int cache_timeout_ms_; // 缓存超时时间(毫秒)
-  bool debug_output_;    // 是否输出调试信息
 
   // 状态数据
   CursorPosition cached_position_; // 缓存的光标位置

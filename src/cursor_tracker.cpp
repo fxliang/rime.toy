@@ -6,23 +6,23 @@
 #include <locale>
 #include <oleacc.h>
 #include <psapi.h>
+#include <utils.h>
 
 namespace weasel {
 
 CursorTracker::CursorTracker()
     : enabled_(true), update_threshold_(5), cache_timeout_ms_(50),
-      debug_output_(false), last_target_window_(nullptr), call_count_(0),
-      cache_hit_count_(0) {
+      last_target_window_(nullptr), call_count_(0), cache_hit_count_(0) {
 
-  DebugLog(L"CursorTracker initialized");
+  DEBUG << L"CursorTracker initialized";
 }
 
 CursorTracker::~CursorTracker() {
-  if (debug_output_ && call_count_ > 0) {
+  if (call_count_ > 0) {
     float cache_hit_rate = (float)cache_hit_count_ / call_count_ * 100.0f;
-    DebugLog(L"CursorTracker stats - Calls: " + std::to_wstring(call_count_) +
-             L", Cache hits: " + std::to_wstring(cache_hit_count_) +
-             L", Hit rate: " + std::to_wstring(cache_hit_rate) + L"%");
+    DEBUG << L"CursorTracker stats - Calls: " + std::to_wstring(call_count_) +
+                 L", Cache hits: " + std::to_wstring(cache_hit_count_) +
+                 L", Hit rate: " + std::to_wstring(cache_hit_rate) + L"%";
   }
 }
 
@@ -55,21 +55,21 @@ CursorPosition CursorTracker::GetCursorPosition(HWND targetWindow) {
 
   // 检测应用类型并使用相应的检测策略
   ApplicationType appType = DetectApplicationType(targetWindow);
-  DebugLog(L"Detected application type: " + std::to_wstring((int)appType));
+  DEBUG << L"Detected application type: " + std::to_wstring((int)appType);
 
   // 根据应用类型选择最佳检测方法
   if (TryDetectByApplicationType(targetWindow, result.point, appType)) {
     // 验证检测结果
     if (ValidateDetectionResult(result.point, targetWindow, appType)) {
       result.valid = true;
-      DebugLog(L"Cursor found using app-specific method");
+      DEBUG << L"Cursor found using app-specific method";
     } else {
-      DebugLog(L"App-specific detection result invalid, trying fallback");
+      DEBUG << L"App-specific detection result invalid, trying fallback";
       // 如果应用特定方法失败，尝试鼠标位置
       if (TryGetMousePosition(result.point)) {
         result.method = CursorDetectionMethod::MOUSE_FALLBACK;
         result.valid = true;
-        DebugLog(L"Using mouse position as fallback");
+        DEBUG << L"Using mouse position as fallback";
       }
     }
   } else {
@@ -77,23 +77,23 @@ CursorPosition CursorTracker::GetCursorPosition(HWND targetWindow) {
     if (TryGetGUIThreadInfo(targetWindow, result.point)) {
       result.method = CursorDetectionMethod::GUI_THREAD_INFO;
       result.valid = true;
-      DebugLog(L"Cursor found using GetGUIThreadInfo");
+      DEBUG << L"Cursor found using GetGUIThreadInfo";
     } else if (TryGetIMEComposition(targetWindow, result.point)) {
       result.method = CursorDetectionMethod::IME_COMPOSITION;
       result.valid = true;
-      DebugLog(L"Cursor found using IME Composition");
+      DEBUG << L"Cursor found using IME Composition";
     } else if (TryGetCaretPos(targetWindow, result.point)) {
       result.method = CursorDetectionMethod::CARET_POS;
       result.valid = true;
-      DebugLog(L"Cursor found using GetCaretPos");
+      DEBUG << L"Cursor found using GetCaretPos";
     } else if (TryGetAccessibility(targetWindow, result.point)) {
       result.method = CursorDetectionMethod::ACCESSIBILITY;
       result.valid = true;
-      DebugLog(L"Cursor found using Accessibility");
+      DEBUG << L"Cursor found using Accessibility";
     } else if (TryGetMousePosition(result.point)) {
       result.method = CursorDetectionMethod::MOUSE_FALLBACK;
       result.valid = true;
-      DebugLog(L"Fallback to mouse position");
+      DEBUG << L"Fallback to mouse position";
     }
   }
 
@@ -103,8 +103,8 @@ CursorPosition CursorTracker::GetCursorPosition(HWND targetWindow) {
 
     if (ShouldUpdatePosition(result)) {
       UpdateCache(result);
-      DebugLog(L"Position updated to (" + std::to_wstring(result.point.x) +
-               L", " + std::to_wstring(result.point.y) + L")");
+      DEBUG << L"Position updated to (" + std::to_wstring(result.point.x) +
+                   L", " + std::to_wstring(result.point.y) + L")";
     }
   }
 
@@ -168,8 +168,8 @@ bool CursorTracker::TryGetIMEComposition(HWND hwnd, POINT &pt) {
 
     if (ClientToScreen(hwnd, &pt) && IsPositionValid(pt, hwnd)) {
       success = true;
-      DebugLog(L"IME position from CompositionWindow: (" +
-               std::to_wstring(pt.x) + L", " + std::to_wstring(pt.y) + L")");
+      DEBUG << L"IME position from CompositionWindow: (" +
+                   std::to_wstring(pt.x) + L", " + std::to_wstring(pt.y) + L")";
     }
   }
 
@@ -182,8 +182,9 @@ bool CursorTracker::TryGetIMEComposition(HWND hwnd, POINT &pt) {
 
       if (ClientToScreen(hwnd, &pt) && IsPositionValid(pt, hwnd)) {
         success = true;
-        DebugLog(L"IME position from CandidateWindow: (" +
-                 std::to_wstring(pt.x) + L", " + std::to_wstring(pt.y) + L")");
+        DEBUG << L"IME position from CandidateWindow: (" +
+                     std::to_wstring(pt.x) + L", " + std::to_wstring(pt.y) +
+                     L")";
       }
     }
   }
@@ -197,8 +198,8 @@ bool CursorTracker::TryGetIMEComposition(HWND hwnd, POINT &pt) {
 
       if (IsPositionValid(pt, hwnd)) {
         success = true;
-        DebugLog(L"IME position from StatusWindow: (" + std::to_wstring(pt.x) +
-                 L", " + std::to_wstring(pt.y) + L")");
+        DEBUG << L"IME position from StatusWindow: (" + std::to_wstring(pt.x) +
+                     L", " + std::to_wstring(pt.y) + L")";
       }
     }
   }
@@ -220,9 +221,9 @@ bool CursorTracker::TryGetIMEComposition(HWND hwnd, POINT &pt) {
 
         if (ClientToScreen(hwnd, &pt) && IsPositionValid(pt, hwnd)) {
           success = true;
-          DebugLog(L"IME position estimated from font info: (" +
-                   std::to_wstring(pt.x) + L", " + std::to_wstring(pt.y) +
-                   L")");
+          DEBUG << L"IME position estimated from font info: (" +
+                       std::to_wstring(pt.x) + L", " + std::to_wstring(pt.y) +
+                       L")";
         }
       }
     }
@@ -253,14 +254,11 @@ bool CursorTracker::TryGetAccessibility(HWND hwnd, POINT &pt) {
   // 延迟初始化无障碍助手
   if (!accessibility_helper_) {
     accessibility_helper_ = std::make_unique<AccessibilityHelper>();
-    if (debug_output_) {
-      accessibility_helper_->EnableDebugOutput(true);
-    }
   }
 
   if (accessibility_helper_->GetCaretPosition(hwnd, pt)) {
-    DebugLog(L"Cursor found using Accessibility API at (" +
-             std::to_wstring(pt.x) + L", " + std::to_wstring(pt.y) + L")");
+    DEBUG << L"Cursor found using Accessibility API at (" +
+                 std::to_wstring(pt.x) + L", " + std::to_wstring(pt.y) + L")";
     return IsPositionValid(pt, hwnd);
   }
 
@@ -362,12 +360,6 @@ bool CursorTracker::IsPointInWindow(const POINT &pt, HWND hwnd) {
   return false;
 }
 
-void CursorTracker::DebugLog(const std::wstring &message) {
-  if (debug_output_) {
-    DEBUG << L"[CursorTracker] " << message;
-  }
-}
-
 ApplicationType CursorTracker::DetectApplicationType(HWND hwnd) {
   if (!hwnd)
     return ApplicationType::UNKNOWN;
@@ -466,13 +458,13 @@ bool CursorTracker::ValidateDetectionResult(const POINT &pt, HWND hwnd,
                                             ApplicationType appType) {
   // 检查 (0,0) 位置 - 通常是无效的
   if (pt.x == 0 && pt.y == 0) {
-    DebugLog(L"Invalid position (0,0) detected");
+    DEBUG << L"Invalid position (0,0) detected";
     return false;
   }
 
   // 检查是否在合理的屏幕范围内
   if (!IsPositionValid(pt, hwnd)) {
-    DebugLog(L"Position outside valid screen area");
+    DEBUG << L"Position outside valid screen area";
     return false;
   }
 
@@ -488,7 +480,7 @@ bool CursorTracker::ValidateDetectionResult(const POINT &pt, HWND hwnd,
     InflateRect(&windowRect, 200, 200);
 
     if (!PtInRect(&windowRect, pt)) {
-      DebugLog(L"Position too far from window bounds");
+      DEBUG << L"Position too far from window bounds";
       return false;
     }
   }
@@ -514,15 +506,15 @@ bool CursorTracker::TryTerminalSpecific(HWND hwnd, POINT &pt) {
       pt.x = consoleRect.left + csbi.dwCursorPosition.X * charWidth + 10;
       pt.y = consoleRect.top + csbi.dwCursorPosition.Y * charHeight + 30;
 
-      DebugLog(L"Terminal cursor from console API: (" + std::to_wstring(pt.x) +
-               L", " + std::to_wstring(pt.y) + L")");
+      DEBUG << L"Terminal cursor from console API: (" + std::to_wstring(pt.x) +
+                   L", " + std::to_wstring(pt.y) + L")";
       return true;
     }
   }
 
   // 2. 如果控制台 API 失败，使用鼠标位置
   if (TryGetMousePosition(pt)) {
-    DebugLog(L"Terminal using mouse position fallback");
+    DEBUG << L"Terminal using mouse position fallback";
     return true;
   }
 
@@ -533,7 +525,7 @@ bool CursorTracker::TryBrowserSpecific(HWND hwnd, POINT &pt) {
   // 浏览器应用的特殊处理
   // 1. 优先使用无障碍接口
   if (TryGetAccessibility(hwnd, pt)) {
-    DebugLog(L"Browser cursor from accessibility API");
+    DEBUG << L"Browser cursor from accessibility API";
     return true;
   }
 
@@ -547,13 +539,13 @@ bool CursorTracker::TryBrowserSpecific(HWND hwnd, POINT &pt) {
         pt.y = windowRect.top + 80; // 调整到地址栏下方
       }
     }
-    DebugLog(L"Browser cursor from GUI thread info (adjusted)");
+    DEBUG << L"Browser cursor from GUI thread info (adjusted)";
     return true;
   }
 
   // 3. 最后使用鼠标位置
   if (TryGetMousePosition(pt)) {
-    DebugLog(L"Browser using mouse position fallback");
+    DEBUG << L"Browser using mouse position fallback";
     return true;
   }
 
@@ -566,19 +558,19 @@ bool CursorTracker::TryFileManagerSpecific(HWND hwnd, POINT &pt) {
 
   // 1. 优先使用 GUI 线程信息
   if (TryGetGUIThreadInfo(hwnd, pt)) {
-    DebugLog(L"File manager cursor from GUI thread info");
+    DEBUG << L"File manager cursor from GUI thread info";
     return true;
   }
 
   // 2. 尝试无障碍接口
   if (TryGetAccessibility(hwnd, pt)) {
-    DebugLog(L"File manager cursor from accessibility API");
+    DEBUG << L"File manager cursor from accessibility API";
     return true;
   }
 
   // 3. 使用鼠标位置作为回退
   if (TryGetMousePosition(pt)) {
-    DebugLog(L"File manager using mouse position fallback");
+    DEBUG << L"File manager using mouse position fallback";
     return true;
   }
 

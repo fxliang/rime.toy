@@ -162,9 +162,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
   // 初始化光标跟踪器
   g_cursor_tracker = std::make_unique<weasel::CursorTracker>();
-#ifdef _DEBUG
-  g_cursor_tracker->EnableDebugOutput(true);
-#endif
 
   m_toy = std::make_unique<RimeWithToy>(hInstance);
   // --------------------------------------------------------------------------

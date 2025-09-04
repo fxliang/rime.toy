@@ -1,19 +1,19 @@
 #include "accessibility_helper.h"
 #include <comdef.h>
+#include <utils.h>
 
 namespace weasel {
 
 AccessibilityHelper::AccessibilityHelper()
-    : m_initialized(false), debug_output_(false), call_count_(0),
-      success_count_(0) {}
+    : m_initialized(false), call_count_(0), success_count_(0) {}
 
 AccessibilityHelper::~AccessibilityHelper() {
-  if (debug_output_ && call_count_ > 0) {
+  if (call_count_ > 0) {
     float success_rate = (float)success_count_ / call_count_ * 100.0f;
-    DebugLog(L"AccessibilityHelper stats - Calls: " +
-             std::to_wstring(call_count_) + L", Success: " +
-             std::to_wstring(success_count_) + L", Success rate: " +
-             std::to_wstring(success_rate) + L"%");
+    DEBUG << L"AccessibilityHelper stats - Calls: " +
+                 std::to_wstring(call_count_) + L", Success: " +
+                 std::to_wstring(success_count_) + L", Success rate: " +
+                 std::to_wstring(success_rate) + L"%";
   }
 }
 
@@ -24,7 +24,7 @@ bool AccessibilityHelper::Initialize() {
   // 初始化 COM (如果尚未初始化)
   HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
-    DebugLog(L"Failed to initialize COM: " + std::to_wstring(hr));
+    DEBUG << L"Failed to initialize COM: " + std::to_wstring(hr);
     return false;
   }
 
@@ -34,9 +34,9 @@ bool AccessibilityHelper::Initialize() {
 
   if (SUCCEEDED(hr)) {
     m_initialized = true;
-    DebugLog(L"UI Automation initialized successfully");
+    DEBUG << L"UI Automation initialized successfully";
   } else {
-    DebugLog(L"Failed to initialize UI Automation: " + std::to_wstring(hr));
+    DEBUG << L"Failed to initialize UI Automation: " + std::to_wstring(hr);
     // 即使 UI Automation 失败，我们仍然可以尝试其他方法
     m_initialized = true;
   }
@@ -53,25 +53,25 @@ bool AccessibilityHelper::GetCaretPosition(HWND hwnd, POINT &pt) {
   // 按优先级尝试不同的无障碍方法
   if (TryUIAutomation(hwnd, pt)) {
     success_count_++;
-    DebugLog(L"Caret position found using UI Automation");
+    DEBUG << L"Caret position found using UI Automation";
     return true;
   }
 
   if (TryAccessibleObjectFromWindow(hwnd, pt)) {
     success_count_++;
-    DebugLog(L"Caret position found using AccessibleObjectFromWindow");
+    DEBUG << L"Caret position found using AccessibleObjectFromWindow";
     return true;
   }
 
   if (TryTextPattern(hwnd, pt)) {
     success_count_++;
-    DebugLog(L"Caret position found using Text Pattern");
+    DEBUG << L"Caret position found using Text Pattern";
     return true;
   }
 
   if (TryMSAA(hwnd, pt)) {
     success_count_++;
-    DebugLog(L"Caret position found using MSAA");
+    DEBUG << L"Caret position found using MSAA";
     return true;
   }
 
@@ -152,7 +152,7 @@ bool AccessibilityHelper::TryUIAutomation(HWND hwnd, POINT &pt) {
       }
     }
   } catch (...) {
-    DebugLog(L"Exception in TryUIAutomation");
+    DEBUG << L"Exception in TryUIAutomation";
   }
 
   return false;
@@ -221,7 +221,7 @@ bool AccessibilityHelper::TryAccessibleObjectFromWindow(HWND hwnd, POINT &pt) {
       VariantClear(&varFocused);
     }
   } catch (...) {
-    DebugLog(L"Exception in TryAccessibleObjectFromWindow");
+    DEBUG << L"Exception in TryAccessibleObjectFromWindow";
   }
 
   return false;
@@ -261,7 +261,7 @@ bool AccessibilityHelper::TryMSAA(HWND hwnd, POINT &pt) {
       }
     }
   } catch (...) {
-    DebugLog(L"Exception in TryMSAA");
+    DEBUG << L"Exception in TryMSAA";
   }
 
   return false;
@@ -274,12 +274,6 @@ bool AccessibilityHelper::IsValidPosition(const POINT &pt) {
 
   return (pt.x >= -100 && pt.x <= screenWidth + 100 && pt.y >= -100 &&
           pt.y <= screenHeight + 100);
-}
-
-void AccessibilityHelper::DebugLog(const std::wstring &message) {
-  if (debug_output_) {
-    DEBUG << L"[AccessibilityHelper] " << message;
-  }
 }
 
 } // namespace weasel
