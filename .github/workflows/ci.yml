@@ -61,11 +61,7 @@ jobs:
       - name: Checkout last commit
         uses: actions/checkout@v4
 
-      # xmake 2.9.4 or later
       - uses: xmake-io/github-action-setup-xmake@v1
-        with:
-          xmake-version: '2.9.4'
-          actions-cache-folder: '.xmake-cache'
 
       - uses: ilammy/msvc-dev-cmd@v1
 
