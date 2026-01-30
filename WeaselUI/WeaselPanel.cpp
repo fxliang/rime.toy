@@ -51,11 +51,46 @@ WeaselPanel::WeaselPanel(UI &ui)
 
 BOOL WeaselPanel::IsWindow() const { return ::IsWindow(m_hWnd); }
 
-void WeaselPanel::ShowWindow(int nCmdShow) { ::ShowWindow(m_hWnd, nCmdShow); }
+void WeaselPanel::ShowWindow(int nCmdShow) {
+  ::ShowWindow(m_hWnd, nCmdShow);
+  if (m_pD2D) {
+    if (nCmdShow != SW_HIDE) {
+      // ensure window resources exist when showing
+      if (!m_pD2D->swapChain) {
+        m_pD2D->m_hWnd = m_hWnd;
+        m_pD2D->InitDpiInfo();
+        m_pD2D->InitDirect2D();
+        if (!m_style.font_face.empty())
+          m_pD2D->InitDirectWriteResources();
+      }
+    }
+  }
+}
 
 void WeaselPanel::DestroyWindow() {
-  ::DestroyWindow(m_hWnd);
-  m_hWnd = nullptr;
+  if (m_pD2D) {
+    // when hiding, keep resources for fast restore; when fully destroying, drop resources
+    if (m_pD2D->keepResourcesOnHide) {
+      // simply hide window
+      ::ShowWindow(m_hWnd, SW_HIDE);
+    } else {
+      m_pD2D->ReleaseWindowResources();
+      ::DestroyWindow(m_hWnd);
+      m_hWnd = nullptr;
+    }
+  } else {
+    ::DestroyWindow(m_hWnd);
+    m_hWnd = nullptr;
+  }
+}
+
+void WeaselPanel::ReleaseAllResources() {
+  if (m_pD2D) {
+    m_pD2D->ReleaseWindowResources();
+    // explicitly reset shared devices
+    DeviceResources::Get().Reset();
+    m_pD2D.reset();
+  }
 }
 
 void WeaselPanel::MoveTo(RECT rc) {
@@ -140,7 +175,11 @@ void WeaselPanel::Refresh() {
     hide_candidates = inline_no_candidates ||
                       (margin_negative && !show_tips && !show_schema_menu);
     auto hr = m_pD2D->direct3dDevice->GetDeviceRemovedReason();
-    FAILEDACTION(hr, DEBUG << StrzHr(hr), m_pD2D->InitDirect2D());
+    if (hr != S_OK) {
+      DEBUG << "Device removed detected: " << StrzHr(hr);
+      DeviceResources::Get().Reset();
+      m_pD2D->InitDirect2D();
+    }
     _CreateLayout();
     m_layout->DoLayout();
     _ResizeWindow();
@@ -259,7 +298,14 @@ void WeaselPanel::DoPaint() {
 
   HR(m_pD2D->dc->EndDraw());
   // Make the swap chain available to the composition engine
-  HR(m_pD2D->swapChain->Present(1, 0)); // sync
+  HRESULT hrPresent = m_pD2D->swapChain->Present(1, 0); // sync
+  if (hrPresent == DXGI_ERROR_DEVICE_REMOVED || hrPresent == DXGI_ERROR_DEVICE_RESET) {
+    DEBUG << "Device lost during Present: " << StrzHr(hrPresent);
+    DeviceResources::Get().Reset();
+    m_pD2D->InitDirect2D();
+  } else {
+    HR(hrPresent);
+  }
 }
 
 bool WeaselPanel::_DrawPreedit(const Text &text, bool isPreedit) {

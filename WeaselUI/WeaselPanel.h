@@ -16,6 +16,8 @@ public:
   BOOL IsWindow() const;
   void ShowWindow(int nCmdShow);
   void DestroyWindow();
+  // release all resources associated with this panel (window + shared devices)
+  void ReleaseAllResources();
   BOOL Create(HWND parent);
   bool GetIsReposition() { return m_istorepos; }
 

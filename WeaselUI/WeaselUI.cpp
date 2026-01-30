@@ -122,6 +122,8 @@ void UI::Destroy(bool full) {
     if (pimpl_->panel.IsWindow())
       pimpl_->panel.DestroyWindow();
     if (full) {
+      // ensure window resources and shared devices are released
+      pimpl_->panel.ReleaseAllResources();
       delete pimpl_;
       pimpl_ = nullptr;
     }

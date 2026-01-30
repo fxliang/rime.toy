@@ -13,10 +13,36 @@
 #include <dwrite_2.h>
 #include <dxgi1_3.h>
 #include <utils.h>
+#include <map>
+#include <mutex>
+#include <string>
 
 namespace weasel {
 
 typedef ComPtr<IDWriteTextFormat1> PtTextFormat;
+
+// Shared device resources for Direct2D/Direct3D/DComposition/DWrite
+class DeviceResources {
+ public:
+  static DeviceResources &Get();
+
+  HRESULT EnsureInitialized();
+  // release and reinitialize device resources (used on device lost)
+  void Reset();
+
+  ComPtr<ID3D11Device> direct3dDevice;
+  ComPtr<IDXGIDevice> dxgiDevice;
+  ComPtr<IDXGIFactory2> dxFactory;
+  ComPtr<ID2D1Factory2> d2Factory;
+  ComPtr<ID2D1Device1> d2Device;
+  ComPtr<IDCompositionDevice> dcompDevice;
+  ComPtr<IDWriteFactory2> m_pWriteFactory;
+
+ private:
+  DeviceResources();
+  bool initialized;
+};
+
 struct IsToRoundStruct {
   bool IsTopLeftNeedToRound;
   bool IsBottomLeftNeedToRound;
@@ -37,6 +63,7 @@ struct D2D {
   void InitDirectWriteResources();
   void InitDpiInfo();
   void InitFontFormats();
+  PtTextFormat GetOrCreateTextFormat(const std::wstring &face, int point, DWRITE_WORD_WRAPPING wrap);
   void InitFontFormats(const wstring &label_font_face,
                        const int label_font_point, const wstring &font_face,
                        const int font_point, const wstring &comment_font_face,
@@ -80,6 +107,16 @@ struct D2D {
   PtTextFormat pCommentFormat;
   ComPtr<IDWriteFactory2> m_pWriteFactory;
   ComPtr<ID2D1SolidColorBrush> m_pBrush;
+  // caches
+  std::map<std::wstring, PtTextFormat> textFormatCache; // key = face|size|wrap
+  std::map<uint32_t, ComPtr<ID2D1SolidColorBrush>> brushCache; // key = color
+  std::mutex cacheMutex;
+  // clear caches that depend on device/context
+  void ClearDeviceDependentCaches();
+  // release per-window resources (swapchain/visual/bitmap/dc) without touching shared devices
+  // if keepResourcesOnHide is true, ReleaseWindowResources will be a no-op
+  void ReleaseWindowResources();
+  bool keepResourcesOnHide = true;
   UIStyle &m_style;
   HWND m_hWnd;
   float m_dpiX;
