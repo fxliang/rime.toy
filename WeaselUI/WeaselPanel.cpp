@@ -69,7 +69,8 @@ void WeaselPanel::ShowWindow(int nCmdShow) {
 
 void WeaselPanel::DestroyWindow() {
   if (m_pD2D) {
-    // when hiding, keep resources for fast restore; when fully destroying, drop resources
+    // when hiding, keep resources for fast restore; when fully destroying, drop
+    // resources
     if (m_pD2D->keepResourcesOnHide) {
       // simply hide window
       ::ShowWindow(m_hWnd, SW_HIDE);
@@ -299,7 +300,8 @@ void WeaselPanel::DoPaint() {
   HR(m_pD2D->dc->EndDraw());
   // Make the swap chain available to the composition engine
   HRESULT hrPresent = m_pD2D->swapChain->Present(1, 0); // sync
-  if (hrPresent == DXGI_ERROR_DEVICE_REMOVED || hrPresent == DXGI_ERROR_DEVICE_RESET) {
+  if (hrPresent == DXGI_ERROR_DEVICE_REMOVED ||
+      hrPresent == DXGI_ERROR_DEVICE_RESET) {
     DEBUG << "Device lost during Present: " << StrzHr(hrPresent);
     DeviceResources::Get().Reset();
     m_pD2D->InitDirect2D();

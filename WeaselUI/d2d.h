@@ -12,10 +12,10 @@
 #include <dwrite.h>
 #include <dwrite_2.h>
 #include <dxgi1_3.h>
-#include <utils.h>
 #include <map>
 #include <mutex>
 #include <string>
+#include <utils.h>
 
 namespace weasel {
 
@@ -23,7 +23,7 @@ typedef ComPtr<IDWriteTextFormat1> PtTextFormat;
 
 // Shared device resources for Direct2D/Direct3D/DComposition/DWrite
 class DeviceResources {
- public:
+public:
   static DeviceResources &Get();
 
   HRESULT EnsureInitialized();
@@ -38,7 +38,7 @@ class DeviceResources {
   ComPtr<IDCompositionDevice> dcompDevice;
   ComPtr<IDWriteFactory2> m_pWriteFactory;
 
- private:
+private:
   DeviceResources();
   bool initialized;
 };
@@ -63,7 +63,8 @@ struct D2D {
   void InitDirectWriteResources();
   void InitDpiInfo();
   void InitFontFormats();
-  PtTextFormat GetOrCreateTextFormat(const std::wstring &face, int point, DWRITE_WORD_WRAPPING wrap);
+  PtTextFormat GetOrCreateTextFormat(const std::wstring &face, int point,
+                                     DWRITE_WORD_WRAPPING wrap);
   void InitFontFormats(const wstring &label_font_face,
                        const int label_font_point, const wstring &font_face,
                        const int font_point, const wstring &comment_font_face,
@@ -113,8 +114,9 @@ struct D2D {
   std::mutex cacheMutex;
   // clear caches that depend on device/context
   void ClearDeviceDependentCaches();
-  // release per-window resources (swapchain/visual/bitmap/dc) without touching shared devices
-  // if keepResourcesOnHide is true, ReleaseWindowResources will be a no-op
+  // release per-window resources (swapchain/visual/bitmap/dc) without touching
+  // shared devices if keepResourcesOnHide is true, ReleaseWindowResources will
+  // be a no-op
   void ReleaseWindowResources();
   bool keepResourcesOnHide = true;
   UIStyle &m_style;

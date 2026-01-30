@@ -6,7 +6,8 @@
 
 namespace weasel {
 
-// DeviceResources implementation moved from cpp to header; provide definitions here
+// DeviceResources implementation moved from cpp to header; provide definitions
+// here
 DeviceResources &DeviceResources::Get() {
   static DeviceResources instance;
   return instance;
@@ -15,32 +16,42 @@ DeviceResources &DeviceResources::Get() {
 DeviceResources::DeviceResources() : initialized(false) {}
 
 HRESULT DeviceResources::EnsureInitialized() {
-  if (initialized) return S_OK;
+  if (initialized)
+    return S_OK;
   HRESULT hr = S_OK;
-  hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
-                         D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0,
-                         D3D11_SDK_VERSION, direct3dDevice.ReleaseAndGetAddressOf(),
-                         nullptr, nullptr);
-  if (FAILED(hr)) return hr;
+  hr = D3D11CreateDevice(
+      nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
+      D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION,
+      direct3dDevice.ReleaseAndGetAddressOf(), nullptr, nullptr);
+  if (FAILED(hr))
+    return hr;
   hr = direct3dDevice.As(&dxgiDevice);
-  if (FAILED(hr)) return hr;
+  if (FAILED(hr))
+    return hr;
   hr = CreateDXGIFactory2(
       0, __uuidof(dxFactory.Get()),
       reinterpret_cast<void **>(dxFactory.ReleaseAndGetAddressOf()));
-  if (FAILED(hr)) return hr;
+  if (FAILED(hr))
+    return hr;
   D2D1_FACTORY_OPTIONS const options = {D2D1_DEBUG_LEVEL_INFORMATION};
   hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, options,
                          d2Factory.ReleaseAndGetAddressOf());
-  if (FAILED(hr)) return hr;
-  hr = d2Factory->CreateDevice(dxgiDevice.Get(), d2Device.ReleaseAndGetAddressOf());
-  if (FAILED(hr)) return hr;
+  if (FAILED(hr))
+    return hr;
+  hr = d2Factory->CreateDevice(dxgiDevice.Get(),
+                               d2Device.ReleaseAndGetAddressOf());
+  if (FAILED(hr))
+    return hr;
   hr = DCompositionCreateDevice(
       dxgiDevice.Get(), __uuidof(dcompDevice.Get()),
       reinterpret_cast<void **>(dcompDevice.ReleaseAndGetAddressOf()));
-  if (FAILED(hr)) return hr;
-  hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory2),
-                           reinterpret_cast<IUnknown **>(m_pWriteFactory.ReleaseAndGetAddressOf()));
-  if (FAILED(hr)) return hr;
+  if (FAILED(hr))
+    return hr;
+  hr = DWriteCreateFactory(
+      DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory2),
+      reinterpret_cast<IUnknown **>(m_pWriteFactory.ReleaseAndGetAddressOf()));
+  if (FAILED(hr))
+    return hr;
 
   initialized = true;
   return S_OK;
@@ -72,7 +83,8 @@ void D2D::ClearDeviceDependentCaches() {
 }
 
 void D2D::ReleaseWindowResources() {
-  if (keepResourcesOnHide) return; // no-op when preserving resources for quick restore
+  if (keepResourcesOnHide)
+    return; // no-op when preserving resources for quick restore
   // detach DC target first
   if (dc) {
     dc->SetTarget(nullptr);
@@ -82,7 +94,8 @@ void D2D::ReleaseWindowResources() {
   visual.Reset();
   target.Reset();
   swapChain.Reset();
-  // brushes are per-window if created from this dc; clear so they'll be recreated
+  // brushes are per-window if created from this dc; clear so they'll be
+  // recreated
   std::lock_guard<std::mutex> lk(cacheMutex);
   for (auto &kv : brushCache) {
     kv.second.Reset();
@@ -109,9 +122,11 @@ void D2D::InitDirect2D() {
   // clear device-dependent caches before reinitializing
   ClearDeviceDependentCaches();
 
-  // Use shared device resources to avoid recreating expensive objects per window
+  // Use shared device resources to avoid recreating expensive objects per
+  // window
   HRESULT hr = DeviceResources::Get().EnsureInitialized();
-  if (FAILED(hr)) return;
+  if (FAILED(hr))
+    return;
 
   // Adopt shared pointers
   direct3dDevice = DeviceResources::Get().direct3dDevice;
@@ -122,7 +137,8 @@ void D2D::InitDirect2D() {
   dcompDevice = DeviceResources::Get().dcompDevice;
   m_pWriteFactory = DeviceResources::Get().m_pWriteFactory;
 
-  // Create the Direct2D device context for this window (renders to window-specific target)
+  // Create the Direct2D device context for this window (renders to
+  // window-specific target)
   HR(d2Device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
                                    dc.ReleaseAndGetAddressOf()));
   dc->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
@@ -145,8 +161,7 @@ void D2D::InitDirect2D() {
   description.Height = rect.bottom - rect.top;
 
   HR(dxFactory->CreateSwapChainForComposition(
-      dxgiDevice.Get(), &description,
-      nullptr,
+      dxgiDevice.Get(), &description, nullptr,
       swapChain.ReleaseAndGetAddressOf()));
 
   // Retrieve the swap chain's back buffer
@@ -182,7 +197,8 @@ void D2D::InitDirect2D() {
       m_pBrush = it->second;
     } else {
       D2D1_COLOR_F const brushColor = D2D1::ColorF(D2D1::ColorF::Black);
-      HR(dc->CreateSolidColorBrush(brushColor, m_pBrush.ReleaseAndGetAddressOf()));
+      HR(dc->CreateSolidColorBrush(brushColor,
+                                   m_pBrush.ReleaseAndGetAddressOf()));
       brushCache[black] = m_pBrush;
     }
   }
@@ -194,11 +210,12 @@ void D2D::OnResize(UINT width, UINT height) {
   bitmap.Reset();
   surface.Reset();
   // Resize the swap chain
-  HRESULT hr = swapChain->ResizeBuffers(2, // Buffer count
-                              width, height,
-                              DXGI_FORMAT_B8G8R8A8_UNORM, // New format
-                              0                           // Swap chain flags
-                              );
+  HRESULT hr =
+      swapChain->ResizeBuffers(2, // Buffer count
+                               width, height,
+                               DXGI_FORMAT_B8G8R8A8_UNORM, // New format
+                               0                           // Swap chain flags
+      );
   if (hr == DXGI_ERROR_DEVICE_RESET || hr == DXGI_ERROR_DEVICE_REMOVED) {
     DEBUG << "Device lost during ResizeBuffers: " << StrzHr(hr);
     // attempt device recovery
@@ -257,18 +274,20 @@ static std::wstring MatchWordsOutLowerCaseTrim1st(const std::wstring &wstr,
   return res;
 }
 
-PtTextFormat D2D::GetOrCreateTextFormat(const std::wstring &face, int point, DWRITE_WORD_WRAPPING wrap) {
+PtTextFormat D2D::GetOrCreateTextFormat(const std::wstring &face, int point,
+                                        DWRITE_WORD_WRAPPING wrap) {
   // safety checks: require write factory and valid point
   if (!m_pWriteFactory || point <= 0 || face.empty()) {
     return PtTextFormat();
   }
-  
+
   bool vertical_text = m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT;
   DWRITE_FLOW_DIRECTION flow = m_style.vertical_text_left_to_right
                                    ? DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
                                    : DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT;
-  
-  std::wstring key = face + L"|" + std::to_wstring(point) + L"|" + std::to_wstring((int)wrap);
+
+  std::wstring key =
+      face + L"|" + std::to_wstring(point) + L"|" + std::to_wstring((int)wrap);
 
   PtTextFormat pFormat;
   {
@@ -289,14 +308,15 @@ PtTextFormat D2D::GetOrCreateTextFormat(const std::wstring &face, int point, DWR
     HR(m_pWriteFactory->CreateTextFormat(
         _mainFontFace.c_str(), NULL, fontWeight, fontStyle, fontStretch,
         point * m_dpiScaleFontPoint, L"",
-        reinterpret_cast<IDWriteTextFormat **>(pFormat.ReleaseAndGetAddressOf())));
+        reinterpret_cast<IDWriteTextFormat **>(
+            pFormat.ReleaseAndGetAddressOf())));
     pFormat->SetWordWrapping(wrap);
 
     std::vector<std::wstring> fontFaceStrVector;
     fontFaceStrVector = ws_split(face, L",");
-    fontFaceStrVector[0] = std::regex_replace(
-        fontFaceStrVector[0], std::wregex(STYLEORWEIGHT, std::wregex::icase),
-        L"");
+    fontFaceStrVector[0] =
+        std::regex_replace(fontFaceStrVector[0],
+                           std::wregex(STYLEORWEIGHT, std::wregex::icase), L"");
     SetFontFallback(pFormat, fontFaceStrVector);
 
     {
@@ -305,7 +325,8 @@ PtTextFormat D2D::GetOrCreateTextFormat(const std::wstring &face, int point, DWR
     }
   }
 
-  // Update dynamic styles (always apply these as they might change with m_style)
+  // Update dynamic styles (always apply these as they might change with
+  // m_style)
   if (vertical_text) {
     pFormat->SetFlowDirection(flow);
     pFormat->SetReadingDirection(DWRITE_READING_DIRECTION_TOP_TO_BOTTOM);
@@ -372,10 +393,12 @@ void D2D::InitFontFormats(const wstring &label_font_face,
 void D2D::InitDirectWriteResources() {
   // dwrite factory is provided by DeviceResources; ensure initialized
   HRESULT hr = DeviceResources::Get().EnsureInitialized();
-  if (FAILED(hr)) return;
+  if (FAILED(hr))
+    return;
   m_pWriteFactory = DeviceResources::Get().m_pWriteFactory;
   // guard against invalid style
-  if (m_style.font_face.empty() || m_style.font_point <= 0) return;
+  if (m_style.font_face.empty() || m_style.font_point <= 0)
+    return;
   InitFontFormats();
 }
 
