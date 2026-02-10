@@ -1,7 +1,6 @@
 #include "RimeWithToy.h"
 #include "key_table.h"
 #include <fstream>
-#include <map>
 #include <nlohmann/json.hpp>
 #include <regex>
 #include <resource.h>
@@ -18,14 +17,6 @@ using json = nlohmann::json;
   (((value & 0xff) << 24) | ((value & 0xff000000) >> 24) |                     \
    ((value & 0x00ff0000) >> 8) | ((value & 0x0000ff00) << 8))
 typedef enum { COLOR_ABGR = 0, COLOR_ARGB, COLOR_RGBA } ColorFormat;
-
-#ifdef USE_SHARP_COLOR_CODE
-#define HEX_REGEX std::regex("^(0x|#)[0-9a-f]+$", std::regex::icase)
-#define TRIMHEAD_REGEX std::regex("0x|#", std::regex::icase)
-#else
-#define HEX_REGEX std::regex("^0x[0-9a-f]+$", std::regex::icase)
-#define TRIMHEAD_REGEX std::regex("0x", std::regex::icase)
-#endif
 
 static RimeApi *rime_api = nullptr;
 PositionType position_type = PositionType::kMousePos;
@@ -657,15 +648,6 @@ static inline COLORREF blend_colors(COLORREF fcolor, COLORREF bcolor) {
   return (BYTE)(retAlpha * 255) << 24 | retB << 16 | retG << 8 | retR;
 }
 
-// convertions from color format to COLOR_ABGR
-static inline int ConvertColorToAbgr(int color, ColorFormat fmt = COLOR_ABGR) {
-  if (fmt == COLOR_ABGR)
-    return color & 0xffffffff;
-  else if (fmt == COLOR_ARGB)
-    return ARGB2ABGR(color) & 0xffffffff;
-  else
-    return RGBA2ABGR(color) & 0xffffffff;
-}
 // parse color value, with fallback value
 static Bool _RimeGetColor(RimeConfig *config, const string key, int &value,
                           const ColorFormat &fmt,
@@ -675,47 +657,65 @@ static Bool _RimeGetColor(RimeConfig *config, const string key, int &value,
     value = fallback;
     return False;
   }
-
-  string color_str = string(color);
-  auto alpha = [&](int &value) {
-    value = (fmt != COLOR_RGBA) ? (value | 0xff000000)
-                                : ((value << 8) | 0x000000ff);
+  const auto color_str = std::string(color);
+  // adjudge if str is 0x 0X # hex color format, return trimmed hex part
+  // out part is 6 or 8 length hex string without white space
+  const auto parse_color_code = [](const std::string &str, std::string &out) {
+    if (str.empty())
+      return false;
+    size_t start = 0;
+    if (str[0] == '#') {
+      start = 1;
+    } else if (str.size() >= 2 &&
+               (str.compare(0, 2, "0x") == 0 || str.compare(0, 2, "0X") == 0)) {
+      start = 2;
+    } else {
+      return false;
+    }
+    const std::string hex_part = str.substr(start);
+    if (hex_part.empty())
+      return false;
+    if ((start == 1 || start == 2) && hex_part.length() != 3 &&
+        hex_part.length() != 4 && hex_part.length() != 6 &&
+        hex_part.length() != 8) {
+      return false;
+    }
+    for (char c : hex_part) {
+      if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
+            (c >= 'A' && c <= 'F')))
+        return false;
+    }
+    out = str.substr(start).substr(0, 8);
+#define _2C(c) std::string(2, c)
+    if (out.size() == 3)
+      out = _2C(out[0]) + _2C(out[1]) + _2C(out[2]);
+    else if (out.size() == 4)
+      out = _2C(out[0]) + _2C(out[1]) + _2C(out[2]) + _2C(out[3]);
+#undef _2C
+    return true;
   };
-  if (std::regex_match(color_str, HEX_REGEX)) {
-    string tmp = std::regex_replace(color_str, TRIMHEAD_REGEX, "").substr(0, 8);
-    switch (tmp.length()) {
-    case 6: // color code without alpha, xxyyzz add alpha ff
-      value = std::stoul(tmp, 0, 16);
-      alpha(value);
-      break;
-    case 3: // color hex code xyz => xxyyzz and alpha ff
-      tmp = string(2, tmp[0]) + string(2, tmp[1]) + string(2, tmp[2]);
-      value = std::stoul(tmp, 0, 16);
-      alpha(value);
-      break;
-    case 4: // color hex code vxyz => vvxxyyzz
-      tmp = string(2, tmp[0]) + string(2, tmp[1]) + string(2, tmp[2]) +
-            string(2, tmp[3]);
-      value = std::stoul(tmp, 0, 16);
-      break;
-    case 7:
-    case 8: // color code with alpha
-      value = std::stoul(tmp, 0, 16);
-      break;
-    default: // invalid length
+  auto hex_color = std::string();
+  if (parse_color_code(color_str, hex_color)) {
+    value = std::stoul(hex_color, 0, 16);
+    if (hex_color.length() == 6)
+      value = (fmt != COLOR_RGBA) ? (value | 0xff000000)
+                                  : (((unsigned int)value << 8) | 0x000000ff);
+  } else {
+    if (!rime_api->config_get_int(config, key.c_str(), &value)) {
       value = fallback;
       return False;
     }
-  } else {
-    int tmp = 0;
-    if (!rime_api->config_get_int(config, key.c_str(), &tmp)) {
-      value = fallback;
-      return False;
-    } else
-      value = tmp;
-    alpha(value);
+    if (value <= 0xffffff)
+      value = (fmt != COLOR_RGBA) ? (value | 0xff000000)
+                                  : (((unsigned int)value << 8) | 0x000000ff);
+    else if (value > 0xffffffff)
+      value &= 0xffffffff;
   }
-  value = ConvertColorToAbgr(value, fmt);
+  if (fmt == COLOR_ARGB)
+    value = ARGB2ABGR(value);
+  else if (fmt == COLOR_RGBA)
+    value = RGBA2ABGR(value);
+  value &= 0xffffffff;
   return True;
 }
 // parset bool type configuration to T type value trueValue / falseValue
@@ -726,17 +726,24 @@ void _RimeGetBool(RimeConfig *config, const char *key, bool cond, T &value,
   if (rime_api->config_get_bool(config, key, &tempb) || cond)
     value = (!!tempb) ? trueValue : falseValue;
 }
-//	parse string option to T type value, with fallback
-template <typename T>
-void _RimeParseStringOptWithFallback(RimeConfig *config, const string &key,
-                                     T &value, const std::map<string, T> &amap,
+
+template <typename T, size_t N>
+using Array = std::array<std::pair<const char *, T>, N>;
+// parse string option to T type value, with fallback
+template <typename T, size_t N>
+void _RimeParseStringOptWithFallback(RimeConfig *config, const char *key,
+                                     T &value, const Array<T, N> &arr,
                                      const T &fallback) {
   char str_buff[256] = {0};
-  if (rime_api->config_get_string(config, key.c_str(), str_buff, 255)) {
-    auto it = amap.find(string(str_buff));
-    value = (it != amap.end()) ? it->second : fallback;
-  } else
-    value = fallback;
+  if (rime_api->config_get_string(config, key, str_buff, 255)) {
+    for (size_t i = 0; i < N; ++i) {
+      if (strcmp(arr[i].first, str_buff) == 0) {
+        value = arr[i].second;
+        return;
+      }
+    }
+  }
+  value = fallback;
 }
 
 template <typename T>
@@ -775,12 +782,10 @@ bool _UpdateUIStyleColor(RimeConfig *config, UIStyle &style, string color) {
     prefix += (color.empty()) ? buffer : color;
     // define color format, default abgr if not set
     ColorFormat fmt = COLOR_ABGR;
-    const std::map<string, ColorFormat> _colorFmt = {
-        {string("argb"), COLOR_ARGB},
-        {string("rgba"), COLOR_RGBA},
-        {string("abgr"), COLOR_ABGR}};
-    _RimeParseStringOptWithFallback(config, (prefix + "/color_format"), fmt,
-                                    _colorFmt, COLOR_ABGR);
+    static constexpr Array<ColorFormat, 3> _colorFmt = {
+        {{"argb", COLOR_ARGB}, {"rgba", COLOR_RGBA}, {"abgr", COLOR_ABGR}}};
+    _RimeParseStringOptWithFallback(config, (prefix + "/color_format").c_str(),
+                                    fmt, _colorFmt, COLOR_ABGR);
 #define COLOR(key, value, fallback)                                            \
   _RimeGetColor(config, (prefix + "/" + key), value, fmt, fallback)
     COLOR("back_color", style.back_color, 0xffffffff);
@@ -855,32 +860,32 @@ void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize) {
                style.vertical_auto_reverse);
   _RimeGetBool(config, "style/vertical_right_to_left", initialize,
                style.vertical_right_to_left);
-  const std::map<string, UIStyle::PreeditType> _preeditMap = {
-      {string("composition"), UIStyle::COMPOSITION},
-      {string("preview"), UIStyle::PREVIEW},
-      {string("preview_all"), UIStyle::PREVIEW_ALL}};
+  static constexpr Array<UIStyle::PreeditType, 3> _preeditArr = {
+      {{"composition", UIStyle::COMPOSITION},
+       {"preview", UIStyle::PREVIEW},
+       {"preview_all", UIStyle::PREVIEW_ALL}}};
   _RimeParseStringOptWithFallback(config, "style/preedit_type",
-                                  style.preedit_type, _preeditMap,
+                                  style.preedit_type, _preeditArr,
                                   style.preedit_type);
-  const std::map<string, UIStyle::AntiAliasMode> _aliasModeMap = {
-      {string("force_dword"), UIStyle::FORCE_DWORD},
-      {string("cleartype"), UIStyle::CLEARTYPE},
-      {string("grayscale"), UIStyle::GRAYSCALE},
-      {string("aliased"), UIStyle::ALIASED},
-      {string("default"), UIStyle::DEFAULT}};
+  static constexpr Array<UIStyle::AntiAliasMode, 5> _aliasModeArr = {
+      {{"force_dword", UIStyle::FORCE_DWORD},
+       {"cleartype", UIStyle::CLEARTYPE},
+       {"grayscale", UIStyle::GRAYSCALE},
+       {"aliased", UIStyle::ALIASED},
+       {"default", UIStyle::DEFAULT}}};
   _RimeParseStringOptWithFallback(config, "style/antialias_mode",
-                                  style.antialias_mode, _aliasModeMap,
+                                  style.antialias_mode, _aliasModeArr,
                                   style.antialias_mode);
-  const std::map<string, UIStyle::HoverType> _hoverTypeMap = {
-      {string("none"), UIStyle::HoverType::NONE},
-      {string("semi_hilite"), UIStyle::HoverType::SEMI_HILITE},
-      {string("hilite"), UIStyle::HoverType::HILITE}};
+  static constexpr Array<UIStyle::HoverType, 3> _hoverTypeArr = {
+      {{"none", UIStyle::HoverType::NONE},
+       {"semi_hilite", UIStyle::HoverType::SEMI_HILITE},
+       {"hilite", UIStyle::HoverType::HILITE}}};
   _RimeParseStringOptWithFallback(config, "style/hover_type", style.hover_type,
-                                  _hoverTypeMap, style.hover_type);
-  const std::map<string, UIStyle::LayoutAlignType> _alignType = {
-      {string("top"), UIStyle::ALIGN_TOP},
-      {string("center"), UIStyle::ALIGN_CENTER},
-      {string("bottom"), UIStyle::ALIGN_BOTTOM}};
+                                  _hoverTypeArr, style.hover_type);
+  static constexpr Array<UIStyle::LayoutAlignType, 3> _alignType = {
+      {{"top", UIStyle::ALIGN_TOP},
+       {"center", UIStyle::ALIGN_CENTER},
+       {"bottom", UIStyle::ALIGN_BOTTOM}}};
   _RimeParseStringOptWithFallback(config, "style/layout/align_type",
                                   style.align_type, _alignType,
                                   style.align_type);
@@ -905,8 +910,8 @@ void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize) {
                style.vertical_text_left_to_right);
   _RimeGetBool(config, "style/vertical_text_with_wrap", false,
                style.vertical_text_with_wrap);
-  const std::map<string, bool> _text_orientation = {
-      {string("horizontal"), false}, {string("vertical"), true}};
+  static constexpr Array<bool, 2> _text_orientation = {
+      {{"horizontal", false}, {"vertical", true}}};
   bool _text_orientation_bool = false;
   _RimeParseStringOptWithFallback(config, "style/text_orientation",
                                   _text_orientation_bool, _text_orientation,
@@ -925,14 +930,14 @@ void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize) {
   _RimeGetIntStr(config, "style/layout/max_height", style.max_height, 0, 0,
                  _abs);
   // layout (alternative to style/horizontal)
-  const std::map<string, UIStyle::LayoutType> _layoutMap = {
-      {string("vertical"), UIStyle::LAYOUT_VERTICAL},
-      {string("horizontal"), UIStyle::LAYOUT_HORIZONTAL},
-      {string("vertical_text"), UIStyle::LAYOUT_VERTICAL_TEXT},
-      {string("vertical+fullscreen"), UIStyle::LAYOUT_VERTICAL_FULLSCREEN},
-      {string("horizontal+fullscreen"), UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN}};
+  static constexpr Array<UIStyle::LayoutType, 5> _layoutArr = {
+      {{"vertical", UIStyle::LAYOUT_VERTICAL},
+       {"horizontal", UIStyle::LAYOUT_HORIZONTAL},
+       {"vertical_text", UIStyle::LAYOUT_VERTICAL_TEXT},
+       {"vertical+fullscreen", UIStyle::LAYOUT_VERTICAL_FULLSCREEN},
+       {"horizontal+fullscreen", UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN}}};
   _RimeParseStringOptWithFallback(config, "style/layout/type",
-                                  style.layout_type, _layoutMap,
+                                  style.layout_type, _layoutArr,
                                   style.layout_type);
   // disable max_width when full screen
   if (style.layout_type == UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN ||
