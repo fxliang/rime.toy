@@ -103,8 +103,6 @@ void D2D::ReleaseWindowResources() {
   brushCache.clear();
 }
 
-#define STYLEORWEIGHT (L":[^:]*[^a-f0-9:]+[^:]*")
-
 D2D::D2D(UIStyle &style, HWND hwnd)
     : m_style(style), m_hWnd(hwnd), m_dpiX(96.0f), m_dpiY(96.0f) {
   InitDpiInfo();
@@ -116,6 +114,8 @@ D2D::~D2D() {
                  d2Device, dc, surface, bitmap, dcompDevice, target, visual,
                  pPreeditFormat, pLabelFormat, pTextFormat, pCommentFormat,
                  m_pWriteFactory, m_pBrush);
+  textFormatCache.clear();
+  brushCache.clear();
 }
 
 void D2D::InitDirect2D() {
@@ -166,8 +166,7 @@ void D2D::InitDirect2D() {
 
   // Retrieve the swap chain's back buffer
   HR(swapChain->GetBuffer(
-      0, // index
-      __uuidof(surface.Get()),
+      0, __uuidof(surface.Get()),
       reinterpret_cast<void **>(surface.ReleaseAndGetAddressOf())));
   // Create a Direct2D bitmap that points to the swap chain surface
   D2D1_BITMAP_PROPERTIES1 properties = {};
@@ -211,11 +210,7 @@ void D2D::OnResize(UINT width, UINT height) {
   surface.Reset();
   // Resize the swap chain
   HRESULT hr =
-      swapChain->ResizeBuffers(2, // Buffer count
-                               width, height,
-                               DXGI_FORMAT_B8G8R8A8_UNORM, // New format
-                               0                           // Swap chain flags
-      );
+      swapChain->ResizeBuffers(2, width, height, DXGI_FORMAT_B8G8R8A8_UNORM, 0);
   if (hr == DXGI_ERROR_DEVICE_RESET || hr == DXGI_ERROR_DEVICE_REMOVED) {
     DEBUG << "Device lost during ResizeBuffers: " << StrzHr(hr);
     // attempt device recovery
@@ -227,8 +222,7 @@ void D2D::OnResize(UINT width, UINT height) {
   HR(hr);
   // Retrieve the new swap chain's back buffer
   HR(swapChain->GetBuffer(
-      0, // index
-      __uuidof(surface.Get()),
+      0, __uuidof(surface.Get()),
       reinterpret_cast<void **>(surface.ReleaseAndGetAddressOf())));
   // Create a new Direct2D bitmap pointing to the new swap chain surface
   D2D1_BITMAP_PROPERTIES1 properties = {};
@@ -255,10 +249,9 @@ std::vector<std::wstring> ws_split(const std::wstring &in,
 }
 
 static std::wstring MatchWordsOutLowerCaseTrim1st(const std::wstring &wstr,
-                                                  const std::wstring &pat) {
+                                                  const std::wregex &pattern) {
   std::wstring mat = L"";
   std::wsmatch mc;
-  std::wregex pattern(pat, std::wregex::icase);
   std::wstring::const_iterator iter = wstr.cbegin();
   std::wstring::const_iterator end = wstr.cend();
   while (regex_search(iter, end, mc, pattern)) {
@@ -280,13 +273,11 @@ PtTextFormat D2D::GetOrCreateTextFormat(const std::wstring &face, int point,
   if (!m_pWriteFactory || point <= 0 || face.empty()) {
     return PtTextFormat();
   }
-
   bool vertical_text = m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT;
   DWRITE_FLOW_DIRECTION flow = m_style.vertical_text_left_to_right
                                    ? DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
                                    : DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT;
-
-  std::wstring key =
+  const std::wstring key =
       face + L"|" + std::to_wstring(point) + L"|" + std::to_wstring((int)wrap);
 
   PtTextFormat pFormat;
@@ -300,7 +291,7 @@ PtTextFormat D2D::GetOrCreateTextFormat(const std::wstring &face, int point,
 
   if (!pFormat) {
     // create new text format
-    const std::wstring _mainFontFace = L"_InvalidFontName_";
+    static const std::wstring _mainFontFace = L"_InvalidFontName_";
     DWRITE_FONT_WEIGHT fontWeight = DWRITE_FONT_WEIGHT_NORMAL;
     DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
     DWRITE_FONT_STRETCH fontStretch = DWRITE_FONT_STRETCH_NORMAL;
@@ -314,9 +305,10 @@ PtTextFormat D2D::GetOrCreateTextFormat(const std::wstring &face, int point,
 
     std::vector<std::wstring> fontFaceStrVector;
     fontFaceStrVector = ws_split(face, L",");
+    static const std::wregex styleorweight((L":[^:]*[^a-f0-9:]+[^:]*"),
+                                           std::wregex::icase);
     fontFaceStrVector[0] =
-        std::regex_replace(fontFaceStrVector[0],
-                           std::wregex(STYLEORWEIGHT, std::wregex::icase), L"");
+        std::regex_replace(fontFaceStrVector[0], styleorweight, L"");
     SetFontFallback(pFormat, fontFaceStrVector);
 
     {
@@ -486,11 +478,12 @@ void D2D::ParseFontFace(const std::wstring &fontFaceStr,
                         DWRITE_FONT_WEIGHT &fontWeight,
                         DWRITE_FONT_STYLE &fontStyle,
                         DWRITE_FONT_STRETCH &fontStretch) {
-  const wstring patWeight(
+  static const std::wregex patWeight(
       L"(:thin|:extra_light|:ultra_light|:light|:semi_light|:medium|:demi_bold|"
       L":semi_bold|:bold|:extra_bold|:ultra_bold|:black|:heavy|:extra_black|:"
-      L"ultra_black)");
-  const std::map<wstring, DWRITE_FONT_WEIGHT> _mapWeight = {
+      L"ultra_black)",
+      std::wregex::icase);
+  static const std::map<wstring, DWRITE_FONT_WEIGHT> _mapWeight = {
       {L"thin", DWRITE_FONT_WEIGHT_THIN},
       {L"extra_light", DWRITE_FONT_WEIGHT_EXTRA_LIGHT},
       {L"ultra_light", DWRITE_FONT_WEIGHT_ULTRA_LIGHT},
@@ -512,8 +505,9 @@ void D2D::ParseFontFace(const std::wstring &fontFaceStr,
   fontWeight =
       (it != _mapWeight.end()) ? it->second : DWRITE_FONT_WEIGHT_NORMAL;
 
-  const wstring patStyle(L"(:italic|:oblique|:normal)");
-  const std::map<wstring, DWRITE_FONT_STYLE> _mapStyle = {
+  static const std::wregex patStyle(L"(:italic|:oblique|:normal)",
+                                    std::wregex::icase);
+  static const std::map<wstring, DWRITE_FONT_STYLE> _mapStyle = {
       {L"italic", DWRITE_FONT_STYLE_ITALIC},
       {L"oblique", DWRITE_FONT_STYLE_OBLIQUE},
       {L"normal", DWRITE_FONT_STYLE_NORMAL},
@@ -522,10 +516,12 @@ void D2D::ParseFontFace(const std::wstring &fontFaceStr,
   const auto it2 = _mapStyle.find(style);
   fontStyle = (it2 != _mapStyle.end()) ? it2->second : DWRITE_FONT_STYLE_NORMAL;
 
-  const wstring patStretch(L"(:undefined|:ultra_condensed|:extra_condensed|"
-                           L":condensed|:semi_condensed|"
-                           L":normal_stretch|:medium_stretch|:semi_expanded|"
-                           L":expanded|:extra_expanded|:ultra_expanded)");
+  static const std::wregex patStretch(
+      L"(:undefined|:ultra_condensed|:extra_condensed|"
+      L":condensed|:semi_condensed|"
+      L":normal_stretch|:medium_stretch|:semi_expanded|"
+      L":expanded|:extra_expanded|:ultra_expanded)",
+      std::wregex::icase);
   const std::map<wstring, DWRITE_FONT_STRETCH> _mapStretch = {
       {L"undefined", DWRITE_FONT_STRETCH_UNDEFINED},
       {L"ultra_condensed", DWRITE_FONT_STRETCH_ULTRA_CONDENSED},
@@ -560,22 +556,20 @@ void D2D::GetTextSize(const wstring &text, size_t nCount,
   ComPtr<IDWriteTextLayout> pTextLayout;
   bool vertical_text_layout =
       (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT);
-  if (vertical_text_layout)
+  if (vertical_text_layout) {
     HR(m_pWriteFactory->CreateTextLayout(
         text.c_str(), (int)nCount, pTextFormat.Get(), 0.0f,
         (float)m_style.max_height, pTextLayout.ReleaseAndGetAddressOf()));
-  else
-    HR(m_pWriteFactory->CreateTextLayout(
-        text.c_str(), (int)nCount, pTextFormat.Get(), (float)m_style.max_width,
-        0, pTextLayout.ReleaseAndGetAddressOf()));
-  if (vertical_text_layout) {
     DWRITE_FLOW_DIRECTION flow = m_style.vertical_text_left_to_right
                                      ? DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
                                      : DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT;
     HR(pTextLayout->SetReadingDirection(
         DWRITE_READING_DIRECTION_TOP_TO_BOTTOM));
     HR(pTextLayout->SetFlowDirection(flow));
-  }
+  } else
+    HR(m_pWriteFactory->CreateTextLayout(
+        text.c_str(), (int)nCount, pTextFormat.Get(), (float)m_style.max_width,
+        0, pTextLayout.ReleaseAndGetAddressOf()));
 
   DWRITE_TEXT_METRICS textMetrics;
   HR(pTextLayout->GetMetrics(&textMetrics));
@@ -591,6 +585,9 @@ void D2D::GetTextSize(const wstring &text, size_t nCount,
         text.c_str(), (int)nCount, pTextFormat.Get(),
         textMetrics.widthIncludingTrailingWhitespace, max_height,
         pTextLayout.ReleaseAndGetAddressOf()));
+    HR(pTextLayout->SetReadingDirection(
+        DWRITE_READING_DIRECTION_TOP_TO_BOTTOM));
+    HR(pTextLayout->SetFlowDirection(DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT));
   } else {
     auto max_width = m_style.max_width == 0
                          ? textMetrics.widthIncludingTrailingWhitespace
@@ -600,11 +597,6 @@ void D2D::GetTextSize(const wstring &text, size_t nCount,
         textMetrics.height, pTextLayout.ReleaseAndGetAddressOf()));
   }
 
-  if (vertical_text_layout) {
-    HR(pTextLayout->SetReadingDirection(
-        DWRITE_READING_DIRECTION_TOP_TO_BOTTOM));
-    HR(pTextLayout->SetFlowDirection(DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT));
-  }
   DWRITE_OVERHANG_METRICS overhangMetrics;
   HR(pTextLayout->GetOverhangMetrics(&overhangMetrics));
   {
@@ -752,7 +744,7 @@ HRESULT
 D2D::CreateRoundedRectanglePath(const RECT &rc, float radius,
                                 const IsToRoundStruct &roundInfo,
                                 ComPtr<ID2D1PathGeometry> &pPathGeometry) {
-#define PT2F(x, y) D2D1::Point2F(x, y)
+#define PT2F(x, y) D2D1::Point2F((float)x, (float)y)
   // 创建路径几何对象
   HRESULT hr =
       d2Factory->CreatePathGeometry(pPathGeometry.ReleaseAndGetAddressOf());
@@ -764,12 +756,11 @@ D2D::CreateRoundedRectanglePath(const RECT &rc, float radius,
   pSink->SetFillMode(D2D1_FILL_MODE_WINDING);
   // if radius is 0, return a rectangle path
   if (radius <= 0.0f) {
-    pSink->BeginFigure(D2D1::Point2F((float)rc.left, (float)rc.top),
-                       D2D1_FIGURE_BEGIN_FILLED);
-    pSink->AddLine(D2D1::Point2F((float)rc.right, (float)rc.top));
-    pSink->AddLine(D2D1::Point2F((float)rc.right, (float)rc.bottom));
-    pSink->AddLine(D2D1::Point2F((float)rc.left, (float)rc.bottom));
-    pSink->AddLine(D2D1::Point2F((float)rc.left, (float)rc.top));
+    pSink->BeginFigure(PT2F(rc.left, rc.top), D2D1_FIGURE_BEGIN_FILLED);
+    pSink->AddLine(PT2F(rc.right, rc.top));
+    pSink->AddLine(PT2F(rc.right, rc.bottom));
+    pSink->AddLine(PT2F(rc.left, rc.bottom));
+    pSink->AddLine(PT2F(rc.left, rc.top));
   } else {
     D2D1_RECT_F rectf{(float)rc.left, (float)rc.top, (float)rc.right,
                       (float)rc.bottom};

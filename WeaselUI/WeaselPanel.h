@@ -43,6 +43,8 @@ private:
   CRect _GetInflatedCandRect(int i);
   void _CaptureRect(CRect &rect);
 
+  void _UpdateOffsetY(CRect &arc, CRect &prc);
+
   void DoPaint();
   void OnDestroy();
   HRESULT OnScroll(UINT uMsg, WPARAM wParam, LPARAM lParam);

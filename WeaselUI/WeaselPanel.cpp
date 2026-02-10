@@ -218,6 +218,36 @@ BOOL WeaselPanel::Create(HWND parent) {
   return !!m_hWnd;
 }
 
+void WeaselPanel::_UpdateOffsetY(CRect &arc, CRect &prc) {
+  if (m_istorepos) {
+    std::vector<CRect> rects(m_candidateCount);
+    std::vector<int> btmys(m_candidateCount);
+    for (int i = 0; i < m_candidateCount && i < MAX_CANDIDATES_COUNT; ++i) {
+      rects[i] = m_layout->GetCandidateRect(i);
+      btmys[i] = rects[i].bottom;
+    }
+    m_offsety_preedit = m_candidateCount && !m_layout->IsInlinePreedit() &&
+                                !m_ctx.preedit.str.empty()
+                            ? rects.back().bottom - prc.bottom
+                            : 0;
+    m_offsety_aux = m_candidateCount && !m_ctx.aux.str.empty()
+                        ? rects.back().bottom - arc.bottom
+                        : 0;
+    int base_gap =
+        !m_ctx.aux.str.empty()
+            ? arc.Height() + m_style.spacing
+            : (!m_layout->IsInlinePreedit() && !m_ctx.preedit.str.empty()
+                   ? prc.Height() + m_style.spacing
+                   : 0);
+    for (int i = 0; i < m_candidateCount && i < MAX_CANDIDATES_COUNT; ++i) {
+      m_offsetys[i] = i == 0 ? btmys.back() - base_gap - rects[i].bottom
+                             : rects[i - 1].top + m_offsetys[i - 1] -
+                                   DPI_SCALE(m_style.candidate_spacing) -
+                                   rects[i].bottom;
+    }
+  }
+}
+
 void WeaselPanel::DoPaint() {
   if (!m_pD2D || !m_layout)
     return;
@@ -234,33 +264,7 @@ void WeaselPanel::DoPaint() {
     CRect &prc = m_layout->GetPreeditRect();
     CRect &arc = m_layout->GetAuxiliaryRect();
     // if vertical auto reverse triggered
-    if (m_istorepos) {
-      std::vector<CRect> rects(m_candidateCount);
-      std::vector<int> btmys(m_candidateCount);
-      for (int i = 0; i < m_candidateCount && i < MAX_CANDIDATES_COUNT; ++i) {
-        rects[i] = m_layout->GetCandidateRect(i);
-        btmys[i] = rects[i].bottom;
-      }
-      m_offsety_preedit = m_candidateCount && !m_layout->IsInlinePreedit() &&
-                                  !m_ctx.preedit.str.empty()
-                              ? rects.back().bottom - prc.bottom
-                              : 0;
-      m_offsety_aux = m_candidateCount && !m_ctx.aux.str.empty()
-                          ? rects.back().bottom - arc.bottom
-                          : 0;
-      int base_gap =
-          !m_ctx.aux.str.empty()
-              ? arc.Height() + m_style.spacing
-              : (!m_layout->IsInlinePreedit() && !m_ctx.preedit.str.empty()
-                     ? prc.Height() + m_style.spacing
-                     : 0);
-      for (int i = 0; i < m_candidateCount && i < MAX_CANDIDATES_COUNT; ++i) {
-        m_offsetys[i] = i == 0 ? btmys.back() - base_gap - rects[i].bottom
-                               : rects[i - 1].top + m_offsetys[i - 1] -
-                                     DPI_SCALE(m_style.candidate_spacing) -
-                                     rects[i].bottom;
-      }
-    }
+    _UpdateOffsetY(arc, prc);
     if (!m_layout->IsInlinePreedit() && !m_ctx.preedit.empty()) {
       _DrawPreedit(m_ctx.preedit, true);
     }
