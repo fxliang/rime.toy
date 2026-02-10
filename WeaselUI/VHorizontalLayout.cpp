@@ -12,70 +12,31 @@ void VHorizontalLayout::DoLayout() {
   int height = offsetY, width = offsetX + real_margin_x;
   int h = offsetY + real_margin_y;
 
-  if ((_style.hilited_mark_color & 0xff000000)) {
-    CSize sg;
-    if (candidates_count) {
-      if (_style.mark_text.empty())
-        _pD2D->GetTextSize(L"|", 1, _pD2D->pTextFormat, &sg);
-      else
-        _pD2D->GetTextSize(_style.mark_text, _style.mark_text.length(),
-                           _pD2D->pTextFormat, &sg);
-    }
-
-    mark_width = sg.cx;
-    mark_height = sg.cy;
-    if (_style.mark_text.empty()) {
-      mark_height = mark_width / 7;
-      if (_style.linespacing && _style.baseline)
-        mark_height =
-            (int)((float)mark_height / ((float)_style.linespacing / 100.0f));
-      mark_height = MAX(mark_height, 6);
-    }
-    mark_gap = (_style.mark_text.empty()) ? mark_height
-                                          : mark_height + _style.hilite_spacing;
-  }
-  int base_offset = ((_style.hilited_mark_color & 0xff000000)) ? mark_gap : 0;
+  int base_offset = CalcMarkMetrics(true);
 
   // calc page indicator
+  int pgw = 0, pgh = 0;
+  CalcPageIndicator(true, pgw, pgh);
   CSize pgszl, pgszr;
+  bool page_en = (_style.prevpage_color & 0xff000000) &&
+                 (_style.nextpage_color & 0xff000000);
   if (!IsInlinePreedit()) {
     _pD2D->GetTextSize(pre, pre.length(), _pD2D->pPreeditFormat, &pgszl);
     _pD2D->GetTextSize(next, next.length(), _pD2D->pPreeditFormat, &pgszr);
   }
-  bool page_en = (_style.prevpage_color & 0xff000000) &&
-                 (_style.nextpage_color & 0xff000000);
-  int pgh = page_en ? pgszl.cy + pgszr.cy + _style.hilite_spacing +
-                          _style.hilite_padding_y * 2
-                    : 0;
-  int pgw = page_en ? MAX(pgszl.cx, pgszr.cx) : 0;
 
   /* Preedit */
   if (!IsInlinePreedit() && !_context.preedit.str.empty()) {
     size = GetPreeditSize(_context.preedit, _pD2D->pPreeditFormat);
-    int szx = MAX(size.cx, pgw), szy = pgh;
-    // icon size wider then preedit text
-    int xoffset = (STATUS_ICON_SIZE >= szx && ShouldDisplayStatusIcon())
-                      ? (STATUS_ICON_SIZE - szx) / 2
-                      : 0;
-    _preeditRect.SetRect(width + xoffset, h, width + xoffset + size.cx,
-                         h + size.cy);
-    width += size.cx + xoffset * 2 + _style.spacing;
-    height = MAX(height, offsetY + real_margin_y + size.cy + szy);
-    if (ShouldDisplayStatusIcon())
-      height += STATUS_ICON_SIZE;
+    LayoutInlineRect(size, true, true, pgw, pgh, h, width, height,
+                     _preeditRect);
   }
 
   /* Auxiliary */
   if (!_context.aux.str.empty()) {
     size = GetPreeditSize(_context.aux, _pD2D->pPreeditFormat);
-    // icon size wider then preedit text
-    int xoffset = (STATUS_ICON_SIZE >= size.cx && ShouldDisplayStatusIcon())
-                      ? (STATUS_ICON_SIZE - size.cx) / 2
-                      : 0;
-    _auxiliaryRect.SetRect(width + xoffset, h, width + xoffset + size.cx,
-                           h + size.cy);
-    width += size.cx + xoffset * 2 + _style.spacing;
-    height = MAX(height, offsetY + real_margin_y + size.cy);
+    LayoutInlineRect(size, true, false, pgw, pgh, h, width, height,
+                     _auxiliaryRect);
   }
   /* Candidates */
   int wids[MAX_CANDIDATES_COUNT] = {0};

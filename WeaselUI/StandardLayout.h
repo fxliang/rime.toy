@@ -50,9 +50,16 @@ protected:
   CSize GetPreeditSize(const Text &text,
                        ComPtr<IDWriteTextFormat1> &pTextFormat);
   void UpdateStatusIconLayout(int *width, int *height);
+  void CalcPageIndicator(bool vertical_text_layout, int &pgw, int &pgh);
   void _PrecomputePreeditRects(const CRect &baseRect, const Text &text,
                                CRect &beforeRect, CRect &hiliteRect,
                                CRect &afterRect);
+  int CalcMarkMetrics(bool vertical_text_layout);
+  // page indicator uses pre/next glyphs, implemented in StandardLayout
+  int CalcStatusIconOffset(int extent) const;
+  void LayoutInlineRect(const CSize &size, bool vertical_text_layout,
+                        bool is_preedit, int pgw, int pgh, int base_coord,
+                        int &width, int &height, CRect &rect);
 
   CSize _beforesz, _hilitedsz, _aftersz;
   TextRange _range;

@@ -108,6 +108,31 @@ void StandardLayout::UpdateStatusIconLayout(int *width, int *height) {
     _statusIconRect.OffsetRect(-_style.border, -_style.border);
 }
 
+void StandardLayout::CalcPageIndicator(bool vertical_text_layout, int &pgw,
+                                       int &pgh) {
+  CSize pgszl, pgszr;
+  if (!IsInlinePreedit()) {
+    _pD2D->GetTextSize(pre, pre.length(), _pD2D->pPreeditFormat, &pgszl);
+    _pD2D->GetTextSize(next, next.length(), _pD2D->pPreeditFormat, &pgszr);
+  }
+  bool page_en = (_style.prevpage_color & 0xff000000) &&
+                 (_style.nextpage_color & 0xff000000);
+  if (!page_en) {
+    pgw = 0;
+    pgh = 0;
+    return;
+  }
+  if (vertical_text_layout) {
+    pgh = pgszl.cy + pgszr.cy + _style.hilite_spacing +
+          _style.hilite_padding_y * 2;
+    pgw = MAX(pgszl.cx, pgszr.cx);
+  } else {
+    pgw = pgszl.cx + pgszr.cx + _style.hilite_spacing +
+          _style.hilite_padding_x * 2;
+    pgh = MAX(pgszl.cy, pgszr.cy);
+  }
+}
+
 bool StandardLayout::IsInlinePreedit() const {
   return _style.inline_preedit &&
          (_style.client_caps & weasel::INLINE_PREEDIT_CAPABLE) != 0 &&
@@ -366,5 +391,80 @@ void StandardLayout::_PrecomputePreeditRects(const CRect &baseRect,
       afterRect = CRect(baseRect.left, y, baseRect.right, y + _aftersz.cy);
     else
       afterRect = CRect(x, baseRect.top, x + _aftersz.cx, baseRect.bottom);
+  }
+}
+
+int StandardLayout::CalcMarkMetrics(bool vertical_text_layout) {
+  if (!(_style.hilited_mark_color & 0xff000000)) {
+    mark_width = 0;
+    mark_height = 0;
+    mark_gap = 0;
+    return 0;
+  }
+  CSize sg;
+  if (candidates_count) {
+    if (_style.mark_text.empty())
+      _pD2D->GetTextSize(L"|", 1, _pD2D->pTextFormat, &sg);
+    else
+      _pD2D->GetTextSize(_style.mark_text, _style.mark_text.length(),
+                         _pD2D->pTextFormat, &sg);
+  }
+  mark_width = sg.cx;
+  mark_height = sg.cy;
+  if (_style.mark_text.empty()) {
+    if (vertical_text_layout) {
+      mark_height = mark_width / 7;
+      if (_style.linespacing && _style.baseline)
+        mark_height =
+            (int)((float)mark_height / ((float)_style.linespacing / 100.0f));
+      mark_height = MAX(mark_height, 6);
+    } else {
+      mark_width = mark_height / 7;
+      if (_style.linespacing && _style.baseline)
+        mark_width =
+            (int)((float)mark_width / ((float)_style.linespacing / 100.0f));
+      mark_width = MAX(mark_width, 6);
+    }
+  }
+  mark_gap = (_style.mark_text.empty())
+                 ? (vertical_text_layout ? mark_height : mark_width)
+                 : (vertical_text_layout ? mark_height : mark_width) +
+                       _style.hilite_spacing;
+  return mark_gap;
+}
+
+// CalcPageIndicator moved to StandardStandardLayout
+
+int StandardLayout::CalcStatusIconOffset(int extent) const {
+  if (!ShouldDisplayStatusIcon())
+    return 0;
+  return (STATUS_ICON_SIZE >= extent) ? (STATUS_ICON_SIZE - extent) / 2 : 0;
+}
+
+void StandardLayout::LayoutInlineRect(const CSize &size,
+                                      bool vertical_text_layout,
+                                      bool is_preedit, int pgw, int pgh,
+                                      int base_coord, int &width, int &height,
+                                      CRect &rect) {
+  if (vertical_text_layout) {
+    int szx = is_preedit ? MAX(size.cx, pgw) : size.cx;
+    int szy = is_preedit ? pgh : size.cy;
+    int xoffset = CalcStatusIconOffset(szx);
+    rect.SetRect(width + xoffset, base_coord, width + xoffset + size.cx,
+                 base_coord + size.cy);
+    width += size.cx + xoffset * 2 + _style.spacing;
+    height = MAX(height, offsetY + real_margin_y + size.cy + szy);
+    if (ShouldDisplayStatusIcon() && is_preedit)
+      height += STATUS_ICON_SIZE;
+  } else {
+    int szx = is_preedit ? pgw : size.cx;
+    int szy = is_preedit ? MAX(size.cy, pgh) : size.cy;
+    int yoffset = CalcStatusIconOffset(szy);
+    rect.SetRect(base_coord, height + yoffset, base_coord + size.cx,
+                 height + yoffset + size.cy);
+    height += size.cy + 2 * yoffset + _style.spacing;
+    width = MAX(width, real_margin_x * 2 + size.cx + (is_preedit ? szx : 0));
+    if (ShouldDisplayStatusIcon() && is_preedit)
+      width += STATUS_ICON_SIZE;
   }
 }
