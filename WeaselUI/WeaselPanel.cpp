@@ -110,7 +110,8 @@ void WeaselPanel::_ResizeWindow() {
 
 void WeaselPanel::_CreateLayout() {
   Layout *layout;
-  if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
+  if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+      m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN) {
     layout = new VHorizontalLayout(m_style, m_ctx, m_status, m_pD2D);
   } else {
     if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL ||
@@ -534,7 +535,8 @@ void WeaselPanel::_TextOut(CRect &rc, const wstring &text, size_t cch,
   m_pD2D->m_pWriteFactory->CreateTextLayout(
       text.c_str(), cch, pTextFormat.Get(), rc.Width(), rc.Height(),
       reinterpret_cast<IDWriteTextLayout **>(pTextLayout.GetAddressOf()));
-  if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
+  if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+      m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN) {
     DWRITE_FLOW_DIRECTION flow = m_style.vertical_text_left_to_right
                                      ? DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
                                      : DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT;
@@ -551,7 +553,9 @@ void WeaselPanel::_TextOut(CRect &rc, const wstring &text, size_t cch,
   pTextLayout->GetOverhangMetrics(&omt);
   if (m_style.layout_type != UIStyle::LAYOUT_VERTICAL_TEXT && omt.left > 0)
     offsetx += omt.left;
-  if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT && omt.top > 0)
+  if ((m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+       m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN) &&
+      omt.top > 0)
     offsety += omt.top;
 
   m_pD2D->DrawTextLayout(pTextLayout, offsetx, offsety, color, false);

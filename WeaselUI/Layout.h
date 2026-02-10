@@ -11,10 +11,12 @@ const int STATUS_ICON_SIZE = GetSystemMetrics(SM_CXICON);
 
 #define IS_FULLSCREENLAYOUT(style)                                             \
   (style.layout_type == UIStyle::LAYOUT_VERTICAL_FULLSCREEN ||                 \
-   style.layout_type == UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN)
+   style.layout_type == UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN ||               \
+   style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
 #define NOT_FULLSCREENLAYOUT(style)                                            \
   (style.layout_type != UIStyle::LAYOUT_VERTICAL_FULLSCREEN &&                 \
-   style.layout_type != UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN)
+   style.layout_type != UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN &&               \
+   style.layout_type != UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
 
 class Layout {
 public:

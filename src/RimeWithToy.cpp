@@ -901,13 +901,23 @@ void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize) {
                style.paging_on_scroll);
   _RimeGetBool(config, "style/click_to_capture", initialize,
                style.click_to_capture);
-  _RimeGetBool(config, "style/fullscreen", false, style.layout_type,
-               ((style.layout_type == UIStyle::LAYOUT_HORIZONTAL)
-                    ? UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN
-                    : UIStyle::LAYOUT_VERTICAL_FULLSCREEN),
-               style.layout_type);
-  _RimeGetBool(config, "style/vertical_text", false, style.layout_type,
-               UIStyle::LAYOUT_VERTICAL_TEXT, style.layout_type);
+  bool fullscreen = false;
+  _RimeGetBool(config, "style/fullscreen", false, fullscreen);
+  bool vertical_text = false;
+  _RimeGetBool(config, "style/vertical_text", false, vertical_text);
+  if (vertical_text) {
+    if (fullscreen) {
+      style.layout_type = UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN;
+    } else {
+      style.layout_type = UIStyle::LAYOUT_VERTICAL_TEXT;
+    }
+  } else {
+    if (fullscreen) {
+      style.layout_type = (style.layout_type == UIStyle::LAYOUT_HORIZONTAL)
+                              ? UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN
+                              : UIStyle::LAYOUT_VERTICAL_FULLSCREEN;
+    }
+  }
   _RimeGetBool(config, "style/vertical_text_left_to_right", false,
                style.vertical_text_left_to_right);
   _RimeGetBool(config, "style/vertical_text_with_wrap", false,
@@ -918,8 +928,13 @@ void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize) {
   _RimeParseStringOptWithFallback(config, "style/text_orientation",
                                   _text_orientation_bool, _text_orientation,
                                   _text_orientation_bool);
-  if (_text_orientation_bool)
-    style.layout_type = UIStyle::LAYOUT_VERTICAL_TEXT;
+  if (_text_orientation_bool) {
+    if (fullscreen) {
+      style.layout_type = UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN;
+    } else {
+      style.layout_type = UIStyle::LAYOUT_VERTICAL_TEXT;
+    }
+  }
   _RimeGetIntStr(config, "style/label_format", style.label_text_format);
   _RimeGetIntStr(config, "style/mark_text", style.mark_text);
   _RimeGetIntStr(config, "style/layout/baseline", style.baseline, 0, 0, _abs);
@@ -1010,6 +1025,9 @@ void _UpdateUIStyle(RimeConfig *config, UI *ui, bool initialize) {
     // hilite_padding_y vs hilite_spacing
     if (!style.inline_preedit)
       style.hilite_spacing = MAX(style.hilite_spacing, style.hilite_padding_y);
+  }
+  if (style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN) {
+    style.max_height = 0;
   }
   // fix padding and margin settings
   int scale = style.margin_x < 0 ? -1 : 1;

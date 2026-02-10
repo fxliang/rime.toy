@@ -2,5 +2,8 @@
   "shared_data_dir": "shared",
   "user_data_dir": "usr",
   "log_dir": "log",
-  "position_type": "mouse"
+  "position_type": "mouse",
+  "watch_files": [
+    "usr/styles.yaml"
+  ]
 }

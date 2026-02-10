@@ -24,7 +24,8 @@ CSize StandardLayout::GetPreeditSize(const Text &text,
                          &_hilitedsz);
       _pD2D->GetTextSize(after_str, after_str.length(), pTextFormat, &_aftersz);
       auto width_max = 0, height_max = 0;
-      if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
+      if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+          _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN) {
         width_max = MAX(width_max, _beforesz.cx, _hilitedsz.cx, _aftersz.cx);
         height_max += _beforesz.cy + (_beforesz.cy > 0) * _style.hilite_spacing;
         height_max +=
@@ -52,7 +53,8 @@ void StandardLayout::UpdateStatusIconLayout(int *width, int *height) {
   // when [margin_x + width(preedit/aux) + spacing + width(icon) + margin_x] <
   // style.min_width
   if (ShouldDisplayStatusIcon()) {
-    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
+    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+        _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN) {
       int top = 0, middle = 0;
       if (!_preeditRect.IsRectNull()) {
         top = _preeditRect.bottom + _style.spacing;
@@ -148,7 +150,8 @@ bool StandardLayout::ShouldDisplayStatusIcon() const {
   return ((_status.ascii_mode && !_style.inline_preedit) ||
           !_status.composing || !_context.aux.empty()) &&
          !((_style.layout_type == UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN ||
-            _style.layout_type == UIStyle::LAYOUT_VERTICAL_FULLSCREEN) &&
+            _style.layout_type == UIStyle::LAYOUT_VERTICAL_FULLSCREEN ||
+            _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN) &&
            !_context.aux.empty());
 }
 
@@ -184,9 +187,10 @@ bool StandardLayout::_IsHighlightOverCandidateWindow(const CRect &rc) {
 
 void StandardLayout::_PrepareRoundInfo() {
 
-  const int tmp[5] = {UIStyle::LAYOUT_VERTICAL, UIStyle::LAYOUT_HORIZONTAL,
-                      UIStyle::LAYOUT_VERTICAL_TEXT, UIStyle::LAYOUT_VERTICAL,
-                      UIStyle::LAYOUT_HORIZONTAL};
+  const int tmp[6] = {
+      UIStyle::LAYOUT_VERTICAL,      UIStyle::LAYOUT_HORIZONTAL,
+      UIStyle::LAYOUT_VERTICAL_TEXT, UIStyle::LAYOUT_VERTICAL,
+      UIStyle::LAYOUT_HORIZONTAL,    UIStyle::LAYOUT_VERTICAL_TEXT};
   int layout_type = tmp[_style.layout_type];
   bool textHemispherical = false, cand0Hemispherical = false;
   if (!_style.inline_preedit) {
@@ -360,12 +364,14 @@ void StandardLayout::_PrecomputePreeditRects(const CRect &baseRect,
 
   // Before part
   if (_range.start > 0 && _beforesz.cx > 0 && _beforesz.cy > 0) {
-    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+        _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
       beforeRect = CRect(baseRect.left, y, baseRect.right, y + _beforesz.cy);
     else
       beforeRect = CRect(x, baseRect.top, x + _beforesz.cx, baseRect.bottom);
 
-    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+        _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
       y += _beforesz.cy + DPI_SCALE(_style.hilite_spacing);
     else
       x += _beforesz.cx + DPI_SCALE(_style.hilite_spacing);
@@ -373,12 +379,14 @@ void StandardLayout::_PrecomputePreeditRects(const CRect &baseRect,
 
   // Highlighted part
   if (_hilitedsz.cx > 0 && _hilitedsz.cy > 0) {
-    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+        _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
       hiliteRect = CRect(baseRect.left, y, baseRect.right, y + _hilitedsz.cy);
     else
       hiliteRect = CRect(x, baseRect.top, x + _hilitedsz.cx, baseRect.bottom);
 
-    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+        _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
       y += _hilitedsz.cy + DPI_SCALE(_style.hilite_spacing);
     else
       x += _hilitedsz.cx + DPI_SCALE(_style.hilite_spacing);
@@ -387,7 +395,8 @@ void StandardLayout::_PrecomputePreeditRects(const CRect &baseRect,
   // After part
   if (_range.end < static_cast<int>(text.str.length()) && _aftersz.cx > 0 &&
       _aftersz.cy > 0) {
-    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+        _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
       afterRect = CRect(baseRect.left, y, baseRect.right, y + _aftersz.cy);
     else
       afterRect = CRect(x, baseRect.top, x + _aftersz.cx, baseRect.bottom);

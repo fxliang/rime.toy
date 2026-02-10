@@ -555,7 +555,8 @@ void D2D::GetTextSize(const wstring &text, size_t nCount,
   }
   ComPtr<IDWriteTextLayout> pTextLayout;
   bool vertical_text_layout =
-      (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT);
+      (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+       m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN);
   if (vertical_text_layout) {
     HR(m_pWriteFactory->CreateTextLayout(
         text.c_str(), (int)nCount, pTextFormat.Get(), 0.0f,

@@ -53,6 +53,22 @@ void weasel::FullScreenLayout::DoLayout() {
   _preeditRect.OffsetRect(offsetx, offsety);
   _auxiliaryRect = m_layout->GetAuxiliaryRect();
   _auxiliaryRect.OffsetRect(offsetx, offsety);
+  // walkaround to make auxiliary rect center of the ContentRect when auxiliary
+  // text is not empty
+  if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN &&
+      !_context.aux.str.empty()) {
+    int aux_center_x = (_auxiliaryRect.left + _auxiliaryRect.right) / 2;
+    int aux_center_y = (_auxiliaryRect.top + _auxiliaryRect.bottom) / 2;
+    int target_x = workArea.Width() / 2;
+    int target_y = workArea.Height() / 2;
+    int delta_x = target_x - aux_center_x;
+    int delta_y = target_y - aux_center_y;
+    _auxiliaryRect.OffsetRect(delta_x, delta_y);
+    _auxBeforeRect.OffsetRect(delta_x, delta_y);
+    _auxHiliteRect.OffsetRect(delta_x, delta_y);
+    _auxAfterRect.OffsetRect(delta_x, delta_y);
+    _statusIconRect.SetRect(0, 0, 0, 0); // hide status icon
+  }
   _highlightRect = m_layout->GetHighlightRect();
   _highlightRect.OffsetRect(offsetx, offsety);
 
