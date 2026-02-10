@@ -608,9 +608,7 @@ void WeaselPanel::_Reposition() {
   }
   CRect rcWindow;
   GetWindowRect(m_hWnd, &rcWindow);
-  if (!(m_style.layout_type == UIStyle::LAYOUT_VERTICAL &&
-        !m_style.vertical_text_left_to_right))
-    rcWorkArea.right -= rcWindow.Width();
+  rcWorkArea.right -= rcWindow.Width();
   rcWorkArea.bottom -= rcWindow.Height();
   int x = m_inputPos.left;
   int y = m_inputPos.bottom;
