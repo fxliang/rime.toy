@@ -276,14 +276,12 @@ void WeaselPanel::DoPaint() {
     }
     if (m_layout->ShouldDisplayStatusIcon()) {
       ComPtr<ID2D1Bitmap1> pBitmap;
-      LoadIconIfNeed(m_current_ascii_icon, m_style.current_ascii_icon,
-                     m_iconAlpha, IDI_EN);
-      LoadIconIfNeed(m_current_zhung_icon, m_style.current_zhung_icon,
-                     m_iconEnabled, IDI_ZH);
-      LoadIconIfNeed(m_current_full_icon, m_style.current_full_icon, m_iconFull,
-                     IDI_FULL_SHAPE);
-      LoadIconIfNeed(m_current_half_icon, m_style.current_half_icon, m_iconHalf,
-                     IDI_HALF_SHAPE);
+#define LOADICON(x, icon, id) LoadIconIfNeed(m_##x, m_style.##x, icon, id)
+      LOADICON(current_ascii_icon, m_iconAlpha, IDI_EN);
+      LOADICON(current_zhung_icon, m_iconEnabled, IDI_ZH);
+      LOADICON(current_full_icon, m_iconFull, IDI_FULL_SHAPE);
+      LOADICON(current_half_icon, m_iconHalf, IDI_HALF_SHAPE);
+#undef LOADICON
 
       HICON &ico =
           m_status.disabled ? m_iconDisabled
@@ -295,6 +293,8 @@ void WeaselPanel::DoPaint() {
       m_pD2D->GetBmpFromIcon(ico, pBitmap);
       // Draw the bitmap
       auto iconRect = m_layout->GetStatusIconRect();
+      if (m_istorepos)
+        iconRect.OffsetRect(0, m_offsety_preedit);
       D2D1_RECT_F iconRectf = D2D1::RectF(iconRect.left, iconRect.top,
                                           iconRect.right, iconRect.bottom);
       m_pD2D->dc->DrawBitmap(pBitmap.Get(), iconRectf);
