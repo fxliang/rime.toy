@@ -222,7 +222,7 @@ bool ConvertKeyEvent(const KBDLLHOOKSTRUCT *pKeyboard, KeyInfo &kinfo,
   if ((keyState[VK_LWIN] & KEY_DOWN) || (keyState[VK_RWIN] & KEY_DOWN))
     result.mask |= ibus::SUPER_MASK;
 
-  if (keyState[VK_CAPITAL] & TOGGLED) {
+  if ((keyState[VK_CAPITAL] & TOGGLED) || (GetKeyState(VK_CAPITAL) & TOGGLED)) {
     result.mask |= ibus::LOCK_MASK;
   }
 
@@ -246,10 +246,17 @@ bool ConvertKeyEvent(const KBDLLHOOKSTRUCT *pKeyboard, KeyInfo &kinfo,
   memcpy(table, keyState, sizeof(table));
   table[VK_CONTROL] = 0;
   table[VK_MENU] = 0;
-  table[VK_CAPITAL] = GetKeyState(VK_CAPITAL) & 0X01;
+  // Do not let CapsLock toggle affect ToUnicodeEx output; report LOCK via mask
+  // instead
+  table[VK_CAPITAL] = 0;
   int ret = ToUnicodeEx(vkey, UINT(kinfo), table, buf, buf_len, 0, NULL);
   if (ret == 1) {
-    result.keycode = UINT(buf[0]);
+    wchar_t ch = buf[0];
+    // If CapsLock is active (reported via LOCK_MASK) and Shift is not pressed,
+    // ensure we send the lowercase letter while still setting LOCK_MASK.
+    if ((result.mask & ibus::LOCK_MASK) && !(result.mask & ibus::SHIFT_MASK))
+      ch = towlower(ch);
+    result.keycode = UINT(ch);
     return true;
   }
 
