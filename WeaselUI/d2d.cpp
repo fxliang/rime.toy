@@ -19,12 +19,29 @@ HRESULT DeviceResources::EnsureInitialized() {
   if (initialized)
     return S_OK;
   HRESULT hr = S_OK;
-  hr = D3D11CreateDevice(
-      nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
-      D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION,
-      direct3dDevice.ReleaseAndGetAddressOf(), nullptr, nullptr);
-  if (FAILED(hr))
-    return hr;
+  // Try hardware first, then WARP fallback
+  static const D3D_FEATURE_LEVEL featureLevels[] = {
+      D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1,
+      D3D_FEATURE_LEVEL_10_0, D3D_FEATURE_LEVEL_9_3,  D3D_FEATURE_LEVEL_9_2,
+      D3D_FEATURE_LEVEL_9_1};
+  hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
+                         D3D11_CREATE_DEVICE_BGRA_SUPPORT, featureLevels,
+                         _countof(featureLevels), D3D11_SDK_VERSION,
+                         direct3dDevice.ReleaseAndGetAddressOf(), nullptr,
+                         nullptr);
+  if (FAILED(hr)) {
+    DEBUG << "D3D11CreateDevice hardware failed: " << StrzHr(hr)
+          << ", retrying WARP";
+    hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_WARP, nullptr,
+                           D3D11_CREATE_DEVICE_BGRA_SUPPORT, featureLevels,
+                           _countof(featureLevels), D3D11_SDK_VERSION,
+                           direct3dDevice.ReleaseAndGetAddressOf(), nullptr,
+                           nullptr);
+    if (FAILED(hr)) {
+      DEBUG << "D3D11CreateDevice WARP failed: " << StrzHr(hr);
+      return hr;
+    }
+  }
   hr = direct3dDevice.As(&dxgiDevice);
   if (FAILED(hr))
     return hr;
@@ -78,21 +95,29 @@ void D2D::ClearDeviceDependentCaches() {
 }
 
 void D2D::ReleaseWindowResources() {
-  if (keepResourcesOnHide)
-    return; // no-op when preserving resources for quick restore
   // detach DC target first
-  if (dc) {
+  if (dc)
     dc->SetTarget(nullptr);
-  }
   bitmap.Reset();
   surface.Reset();
   visual.Reset();
   target.Reset();
   swapChain.Reset();
+  m_hWnd = nullptr;
 }
 
-D2D::D2D(UIStyle &style, HWND hwnd)
-    : m_style(style), m_hWnd(hwnd), m_dpiX(96.0f), m_dpiY(96.0f) {
+D2D::D2D(UIStyle &style)
+    : m_style(style), m_hWnd(nullptr), m_dpiX(96.0f), m_dpiY(96.0f) {
+  // Prepare shared device resources early so formats can be built before window
+  DeviceResources::Get().EnsureInitialized();
+  // initialize dpi scales even without window (defaults to 96 DPI)
+  InitDpiInfo();
+}
+
+void D2D::AttachWindow(HWND hwnd) {
+  if (m_hWnd == hwnd && swapChain)
+    return;
+  m_hWnd = hwnd;
   InitDpiInfo();
   InitDirect2D();
 }
@@ -112,8 +137,10 @@ void D2D::InitDirect2D() {
   // Use shared device resources to avoid recreating expensive objects per
   // window
   HRESULT hr = DeviceResources::Get().EnsureInitialized();
-  if (FAILED(hr))
+  if (FAILED(hr)) {
+    DEBUG << "EnsureInitialized failed: " << StrzHr(hr);
     return;
+  }
 
   // Adopt shared pointers
   direct3dDevice = DeviceResources::Get().direct3dDevice;
@@ -147,37 +174,72 @@ void D2D::InitDirect2D() {
   description.Width = rect.right - rect.left;
   description.Height = rect.bottom - rect.top;
 
-  HR(dxFactory->CreateSwapChainForComposition(
+  hr = dxFactory->CreateSwapChainForComposition(
       dxgiDevice.Get(), &description, nullptr,
-      swapChain.ReleaseAndGetAddressOf()));
+      swapChain.ReleaseAndGetAddressOf());
+  if (FAILED(hr)) {
+    DEBUG << "CreateSwapChainForComposition failed: " << StrzHr(hr);
+    return;
+  }
 
   // Retrieve the swap chain's back buffer
-  HR(swapChain->GetBuffer(
+  hr = swapChain->GetBuffer(
       0, __uuidof(surface.Get()),
-      reinterpret_cast<void **>(surface.ReleaseAndGetAddressOf())));
+      reinterpret_cast<void **>(surface.ReleaseAndGetAddressOf()));
+  if (FAILED(hr)) {
+    DEBUG << "GetBuffer failed: " << StrzHr(hr);
+    return;
+  }
   // Create a Direct2D bitmap that points to the swap chain surface
   D2D1_BITMAP_PROPERTIES1 properties = {};
   properties.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
   properties.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
   properties.bitmapOptions =
       D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW;
-  HR(dc->CreateBitmapFromDxgiSurface(surface.Get(), properties,
-                                     bitmap.ReleaseAndGetAddressOf()));
+  hr = dc->CreateBitmapFromDxgiSurface(surface.Get(), properties,
+                                       bitmap.ReleaseAndGetAddressOf());
+  if (FAILED(hr)) {
+    DEBUG << "CreateBitmapFromDxgiSurface failed: " << StrzHr(hr);
+    return;
+  }
   // Point the device context to the bitmap for rendering
   dc->SetTarget(bitmap.Get());
 
   target.Reset();
-  HR(dcompDevice->CreateTargetForHwnd(m_hWnd,
-                                      true, // Top most
-                                      target.ReleaseAndGetAddressOf()));
-  HR(dcompDevice->CreateVisual(visual.ReleaseAndGetAddressOf()));
-  HR(visual->SetContent(swapChain.Get()));
-  HR(target->SetRoot(visual.Get()));
-  HR(dcompDevice->Commit());
+  hr = dcompDevice->CreateTargetForHwnd(m_hWnd,
+                                        true, // Top most
+                                        target.ReleaseAndGetAddressOf());
+  if (FAILED(hr)) {
+    DEBUG << "CreateTargetForHwnd failed: " << StrzHr(hr);
+    return;
+  }
+  hr = dcompDevice->CreateVisual(visual.ReleaseAndGetAddressOf());
+  if (FAILED(hr)) {
+    DEBUG << "CreateVisual failed: " << StrzHr(hr);
+    return;
+  }
+  hr = visual->SetContent(swapChain.Get());
+  if (FAILED(hr)) {
+    DEBUG << "SetContent failed: " << StrzHr(hr);
+    return;
+  }
+  hr = target->SetRoot(visual.Get());
+  if (FAILED(hr)) {
+    DEBUG << "SetRoot failed: " << StrzHr(hr);
+    return;
+  }
+  hr = dcompDevice->Commit();
+  if (FAILED(hr)) {
+    DEBUG << "Commit failed: " << StrzHr(hr);
+    return;
+  }
   // create or reuse brush from cache
-  static const D2D1_COLOR_F brushColor =
-      D2D1::ColorF(D2D1::ColorF::Black);
-  HR(dc->CreateSolidColorBrush(brushColor, m_pBrush.ReleaseAndGetAddressOf()));
+  static const D2D1_COLOR_F brushColor = D2D1::ColorF(D2D1::ColorF::Black);
+  hr = dc->CreateSolidColorBrush(brushColor, m_pBrush.ReleaseAndGetAddressOf());
+  if (FAILED(hr)) {
+    DEBUG << "CreateSolidColorBrush failed: " << StrzHr(hr);
+    return;
+  }
 }
 
 void D2D::OnResize(UINT width, UINT height) {
@@ -273,11 +335,11 @@ PtTextFormat D2D::GetOrCreateTextFormat(const std::wstring &face, int point,
     DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
     DWRITE_FONT_STRETCH fontStretch = DWRITE_FONT_STRETCH_NORMAL;
     ParseFontFace(face, fontWeight, fontStyle, fontStretch);
-    HR(m_pWriteFactory->CreateTextFormat(
-        _mainFontFace.c_str(), NULL, fontWeight, fontStyle, fontStretch,
-        point * m_dpiScaleFontPoint, L"",
-        reinterpret_cast<IDWriteTextFormat **>(
-            pFormat.ReleaseAndGetAddressOf())));
+    m_pWriteFactory->CreateTextFormat(_mainFontFace.c_str(), NULL, fontWeight,
+                                      fontStyle, fontStretch,
+                                      point * m_dpiScaleFontPoint, L"",
+                                      reinterpret_cast<IDWriteTextFormat **>(
+                                          pFormat.ReleaseAndGetAddressOf()));
     pFormat->SetWordWrapping(wrap);
 
     std::vector<std::wstring> fontFaceStrVector;
@@ -381,16 +443,17 @@ void D2D::SetBrushColor(uint32_t color) {
 }
 
 void D2D::InitDpiInfo() {
-  if (IsWindowsBlueOrLaterEx()) {
+  if (m_hWnd && IsWindowsBlueOrLaterEx()) {
     HMONITOR const mon = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
     UINT x = 0, y = 0;
     HR(GetDpiForMonitor(mon, MDT_EFFECTIVE_DPI, &x, &y));
     m_dpiX = static_cast<float>(x);
     m_dpiY = static_cast<float>(y);
     if (m_dpiY == 0)
-      m_dpiX = m_dpiY = 96.0;
-  } else
+      m_dpiX = m_dpiY = 96.0f;
+  } else {
     m_dpiY = m_dpiX = 96.0f;
+  }
   m_dpiScaleFontPoint = m_dpiY / 72.0f;
   m_dpiScaleLayout = m_dpiY / 96.0;
 }
@@ -723,6 +786,8 @@ D2D::CreateRoundedRectanglePath(const RECT &rc, float radius,
                                 const IsToRoundStruct &roundInfo,
                                 ComPtr<ID2D1PathGeometry> &pPathGeometry) {
 #define PT2F(x, y) D2D1::Point2F((float)x, (float)y)
+  if (!d2Factory)
+    return E_POINTER;
   // 创建路径几何对象
   HRESULT hr =
       d2Factory->CreatePathGeometry(pPathGeometry.ReleaseAndGetAddressOf());
@@ -802,6 +867,18 @@ D2D::CreateRoundedRectanglePath(const RECT &rc, float radius,
 
 HRESULT D2D::FillGeometry(const CRect &rect, uint32_t color, uint32_t radius,
                           IsToRoundStruct roundInfo, bool to_blur) {
+  if (!dc || !d2Factory)
+    return E_POINTER;
+  if (((color >> 24) & 0xFF) == 0)
+    return S_OK;
+  if (!to_blur && radius == 0) {
+    // draw simple rectangle without path/blur
+    D2D1_RECT_F rf{(float)rect.left, (float)rect.top, (float)rect.right,
+                   (float)rect.bottom};
+    SetBrushColor(color);
+    dc->FillRectangle(&rf, m_pBrush.Get());
+    return S_OK;
+  }
   SetBrushColor(color);
   ComPtr<ID2D1PathGeometry> pGeometry;
   if (to_blur) {

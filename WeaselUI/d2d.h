@@ -57,7 +57,11 @@ struct IsToRoundStruct {
 
 struct D2D {
 
-  D2D(UIStyle &style, HWND hwnd);
+  // Construct without window; call AttachWindow when HWND is ready.
+  D2D(UIStyle &style);
+  // Allow constructing before window exists; attach window later to finish
+  // init.
+  void AttachWindow(HWND hwnd);
   ~D2D();
   void InitDirect2D();
   void InitDirectWriteResources();
@@ -117,7 +121,6 @@ struct D2D {
   // shared devices if keepResourcesOnHide is true, ReleaseWindowResources will
   // be a no-op
   void ReleaseWindowResources();
-  bool keepResourcesOnHide = true;
   UIStyle &m_style;
   HWND m_hWnd;
   float m_dpiX;

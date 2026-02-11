@@ -57,9 +57,7 @@ void WeaselPanel::ShowWindow(int nCmdShow) {
     if (nCmdShow != SW_HIDE) {
       // ensure window resources exist when showing
       if (!m_pD2D->swapChain) {
-        m_pD2D->m_hWnd = m_hWnd;
-        m_pD2D->InitDpiInfo();
-        m_pD2D->InitDirect2D();
+        m_pD2D->AttachWindow(m_hWnd);
         if (!m_style.font_face.empty())
           m_pD2D->InitDirectWriteResources();
       }
@@ -69,20 +67,12 @@ void WeaselPanel::ShowWindow(int nCmdShow) {
 
 void WeaselPanel::DestroyWindow() {
   if (m_pD2D) {
-    // when hiding, keep resources for fast restore; when fully destroying, drop
-    // resources
-    if (m_pD2D->keepResourcesOnHide) {
-      // simply hide window
-      ::ShowWindow(m_hWnd, SW_HIDE);
-    } else {
-      m_pD2D->ReleaseWindowResources();
-      ::DestroyWindow(m_hWnd);
-      m_hWnd = nullptr;
-    }
-  } else {
-    ::DestroyWindow(m_hWnd);
-    m_hWnd = nullptr;
+    m_pD2D->ReleaseWindowResources();
+    // mark D2D as detached from any window
+    m_pD2D->m_hWnd = nullptr;
   }
+  ::DestroyWindow(m_hWnd);
+  m_hWnd = nullptr;
 }
 
 void WeaselPanel::ReleaseAllResources() {
@@ -131,29 +121,13 @@ void WeaselPanel::_CreateLayout() {
 
 void WeaselPanel::Refresh() {
   if (m_hWnd) {
-    if (m_ostyle != m_style) {
-      if (!m_pD2D) {
-        m_pD2D = std::make_shared<D2D>(m_style, m_hWnd);
-        if (!m_style.font_face.empty())
-          m_pD2D->InitDirectWriteResources();
-      } else {
-        m_pD2D->m_hWnd = m_hWnd;
-        m_pD2D->InitDpiInfo();
-        m_pD2D->InitDirect2D();
-        if (!m_style.font_face.empty())
-          m_pD2D->InitDirectWriteResources();
-      }
-      m_ostyle = m_style;
-    } else {
-      if (m_pD2D) {
-        if (!m_style.font_face.empty() && !m_pD2D->pTextFormat)
-          m_pD2D->InitDirectWriteResources();
-      } else {
-        m_pD2D = std::make_shared<D2D>(m_style, m_hWnd);
-        if (!m_style.font_face.empty())
-          m_pD2D->InitDirectWriteResources();
-      }
-    }
+    if (!m_pD2D)
+      m_pD2D = std::make_shared<D2D>(m_style);
+    m_pD2D->AttachWindow(m_hWnd);
+    if (!m_style.font_face.empty() &&
+        (m_ostyle != m_style || !m_pD2D->pTextFormat))
+      m_pD2D->InitDirectWriteResources();
+    m_ostyle = m_style;
     bool should_show_icon =
         (m_status.ascii_mode || !m_status.composing || !m_ctx.aux.empty());
     m_candidateCount = (BYTE)m_ctx.cinfo.candies.size();
@@ -176,11 +150,14 @@ void WeaselPanel::Refresh() {
         (m_style.inline_preedit && m_candidateCount == 0) && !show_tips;
     hide_candidates = inline_no_candidates ||
                       (margin_negative && !show_tips && !show_schema_menu);
-    auto hr = m_pD2D->direct3dDevice->GetDeviceRemovedReason();
+    auto hr = m_pD2D->direct3dDevice
+                  ? m_pD2D->direct3dDevice->GetDeviceRemovedReason()
+                  : DXGI_ERROR_DEVICE_REMOVED;
     if (hr != S_OK) {
       DEBUG << "Device removed detected: " << StrzHr(hr);
       DeviceResources::Get().Reset();
-      m_pD2D->InitDirect2D();
+      if (m_pD2D->swapChain) // only reinit window resources if attached
+        m_pD2D->InitDirect2D();
     }
     _CreateLayout();
     m_layout->DoLayout();
@@ -206,14 +183,10 @@ BOOL WeaselPanel::Create(HWND parent) {
       CW_USEDEFAULT, 10, 10, parent, nullptr, nullptr, this);
   if (m_hWnd) {
     if (!m_pD2D)
-      m_pD2D = std::make_shared<D2D>(m_style, m_hWnd);
-    else {
-      m_pD2D->m_hWnd = m_hWnd;
-      m_pD2D->InitDpiInfo();
-      m_pD2D->InitDirect2D();
-      if (!m_style.font_face.empty())
-        m_pD2D->InitDirectWriteResources();
-    }
+      m_pD2D = std::make_shared<D2D>(m_style);
+    m_pD2D->AttachWindow(m_hWnd);
+    if (!m_style.font_face.empty())
+      m_pD2D->InitDirectWriteResources();
     m_ostyle = m_style;
   }
   return !!m_hWnd;

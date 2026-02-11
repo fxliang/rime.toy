@@ -156,6 +156,8 @@ bool StandardLayout::ShouldDisplayStatusIcon() const {
 }
 
 bool StandardLayout::_IsHighlightOverCandidateWindow(const CRect &rc) {
+  if (!_pD2D || !_pD2D->d2Factory)
+    return false;
   ComPtr<ID2D1PathGeometry> bgPathGeometry;
   HR(_pD2D->CreateRoundedRectanglePath(_bgRect, _style.round_corner_ex,
                                        IsToRoundStruct(), bgPathGeometry));
