@@ -67,11 +67,6 @@ void DeviceResources::Reset() {
 // implementation of D2D::ClearDeviceDependentCaches declared in header
 void D2D::ClearDeviceDependentCaches() {
   std::lock_guard<std::mutex> lk(cacheMutex);
-  // brushes are device/context dependent - clear them
-  for (auto &kv : brushCache) {
-    kv.second.Reset();
-  }
-  brushCache.clear();
   // text formats created from IDWriteFactory are generally immutable and can
   // survive device reset; however if DWriteFactory is reset, clear cache
   if (!m_pWriteFactory) {
@@ -94,13 +89,6 @@ void D2D::ReleaseWindowResources() {
   visual.Reset();
   target.Reset();
   swapChain.Reset();
-  // brushes are per-window if created from this dc; clear so they'll be
-  // recreated
-  std::lock_guard<std::mutex> lk(cacheMutex);
-  for (auto &kv : brushCache) {
-    kv.second.Reset();
-  }
-  brushCache.clear();
 }
 
 D2D::D2D(UIStyle &style, HWND hwnd)
@@ -115,7 +103,6 @@ D2D::~D2D() {
                  pPreeditFormat, pLabelFormat, pTextFormat, pCommentFormat,
                  m_pWriteFactory, m_pBrush);
   textFormatCache.clear();
-  brushCache.clear();
 }
 
 void D2D::InitDirect2D() {
@@ -188,19 +175,9 @@ void D2D::InitDirect2D() {
   HR(target->SetRoot(visual.Get()));
   HR(dcompDevice->Commit());
   // create or reuse brush from cache
-  uint32_t black = 0xFF000000;
-  {
-    std::lock_guard<std::mutex> lk(cacheMutex);
-    auto it = brushCache.find(black);
-    if (it != brushCache.end() && it->second) {
-      m_pBrush = it->second;
-    } else {
-      D2D1_COLOR_F const brushColor = D2D1::ColorF(D2D1::ColorF::Black);
-      HR(dc->CreateSolidColorBrush(brushColor,
-                                   m_pBrush.ReleaseAndGetAddressOf()));
-      brushCache[black] = m_pBrush;
-    }
-  }
+  static const D2D1_COLOR_F brushColor =
+      D2D1::ColorF(D2D1::ColorF::Black);
+  HR(dc->CreateSolidColorBrush(brushColor, m_pBrush.ReleaseAndGetAddressOf()));
 }
 
 void D2D::OnResize(UINT width, UINT height) {

@@ -110,7 +110,6 @@ struct D2D {
   ComPtr<ID2D1SolidColorBrush> m_pBrush;
   // caches
   std::map<std::wstring, PtTextFormat> textFormatCache; // key = face|size|wrap
-  std::map<uint32_t, ComPtr<ID2D1SolidColorBrush>> brushCache; // key = color
   std::mutex cacheMutex;
   // clear caches that depend on device/context
   void ClearDeviceDependentCaches();
