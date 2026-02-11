@@ -1,7 +1,6 @@
 #include "d2d.h"
 #include <Dwmapi.h>
 #include <ShellScalingApi.h>
-#include <map>
 #include <wincodec.h>
 
 namespace weasel {
