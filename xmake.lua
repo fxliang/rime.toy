@@ -3,7 +3,9 @@ local project_name = "rime.toy"
 add_includedirs("./include")
 add_defines("UNICODE", "_UNICODE", "_WIN32_WINNT=0x0603", "TOY_FEATURE")
 includes("WeaselUI")
-add_requires("nlohmann_json")
+-- check if include/nlohmann/json.hpp exists before adding dependency
+local bundled_json = os.isfile("include/nlohmann/json.hpp")
+if not bundled_json then add_requires("nlohmann_json") end
 
 target(project_name)
   set_kind(binary)
@@ -14,7 +16,7 @@ target(project_name)
   "dwrite", 'dxgi', 'd3d11', 'dcomp', "oleaut32", "uiautomationcore", "ole32",
   "oleacc", "imm32", "advapi32")
   add_deps('WeaselUI')
-  add_packages("nlohmann_json")
+  if not bundled_json then add_packages("nlohmann_json") end
   if is_plat('windows') then
     add_cxflags("/utf-8")
     add_cxflags("/Zi")
