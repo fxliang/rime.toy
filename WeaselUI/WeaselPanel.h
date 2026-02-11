@@ -42,6 +42,7 @@ private:
                       uint32_t border_color, const IsToRoundStruct &roundInfo);
   CRect _GetInflatedCandRect(int i);
   void _CaptureRect(CRect &rect);
+  void _UpdateHideCandidates();
 
   void _UpdateOffsetY(CRect &arc, CRect &prc);
 
