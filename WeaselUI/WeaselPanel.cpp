@@ -463,7 +463,8 @@ bool WeaselPanel::_DrawCandidates() {
       int hgap =
           m_layout->mark_width ? (rc.Width() - m_layout->mark_width) / 2 : 0;
       CRect hlRc;
-      if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
+      if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+          m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
         hlRc = CRect(rc.left + hgap, rc.top + pady,
                      rc.left + hgap + m_layout->mark_width,
                      rc.top + pady + m_layout->mark_height);
@@ -486,7 +487,8 @@ bool WeaselPanel::_DrawCandidates() {
 
       CRect mkrc;
       int mark_radius;
-      if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
+      if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+          m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN) {
         int x = rc.left + (rc.Width() - width) / 2;
         mkrc = CRect(x, rc.top, x + width, rc.top + m_layout->mark_height);
         mark_radius = mkrc.Height() / 2;

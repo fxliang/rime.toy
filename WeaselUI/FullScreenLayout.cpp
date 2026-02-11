@@ -23,30 +23,11 @@ void weasel::FullScreenLayout::DoLayout() {
   int step = 32;
   do {
     m_layout->DoLayout();
-    if ((_style.hilited_mark_color & 0xff000000)) {
-      CSize sg;
-      if (candidates_count) {
-        if (_style.mark_text.empty())
-          _pD2D->GetTextSize(L"|", 1, _pD2D->pTextFormat, &sg);
-        else
-          _pD2D->GetTextSize(_style.mark_text, _style.mark_text.length(),
-                             _pD2D->pTextFormat, &sg);
-      }
-      mark_width = sg.cx;
-      mark_height = sg.cy;
-      if (_style.mark_text.empty()) {
-        mark_width = mark_height / 7;
-        if (_style.linespacing && _style.baseline)
-          mark_width =
-              (int)((float)mark_width / ((float)_style.linespacing / 100.0f));
-        mark_width = MAX(mark_width, 6);
-      }
-      mark_gap = (_style.mark_text.empty())
-                     ? mark_width
-                     : mark_width + _style.hilite_spacing;
-    }
   } while (AdjustFontPoint(workArea, step));
 
+  mark_height = m_layout->mark_height;
+  mark_width = m_layout->mark_width;
+  mark_gap = m_layout->mark_gap;
   int offsetx = (workArea.Width() - m_layout->GetContentSize().cx) / 2;
   int offsety = (workArea.Height() - m_layout->GetContentSize().cy) / 2;
   _preeditRect = m_layout->GetPreeditRect();
