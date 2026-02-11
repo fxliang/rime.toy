@@ -175,6 +175,7 @@ private:
   UIStyle m_base_style;
   bool m_disabled;
   bool m_current_dark_mode;
+  int m_show_notifications_time;
   std::unique_ptr<SimpleFileMonitor> m_file_monitor;
 };
 

@@ -168,7 +168,8 @@ void RimeWithToy::BalloonMsg(const string &msg) {
 }
 
 RimeWithToy::RimeWithToy(HINSTANCE hInstance)
-    : m_hInstance(hInstance), m_disabled(false) {
+    : m_hInstance(hInstance), m_disabled(false),
+      m_show_notifications_time(1200) {
   rime_api = rime_get_api();
   m_ui = std::make_shared<UI>();
   const auto tooltip = L"rime.toy\n左键点击切换ASCII\n右键菜单可退出^_^";
@@ -240,6 +241,9 @@ void RimeWithToy::Initialize() {
   RimeConfig config = {NULL};
   if (rime_api->config_open("weasel", &config)) {
     _UpdateUIStyle(&config, m_ui.get(), true);
+    if (!rime_api->config_get_int(&config, "show_notifications_time",
+                                  &m_show_notifications_time))
+      m_show_notifications_time = 1200;
     rime_api->config_close(&config);
   } else
     CONDDEBUG << L"open weasel config failed";
@@ -358,7 +362,7 @@ BOOL RimeWithToy::ShowMessage(Context &ctx, Status &status) {
   if (tips.empty())
     return m_ui->IsCountingDown();
   m_ui->Update(ctx, status);
-  m_ui->ShowWithTimeout(500);
+  m_ui->ShowWithTimeout(m_show_notifications_time);
   return true;
 }
 
