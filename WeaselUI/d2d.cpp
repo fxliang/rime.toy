@@ -503,14 +503,12 @@ void D2D::SetFontFallback(PtTextFormat textFormat,
     DWRITE_UNICODE_RANGE range = {first, last};
     const WCHAR *familys = {_fontFaceWstr.c_str()};
     HR(pFontFallbackBuilder->AddMapping(&range, 1, &familys, 1));
-    decltype(fallbackFontsVector)().swap(fallbackFontsVector);
   }
   // add system defalt font fallback
   HR(pFontFallbackBuilder->AddMappings(pSysFallback.Get()));
   HR(pFontFallbackBuilder->CreateFontFallback(
       pFontFallback.ReleaseAndGetAddressOf()));
   HR(textFormat->SetFontFallback(pFontFallback.Get()));
-  decltype(fallbackFontsVector)().swap(fallbackFontsVector);
 }
 
 void D2D::ParseFontFace(const std::wstring &fontFaceStr,
