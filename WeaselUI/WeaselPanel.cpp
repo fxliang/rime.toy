@@ -426,11 +426,12 @@ bool WeaselPanel::_DrawCandidates() {
   const auto drawText = [&](int i, const vector<Text> &texts, int color,
                             PtTextFormat &textFormat, CRect rc) {
     const auto &text = texts.at(i).str;
-    if (!text.empty()) {
-      if (m_istorepos)
-        rc.OffsetRect(0, m_offsetys[i]);
-      _TextOut(rc, text, text.length(), color, textFormat);
-    }
+    if (COLORTRANSPARENT(color) || rc.IsRectNull() || text.empty() ||
+        !textFormat.Get())
+      return;
+    if (m_istorepos)
+      rc.OffsetRect(0, m_offsetys[i]);
+    _TextOut(rc, text, text.length(), color, textFormat);
   };
   for (auto i = 0; i < candidates.size(); i++) {
     bool hilited = (i == m_ctx.cinfo.highlighted);
