@@ -712,6 +712,11 @@ LRESULT WeaselPanel::OnMouseMove(UINT uMsg, WPARAM wParam, LPARAM lParam) {
   CPoint point(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
   bool hovered = false;
   bool hover_index_change = false;
+  CPoint ptScreen = point;
+  ClientToScreen(m_hWnd, &ptScreen);
+  if (ptScreen == m_lastCursorPos)
+    return 0;
+  m_lastCursorPos = ptScreen;
   for (int i = 0; i < m_candidateCount; i++) {
     CRect rect = _GetInflatedCandRect(i);
     if (rect.PtInRect(point)) {

@@ -58,6 +58,7 @@ private:
                                      LPARAM lParam);
 
   RECT m_inputPos{0, 0, 0, 0};
+  CPoint m_lastCursorPos = {-1, -1};
 
   Context &m_ctx;
   Context &m_octx;
