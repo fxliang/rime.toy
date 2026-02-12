@@ -402,13 +402,17 @@ bool WeaselPanel::_DrawPreedit(const Text &text, bool isPreedit) {
         COLORNOTTRANSPARENT(m_style.nextpage_color)) {
       const std::wstring pre = L"<";
       const std::wstring next = L">";
-      CRect &prc = m_layout->GetPrepageRect();
+      CRect prc = m_layout->GetPrepageRect();
+      if (m_istorepos)
+        prc.OffsetRect(0, m_offsety_preedit);
       // clickable color / disabled color
       int color =
           m_ctx.cinfo.currentPage ? m_style.prevpage_color : m_style.text_color;
       _TextOut(prc, pre.c_str(), pre.length(), color, pTextFormat);
 
-      CRect &nrc = m_layout->GetNextpageRect();
+      CRect nrc = m_layout->GetNextpageRect();
+      if (m_istorepos)
+        nrc.OffsetRect(0, m_offsety_preedit);
       // clickable color / disabled color
       color = m_ctx.cinfo.is_last_page ? m_style.text_color
                                        : m_style.nextpage_color;
@@ -642,8 +646,6 @@ void WeaselPanel::_Reposition() {
     x = rcWorkArea.right;
   bool m_istorepos_buffer = m_istorepos;
   m_istorepos = false;
-  if (y < rcWorkArea.bottom)
-    m_sticky = false;
   if (y > rcWorkArea.bottom || m_sticky) {
     m_sticky = true;
     m_istorepos = (m_style.vertical_auto_reverse &&
