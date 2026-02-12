@@ -22,6 +22,7 @@ public:
   bool GetIsReposition() { return m_istorepos; }
 
   static const int AUTOREV_TIMER = 20241209;
+  static const int AUTOHIDE_TIMER = 20241107;
 
   HWND hwnd() const;
 
@@ -54,6 +55,9 @@ private:
   LRESULT MsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
   static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
                                      LPARAM lParam);
+
+  // helper to clear any active timers
+  void _ClearTimers();
 
   RECT m_inputPos{0, 0, 0, 0};
   CPoint m_lastCursorPos = {-1, -1};
@@ -91,5 +95,10 @@ private:
   // window handle and per-instance click timer
   HWND m_hWnd;
   UINT_PTR m_clickTimer = 0;
+  UINT_PTR m_autoHideTimer = 0;
+
+public:
+  void ShowWithTimeout(size_t millisec);
+  bool IsCountingDown() const;
 };
 } // namespace weasel

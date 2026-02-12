@@ -53,6 +53,34 @@ BOOL WeaselPanel::IsWindow() const { return ::IsWindow(m_hWnd); }
 
 HWND WeaselPanel::hwnd() const { return m_hWnd; }
 
+void WeaselPanel::_ClearTimers() {
+  if (!m_hWnd)
+    return;
+  if (m_clickTimer) {
+    ::KillTimer(m_hWnd, AUTOREV_TIMER);
+    m_clickTimer = 0;
+  }
+  if (m_autoHideTimer) {
+    ::KillTimer(m_hWnd, AUTOHIDE_TIMER);
+    m_autoHideTimer = 0;
+  }
+}
+
+void WeaselPanel::ShowWithTimeout(size_t millisec) {
+  if (!m_hWnd)
+    return;
+  ShowWindow(SW_SHOWNA);
+  // cancel existing auto-hide timer if any
+  if (m_autoHideTimer) {
+    ::KillTimer(m_hWnd, m_autoHideTimer);
+    m_autoHideTimer = 0;
+  }
+  m_autoHideTimer =
+      ::SetTimer(m_hWnd, AUTOHIDE_TIMER, static_cast<UINT>(millisec), NULL);
+}
+
+bool WeaselPanel::IsCountingDown() const { return m_autoHideTimer != 0; }
+
 void WeaselPanel::ShowWindow(int nCmdShow) {
   ::ShowWindow(m_hWnd, nCmdShow);
   if (m_pD2D) {
@@ -68,6 +96,9 @@ void WeaselPanel::ShowWindow(int nCmdShow) {
 }
 
 void WeaselPanel::DestroyWindow() {
+  // clear timers before releasing window resources
+  _ClearTimers();
+
   if (m_pD2D) {
     m_pD2D->ReleaseWindowResources();
     // mark D2D as detached from any window
@@ -78,6 +109,9 @@ void WeaselPanel::DestroyWindow() {
 }
 
 void WeaselPanel::ReleaseAllResources() {
+  // ensure timers are killed before releasing window/device resources
+  _ClearTimers();
+
   if (m_pD2D) {
     m_pD2D->ReleaseWindowResources();
     // explicitly reset shared devices
@@ -674,6 +708,9 @@ void WeaselPanel::_CaptureRect(CRect &rect) {
 }
 
 void WeaselPanel::OnDestroy() {
+  // ensure timers are cleared and then reset state
+  _ClearTimers();
+
   m_hoverIndex = -1;
   m_layout.reset();
   m_sticky = false;
@@ -886,6 +923,12 @@ LRESULT WeaselPanel::MsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam,
       m_clickTimer = 0;
       m_bar_scale = 1.0f;
       InvalidateRect(m_hWnd, nullptr, TRUE);
+      return 0;
+    } else if (wParam == AUTOHIDE_TIMER) {
+      ::KillTimer(m_hWnd, AUTOHIDE_TIMER);
+      m_autoHideTimer = 0;
+      // hide the panel on auto-hide
+      ShowWindow(SW_HIDE);
       return 0;
     }
   }

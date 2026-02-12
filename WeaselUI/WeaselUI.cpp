@@ -12,11 +12,6 @@ public:
   void Refresh() {
     if (!panel.IsWindow())
       return;
-    if (timer) {
-      Hide();
-      KillTimer(panel.hwnd(), AUTOHIDE_TIMER);
-      timer = 0;
-    }
     panel.Refresh();
   }
   void Show() {
@@ -24,52 +19,22 @@ public:
       return;
     panel.ShowWindow(SW_SHOWNA);
     shown = true;
-    if (timer) {
-      KillTimer(panel.hwnd(), AUTOHIDE_TIMER);
-      timer = 0;
-    }
   }
   void Hide() {
     if (!panel.IsWindow())
       return;
     panel.ShowWindow(SW_HIDE);
     shown = false;
-    if (timer) {
-      KillTimer(panel.hwnd(), AUTOHIDE_TIMER);
-      timer = 0;
-    }
   }
-  void ShowWithTimeout(size_t millisec);
+  void ShowWithTimeout(size_t millisec) { panel.ShowWithTimeout(millisec); }
   bool IsShown() const { return shown; }
-  static VOID CALLBACK OnTimer(_In_ HWND hwnd, _In_ UINT uMsg,
-                               _In_ UINT_PTR idEvent, _In_ DWORD dwTime);
-  static const int AUTOHIDE_TIMER = 20241107;
-  static UINT_PTR timer;
+  bool IsCountingDown() const { return panel.IsCountingDown(); }
   bool shown;
 };
-UINT_PTR UIImpl::timer = 0;
-
-void UIImpl::ShowWithTimeout(size_t millisec) {
-  if (!panel.IsWindow())
-    return;
-  panel.ShowWindow(SW_SHOWNA);
-  shown = true;
-  SetTimer(panel.hwnd(), AUTOHIDE_TIMER, static_cast<UINT>(millisec),
-           &UIImpl::OnTimer);
-  timer = UINT_PTR(this);
-}
-VOID CALLBACK UIImpl::OnTimer(_In_ HWND hwnd, _In_ UINT uMsg,
-                              _In_ UINT_PTR idEvent, _In_ DWORD dwTime) {
-  KillTimer(hwnd, idEvent);
-  UIImpl *self = (UIImpl *)timer;
-  timer = 0;
-  if (self) {
-    self->Hide();
-    self->shown = false;
-  }
-}
 // ----------------------------------------------------------------------------
-BOOL UI::IsCountingDown() const { return pimpl_ && pimpl_->timer != 0; };
+BOOL UI::IsCountingDown() const {
+  return pimpl_ && pimpl_->panel.IsCountingDown();
+};
 BOOL UI::IsShown() const { return pimpl_ && pimpl_->IsShown(); }
 void UI::UpdateInputPosition(RECT const &rc) {
   if (pimpl_ && pimpl_->panel.IsWindow()) {
