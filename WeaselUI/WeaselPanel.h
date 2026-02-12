@@ -81,7 +81,7 @@ private:
   float m_bar_scale = 1.0f;
   // ------------------------------------------------------------
   an<D2D> m_pD2D;
-  an<Layout> m_layout;
+  the<Layout> m_layout;
   HICON m_iconAlpha;
   HICON m_iconEnabled;
   HICON m_iconFull;

@@ -35,6 +35,13 @@ public:
 BOOL UI::IsCountingDown() const {
   return pimpl_ && pimpl_->panel.IsCountingDown();
 };
+
+UI::UI() : pimpl_(nullptr) {}
+
+UI::~UI() {
+  if (pimpl_)
+    Destroy(true);
+}
 BOOL UI::IsShown() const { return pimpl_ && pimpl_->IsShown(); }
 void UI::UpdateInputPosition(RECT const &rc) {
   if (pimpl_ && pimpl_->panel.IsWindow()) {
@@ -89,8 +96,7 @@ void UI::Destroy(bool full) {
     if (full) {
       // ensure window resources and shared devices are released
       pimpl_->panel.ReleaseAllResources();
-      delete pimpl_;
-      pimpl_ = nullptr;
+      pimpl_.reset();
     }
   }
 }
@@ -99,7 +105,7 @@ bool UI::Create(HWND parent) {
     pimpl_->panel.Create(parent);
     return true;
   }
-  pimpl_ = new UIImpl(*this);
+  pimpl_ = std::make_unique<UIImpl>(*this);
   if (!pimpl_)
     return false;
   return pimpl_->panel.Create(parent);

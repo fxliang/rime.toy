@@ -4,6 +4,7 @@
 #include "VHorizontalLayout.h"
 #include "VerticalLayout.h"
 #include <filesystem>
+#include <memory>
 #include <resource.h>
 #include <windowsx.h>
 #include <wrl/client.h>
@@ -135,24 +136,27 @@ void WeaselPanel::_ResizeWindow() {
 }
 
 void WeaselPanel::_CreateLayout() {
-  Layout *layout;
+  the<Layout> layout;
   if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
       m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN) {
-    layout = new VHorizontalLayout(m_style, m_ctx, m_status, m_pD2D);
+    layout =
+        std::make_unique<VHorizontalLayout>(m_style, m_ctx, m_status, m_pD2D);
   } else {
     if (m_style.layout_type == UIStyle::LAYOUT_VERTICAL ||
         m_style.layout_type == UIStyle::LAYOUT_VERTICAL_FULLSCREEN) {
-      layout = new VerticalLayout(m_style, m_ctx, m_status, m_pD2D);
+      layout =
+          std::make_unique<VerticalLayout>(m_style, m_ctx, m_status, m_pD2D);
     } else if (m_style.layout_type == UIStyle::LAYOUT_HORIZONTAL ||
                m_style.layout_type == UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN) {
-      layout = new HorizontalLayout(m_style, m_ctx, m_status, m_pD2D);
+      layout =
+          std::make_unique<HorizontalLayout>(m_style, m_ctx, m_status, m_pD2D);
     }
   }
   if (IS_FULLSCREENLAYOUT(m_style)) {
-    layout = new FullScreenLayout(m_style, m_ctx, m_status, m_inputPos, layout,
-                                  m_pD2D);
+    layout = std::make_unique<FullScreenLayout>(
+        m_style, m_ctx, m_status, m_inputPos, std::move(layout), m_pD2D);
   }
-  m_layout.reset(layout);
+  m_layout = std::move(layout);
 }
 
 void WeaselPanel::_UpdateHideCandidates() {

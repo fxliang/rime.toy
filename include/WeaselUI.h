@@ -22,11 +22,8 @@ enum ClientCapabilities {
 class UIImpl;
 class UI {
 public:
-  UI() : pimpl_(nullptr) {}
-  virtual ~UI() {
-    if (pimpl_)
-      Destroy(true);
-  }
+  UI();
+  virtual ~UI();
   // 创建输入法界面
   bool Create(HWND parent);
   // 销毁界面
@@ -54,7 +51,7 @@ public:
   HWND hwnd();
 
 private:
-  UIImpl *pimpl_;
+  the<UIImpl> pimpl_;
   Context ctx_;
   Context octx_;
   Status status_;
