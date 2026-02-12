@@ -6,34 +6,25 @@ void weasel::VerticalLayout::DoLayout() {
   const int space = _style.hilite_spacing;
   int width = 0, height = real_margin_y;
 
-  int base_offset = CalcMarkMetrics(false);
+  int base_offset = _CalcMarkMetrics(false);
 
   // calc page indicator
   int pgw = 0, pgh = 0;
-  CalcPageIndicator(false, pgw, pgh);
-  CSize pgszl, pgszr;
-  bool page_en = (_style.prevpage_color & 0xff000000) &&
-                 (_style.nextpage_color & 0xff000000);
-  if (!IsInlinePreedit()) {
-    _pD2D->GetTextSize(pre, pre.length(), _pD2D->pPreeditFormat, &pgszl);
-    _pD2D->GetTextSize(next, next.length(), _pD2D->pPreeditFormat, &pgszr);
-  }
+  _CalcPageIndicator(false, pgw, pgh);
 
   /*  preedit and auxiliary rectangle calc start */
   CSize size;
   /* Preedit */
   if (!IsInlinePreedit() && !_context.preedit.str.empty()) {
-    size = GetPreeditSize(_context.preedit, _pD2D->pPreeditFormat);
-    LayoutInlineRect(size, false, true, pgw, pgh, real_margin_x, width, height,
-                     _preeditRect);
+    _LayoutInlineRect(_preeditSize, false, true, pgw, pgh, real_margin_x, width,
+                      height, _preeditRect);
     _preeditRect.OffsetRect(offsetX, offsetY);
   }
 
   /* Auxiliary */
   if (!_context.aux.str.empty()) {
-    size = GetPreeditSize(_context.aux, _pD2D->pPreeditFormat);
-    LayoutInlineRect(size, false, false, pgw, pgh, real_margin_x, width, height,
-                     _auxiliaryRect);
+    _LayoutInlineRect(_auxSize, false, false, pgw, pgh, real_margin_x, width,
+                      height, _auxiliaryRect);
     _auxiliaryRect.OffsetRect(offsetX, offsetY);
   }
   /*  preedit and auxiliary rectangle calc end */
@@ -49,24 +40,22 @@ void weasel::VerticalLayout::DoLayout() {
     int w = real_margin_x + base_offset, h = 0;
     int candidate_width = base_offset, comment_width = 0;
     /* Label */
-    auto &label = labels.at(i).str;
-    _pD2D->GetTextSize(label, label.length(), _pD2D->pLabelFormat, &size);
-    _candidateLabelRects[i].SetRect(w, height, w + size.cx * labelFontValid,
-                                    height + size.cy);
+    const auto &labelSize = _candidateLabelSizes[i];
+    _candidateLabelRects[i].SetRect(w, height, w + labelSize.cx,
+                                    height + labelSize.cy);
     _candidateLabelRects[i].OffsetRect(offsetX, offsetY);
-    w += (size.cx + space) * labelFontValid;
-    h = MAX(h, size.cy);
-    candidate_width += (size.cx + space) * labelFontValid;
+    w += (labelSize.cx + space) * labelFontValid;
+    h = MAX(h, labelSize.cy);
+    candidate_width += (labelSize.cx + space) * labelFontValid;
 
     /* Text */
-    const std::wstring &text = candidates.at(i).str;
-    _pD2D->GetTextSize(text, text.length(), _pD2D->pTextFormat, &size);
-    _candidateTextRects[i].SetRect(w, height, w + size.cx * textFontValid,
-                                   height + size.cy);
+    const auto &textSize = _candidateTextSizes[i];
+    _candidateTextRects[i].SetRect(w, height, w + textSize.cx,
+                                   height + textSize.cy);
     _candidateTextRects[i].OffsetRect(offsetX, offsetY);
-    w += size.cx * textFontValid;
-    h = MAX(h, size.cy);
-    candidate_width += size.cx * textFontValid;
+    w += textSize.cx * textFontValid;
+    h = MAX(h, textSize.cy);
+    candidate_width += textSize.cx * textFontValid;
     max_candidate_width = MAX(max_candidate_width, candidate_width);
 
     /* Comment */
@@ -77,15 +66,13 @@ void weasel::VerticalLayout::DoLayout() {
       w += space;
       comment_shift_width = MAX(comment_shift_width, w);
 
-      const std::wstring &comment = comments.at(i).str;
-      _pD2D->GetTextSize(comment, comment.length(), _pD2D->pCommentFormat,
-                         &size);
-      _candidateCommentRects[i].SetRect(0, height, size.cx * cmtFontValid,
-                                        height + size.cy);
+      const auto &commentSize = _candidateCommentSizes[i];
+      _candidateCommentRects[i].SetRect(0, height, commentSize.cx,
+                                        height + commentSize.cy);
       _candidateCommentRects[i].OffsetRect(offsetX, offsetY);
-      w += size.cx * cmtFontValid;
-      h = MAX(h, size.cy);
-      comment_width += size.cx * cmtFontValid;
+      w += commentSize.cx * cmtFontValid;
+      h = MAX(h, commentSize.cy);
+      comment_width += commentSize.cx * cmtFontValid;
       max_comment_width = MAX(max_comment_width, comment_width);
     }
     if (_style.align_type != UIStyle::ALIGN_TOP) {
@@ -158,7 +145,7 @@ void weasel::VerticalLayout::DoLayout() {
     width = MAX(width, _style.min_width);
     height = MAX(height, _style.min_height);
   }
-  UpdateStatusIconLayout(&width, &height);
+  _UpdateStatusIconLayout(&width, &height);
   // candidate rectangle always align to right side, margin_x to the right edge
   for (auto i = 0; i < candidates_count && i < MAX_CANDIDATES_COUNT; ++i) {
     int right =
@@ -173,14 +160,17 @@ void weasel::VerticalLayout::DoLayout() {
   /* Highlighted Candidate */
 
   _highlightRect = _candidateRects[id];
-  if (page_en && candidates_count && !_style.inline_preedit) {
+  if (_pageEnabled && candidates_count && !_style.inline_preedit) {
     int _prex = _contentSize.cx - offsetX - real_margin_x +
                 _style.hilite_padding_x - pgw;
-    int _prey = (_preeditRect.top + _preeditRect.bottom) / 2 - pgszl.cy / 2;
-    _prePageRect.SetRect(_prex, _prey, _prex + pgszl.cx, _prey + pgszl.cy);
+    int _prey =
+        (_preeditRect.top + _preeditRect.bottom) / 2 - _pagePrevSize.cy / 2;
+    _prePageRect.SetRect(_prex, _prey, _prex + _pagePrevSize.cx,
+                         _prey + _pagePrevSize.cy);
     _nextPageRect.SetRect(_prePageRect.right + _style.hilite_spacing, _prey,
-                          _prePageRect.right + _style.hilite_spacing + pgszr.cx,
-                          _prey + pgszr.cy);
+                          _prePageRect.right + _style.hilite_spacing +
+                              _pageNextSize.cx,
+                          _prey + _pageNextSize.cy);
     if (ShouldDisplayStatusIcon()) {
       _prePageRect.OffsetRect(-STATUS_ICON_SIZE, 0);
       _nextPageRect.OffsetRect(-STATUS_ICON_SIZE, 0);

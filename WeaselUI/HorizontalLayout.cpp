@@ -3,36 +3,26 @@
 using namespace weasel;
 
 void HorizontalLayout::DoLayout() {
-  CSize size;
   int width = offsetX + real_margin_x, height = offsetY + real_margin_y;
   int w = offsetX + real_margin_x;
 
   /* calc mark_text sizes */
-  int base_offset = CalcMarkMetrics(false);
+  int base_offset = _CalcMarkMetrics(false);
 
   // calc page indicator
   int pgw = 0, pgh = 0;
-  CalcPageIndicator(false, pgw, pgh);
-  CSize pgszl, pgszr;
-  bool page_en = (_style.prevpage_color & 0xff000000) &&
-                 (_style.nextpage_color & 0xff000000);
-  if (!IsInlinePreedit()) {
-    _pD2D->GetTextSize(pre, pre.length(), _pD2D->pPreeditFormat, &pgszl);
-    _pD2D->GetTextSize(next, next.length(), _pD2D->pPreeditFormat, &pgszr);
-  }
+  _CalcPageIndicator(false, pgw, pgh);
 
   /* Preedit */
   if (!IsInlinePreedit() && !_context.preedit.str.empty()) {
-    size = GetPreeditSize(_context.preedit, _pD2D->pPreeditFormat);
-    LayoutInlineRect(size, false, true, pgw, pgh, w, width, height,
-                     _preeditRect);
+    _LayoutInlineRect(_preeditSize, false, true, pgw, pgh, w, width, height,
+                      _preeditRect);
   }
 
   /* Auxiliary */
   if (!_context.aux.str.empty()) {
-    size = GetPreeditSize(_context.aux, _pD2D->pPreeditFormat);
-    LayoutInlineRect(size, false, false, pgw, pgh, w, width, height,
-                     _auxiliaryRect);
+    _LayoutInlineRect(_auxSize, false, false, pgw, pgh, w, width, height,
+                      _auxiliaryRect);
   }
 
   int row_cnt = 0;
@@ -50,37 +40,33 @@ void HorizontalLayout::DoLayout() {
       if (id == i)
         w += base_offset;
       /* Label */
-      auto &label = labels.at(i).str;
-      _pD2D->GetTextSize(label, label.length(), _pD2D->pLabelFormat, &size);
-      _candidateLabelRects[i].SetRect(w, height, w + size.cx * labelFontValid,
-                                      height + size.cy);
-      w += size.cx * labelFontValid;
-      current_cand_width += size.cx * labelFontValid;
+      const auto &labelSize = _candidateLabelSizes[i];
+      _candidateLabelRects[i].SetRect(w, height, w + labelSize.cx,
+                                      height + labelSize.cy);
+      w += labelSize.cx;
+      current_cand_width += labelSize.cx;
 
       /* Text */
       w += _style.hilite_spacing;
-      const std::wstring &text = candidates.at(i).str;
-      _pD2D->GetTextSize(text, text.length(), _pD2D->pTextFormat, &size);
-      _candidateTextRects[i].SetRect(w, height, w + size.cx * textFontValid,
-                                     height + size.cy);
-      w += size.cx * textFontValid;
-      current_cand_width += (size.cx + _style.hilite_spacing) * textFontValid;
+      const auto &textSize = _candidateTextSizes[i];
+      _candidateTextRects[i].SetRect(w, height, w + textSize.cx,
+                                     height + textSize.cy);
+      w += textSize.cx;
+      current_cand_width += (textSize.cx + _style.hilite_spacing);
 
       /* Comment */
       bool cmtFontNotTrans =
           (i == id && (_style.hilited_comment_text_color & 0xff000000)) ||
           (i != id && (_style.comment_text_color & 0xff000000));
       if (!comments.at(i).str.empty() && cmtFontValid && cmtFontNotTrans) {
-        const std::wstring &comment = comments.at(i).str;
-        _pD2D->GetTextSize(comment, comment.length(), _pD2D->pCommentFormat,
-                           &size);
+        const auto &commentSize = _candidateCommentSizes[i];
         w += _style.hilite_spacing;
-        _candidateCommentRects[i].SetRect(w, height, w + size.cx * cmtFontValid,
-                                          height + size.cy);
-        w += size.cx * cmtFontValid;
-        current_cand_width += (size.cx + _style.hilite_spacing) * cmtFontValid;
+        _candidateCommentRects[i].SetRect(w, height, w + commentSize.cx,
+                                          height + commentSize.cy);
+        w += commentSize.cx;
+        current_cand_width += (commentSize.cx + _style.hilite_spacing);
       } else /* Used for highlighted candidate calculation below */
-        _candidateCommentRects[i].SetRect(w, height, w, height + size.cy);
+        _candidateCommentRects[i].SetRect(w, height, w, height + textSize.cy);
 
       int base_left = (i == id) ? _candidateLabelRects[i].left - base_offset
                                 : _candidateLabelRects[i].left;
@@ -169,19 +155,22 @@ void HorizontalLayout::DoLayout() {
     }
   }
   _highlightRect = _candidateRects[id];
-  UpdateStatusIconLayout(&width, &height);
+  _UpdateStatusIconLayout(&width, &height);
   _contentSize.SetSize(width + offsetX, height + 2 * offsetY);
   _contentRect.SetRect(0, 0, _contentSize.cx, _contentSize.cy);
 
   // calc page indicator
-  if (page_en && candidates_count && !_style.inline_preedit) {
+  if (_pageEnabled && candidates_count && !_style.inline_preedit) {
     int _prex = _contentSize.cx - offsetX - real_margin_x +
                 _style.hilite_padding_x - pgw;
-    int _prey = (_preeditRect.top + _preeditRect.bottom) / 2 - pgszl.cy / 2;
-    _prePageRect.SetRect(_prex, _prey, _prex + pgszl.cx, _prey + pgszl.cy);
+    int _prey =
+        (_preeditRect.top + _preeditRect.bottom) / 2 - _pagePrevSize.cy / 2;
+    _prePageRect.SetRect(_prex, _prey, _prex + _pagePrevSize.cx,
+                         _prey + _pagePrevSize.cy);
     _nextPageRect.SetRect(_prePageRect.right + _style.hilite_spacing, _prey,
-                          _prePageRect.right + _style.hilite_spacing + pgszr.cx,
-                          _prey + pgszr.cy);
+                          _prePageRect.right + _style.hilite_spacing +
+                              _pageNextSize.cx,
+                          _prey + _pageNextSize.cy);
     if (ShouldDisplayStatusIcon()) {
       _prePageRect.OffsetRect(-STATUS_ICON_SIZE, 0);
       _nextPageRect.OffsetRect(-STATUS_ICON_SIZE, 0);

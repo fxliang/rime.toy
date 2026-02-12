@@ -4,8 +4,11 @@
 
 using namespace weasel;
 
-CSize StandardLayout::GetPreeditSize(const Text &text,
-                                     ComPtr<IDWriteTextFormat1> &pTextFormat) {
+const wstring StandardLayout::_pre = L"<";
+const wstring StandardLayout::_next = L">";
+
+CSize StandardLayout::_GetPreeditSize(const Text &text,
+                                      ComPtr<IDWriteTextFormat1> &pTextFormat) {
   const wstring &preedit = text.str;
   const vector<TextAttribute> &attrs = text.attributes;
   CSize size(0, 0);
@@ -46,7 +49,47 @@ CSize StandardLayout::GetPreeditSize(const Text &text,
   return size;
 }
 
-void StandardLayout::UpdateStatusIconLayout(int *width, int *height) {
+void StandardLayout::RecalculateSizes() {
+  _preeditSize = _GetPreeditSize(_context.preedit, _pD2D->pPreeditFormat);
+  _auxSize = _GetPreeditSize(_context.aux, _pD2D->pPreeditFormat);
+  _pD2D->GetTextSize(_pre, _pre.length(), _pD2D->pPreeditFormat,
+                     &_pagePrevSize);
+  _pD2D->GetTextSize(_next, _next.length(), _pD2D->pPreeditFormat,
+                     &_pageNextSize);
+
+  // Precompute candidate sizes
+  _candidateLabelSizes.clear();
+  _candidateTextSizes.clear();
+  _candidateCommentSizes.clear();
+  for (size_t i = 0; i < candidates.size(); ++i) {
+    CSize labelSize(0, 0), textSize(0, 0), commentSize(0, 0);
+    if (labelFontValid) {
+      _pD2D->GetTextSize(labels.at(i).str, labels.at(i).str.length(),
+                         _pD2D->pLabelFormat, &labelSize);
+    }
+    if (textFontValid) {
+      _pD2D->GetTextSize(candidates.at(i).str, candidates.at(i).str.length(),
+                         _pD2D->pTextFormat, &textSize);
+    }
+    if (cmtFontValid) {
+      _pD2D->GetTextSize(comments.at(i).str, comments.at(i).str.length(),
+                         _pD2D->pCommentFormat, &commentSize);
+    }
+    _candidateLabelSizes.push_back(labelSize);
+    _candidateTextSizes.push_back(textSize);
+    _candidateCommentSizes.push_back(commentSize);
+  }
+
+  // Recalculate mark size
+  if (!_style.mark_text.empty()) {
+    _pD2D->GetTextSize(_style.mark_text, _style.mark_text.length(),
+                       _pD2D->pTextFormat, &_markTextSize);
+  } else {
+    _markTextSize = CSize(0, 0);
+  }
+}
+
+void StandardLayout::_UpdateStatusIconLayout(int *width, int *height) {
   // rule 1. status icon is middle-aligned with preedit text or auxiliary text,
   // whichever comes first rule 2. there is a spacing between preedit/aux text
   // and the status icon rule 3. status icon is right aligned in WeaselPanel,
@@ -110,12 +153,12 @@ void StandardLayout::UpdateStatusIconLayout(int *width, int *height) {
     _statusIconRect.OffsetRect(-_style.border, -_style.border);
 }
 
-void StandardLayout::CalcPageIndicator(bool vertical_text_layout, int &pgw,
-                                       int &pgh) {
+void StandardLayout::_CalcPageIndicator(bool vertical_text_layout, int &pgw,
+                                        int &pgh) {
   CSize pgszl, pgszr;
   if (!IsInlinePreedit()) {
-    _pD2D->GetTextSize(pre, pre.length(), _pD2D->pPreeditFormat, &pgszl);
-    _pD2D->GetTextSize(next, next.length(), _pD2D->pPreeditFormat, &pgszr);
+    _pD2D->GetTextSize(_pre, _pre.length(), _pD2D->pPreeditFormat, &pgszl);
+    _pD2D->GetTextSize(_next, _next.length(), _pD2D->pPreeditFormat, &pgszr);
   }
   bool page_en = (_style.prevpage_color & 0xff000000) &&
                  (_style.nextpage_color & 0xff000000);
@@ -405,7 +448,7 @@ void StandardLayout::_PrecomputePreeditRects(const CRect &baseRect,
   }
 }
 
-int StandardLayout::CalcMarkMetrics(bool vertical_text_layout) {
+int StandardLayout::_CalcMarkMetrics(bool vertical_text_layout) {
   if (!(_style.hilited_mark_color & 0xff000000)) {
     mark_width = 0;
     mark_height = 0;
@@ -417,8 +460,7 @@ int StandardLayout::CalcMarkMetrics(bool vertical_text_layout) {
     if (_style.mark_text.empty())
       _pD2D->GetTextSize(L"|", 1, _pD2D->pTextFormat, &sg);
     else
-      _pD2D->GetTextSize(_style.mark_text, _style.mark_text.length(),
-                         _pD2D->pTextFormat, &sg);
+      sg = _markTextSize;
   }
   mark_width = sg.cx;
   mark_height = sg.cy;
@@ -446,21 +488,21 @@ int StandardLayout::CalcMarkMetrics(bool vertical_text_layout) {
 
 // CalcPageIndicator moved to StandardStandardLayout
 
-int StandardLayout::CalcStatusIconOffset(int extent) const {
+int StandardLayout::_CalcStatusIconOffset(int extent) const {
   if (!ShouldDisplayStatusIcon())
     return 0;
   return (STATUS_ICON_SIZE >= extent) ? (STATUS_ICON_SIZE - extent) / 2 : 0;
 }
 
-void StandardLayout::LayoutInlineRect(const CSize &size,
-                                      bool vertical_text_layout,
-                                      bool is_preedit, int pgw, int pgh,
-                                      int base_coord, int &width, int &height,
-                                      CRect &rect) {
+void StandardLayout::_LayoutInlineRect(const CSize &size,
+                                       bool vertical_text_layout,
+                                       bool is_preedit, int pgw, int pgh,
+                                       int base_coord, int &width, int &height,
+                                       CRect &rect) {
   if (vertical_text_layout) {
     int szx = is_preedit ? MAX(size.cx, pgw) : size.cx;
     int szy = is_preedit ? pgh : size.cy;
-    int xoffset = CalcStatusIconOffset(szx);
+    int xoffset = _CalcStatusIconOffset(szx);
     rect.SetRect(width + xoffset, base_coord, width + xoffset + size.cx,
                  base_coord + size.cy);
     width += size.cx + xoffset * 2 + _style.spacing;
@@ -470,7 +512,7 @@ void StandardLayout::LayoutInlineRect(const CSize &size,
   } else {
     int szx = is_preedit ? pgw : size.cx;
     int szy = is_preedit ? MAX(size.cy, pgh) : size.cy;
-    int yoffset = CalcStatusIconOffset(szy);
+    int yoffset = _CalcStatusIconOffset(szy);
     rect.SetRect(base_coord, height + yoffset, base_coord + size.cx,
                  height + yoffset + size.cy);
     height += size.cy + 2 * yoffset + _style.spacing;

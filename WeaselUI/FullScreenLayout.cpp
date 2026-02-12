@@ -5,7 +5,7 @@ using namespace weasel;
 void weasel::FullScreenLayout::DoLayout() {
   if (_context.empty()) {
     int width = 0, height = 0;
-    UpdateStatusIconLayout(&width, &height);
+    _UpdateStatusIconLayout(&width, &height);
     _contentSize.SetSize(width, height);
     return;
   }
@@ -21,9 +21,15 @@ void weasel::FullScreenLayout::DoLayout() {
   }
 
   int step = 32;
+  bool adjusted = false;
   do {
+    if (adjusted) {
+      // Font changed, recalculate cached sizes
+      static_cast<StandardLayout *>(m_layout.get())->RecalculateSizes();
+    }
     m_layout->DoLayout();
-  } while (AdjustFontPoint(workArea, step));
+    adjusted = AdjustFontPoint(workArea, step);
+  } while (adjusted);
 
   mark_height = m_layout->mark_height;
   mark_width = m_layout->mark_width;
