@@ -107,15 +107,15 @@ void HorizontalLayout::DoLayout() {
 
     // reposition for alignment, exp when rect height not equal to
     // height_of_rows
-    if (_style.align_type != UIStyle::ALIGN_TOP) {
-      for (auto i = 0; i < candidates_count && i < MAX_CANDIDATES_COUNT; ++i) {
-        int base_left = (i == id) ? _candidateLabelRects[i].left - base_offset
-                                  : _candidateLabelRects[i].left;
-        const int height_of_current_raw = height_of_rows[row_of_candidate[i]];
-        _candidateRects[i].SetRect(
-            base_left, mintop_of_rows[row_of_candidate[i]],
-            _candidateCommentRects[i].right,
-            mintop_of_rows[row_of_candidate[i]] + height_of_current_raw);
+    for (auto i = 0; i < candidates_count && i < MAX_CANDIDATES_COUNT; ++i) {
+      int base_left = (i == id) ? _candidateLabelRects[i].left - base_offset
+                                : _candidateLabelRects[i].left;
+      const int height_of_current_raw = height_of_rows[row_of_candidate[i]];
+      _candidateRects[i].SetRect(base_left, mintop_of_rows[row_of_candidate[i]],
+                                 _candidateCommentRects[i].right,
+                                 mintop_of_rows[row_of_candidate[i]] +
+                                     height_of_current_raw);
+      if (_style.align_type != UIStyle::ALIGN_TOP) {
         int ol = 0, ot = 0, oc = 0;
         if (_style.align_type == UIStyle::ALIGN_CENTER) {
           ol = (height_of_current_raw - _candidateLabelRects[i].Height()) / 2;
@@ -129,6 +129,10 @@ void HorizontalLayout::DoLayout() {
         _candidateLabelRects[i].OffsetRect(0, ol);
         _candidateTextRects[i].OffsetRect(0, ot);
         _candidateCommentRects[i].OffsetRect(0, oc);
+        // 更新 _candidateRects[i] 基于偏移后的子矩形
+        _candidateRects[i].SetRect(
+            _candidateLabelRects[i].left, _candidateLabelRects[i].top,
+            _candidateCommentRects[i].right, _candidateCommentRects[i].bottom);
       }
     }
     height = mintop_of_rows[row_cnt] + height_of_rows[row_cnt] - offsetY;
