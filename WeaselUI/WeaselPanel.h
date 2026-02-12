@@ -21,12 +21,9 @@ public:
   BOOL Create(HWND parent);
   bool GetIsReposition() { return m_istorepos; }
 
-  HWND m_hWnd;
-
-  static void CALLBACK OnClickTimer(_In_ HWND hwnd, _In_ UINT uMsg,
-                                    _In_ UINT_PTR idEvent, _In_ DWORD dwTime);
-  static UINT_PTR ptimer;
   static const int AUTOREV_TIMER = 20241209;
+
+  HWND hwnd() const;
 
 private:
   void RedrawWindow() { InvalidateRect(m_hWnd, nullptr, true); }
@@ -91,5 +88,8 @@ private:
   wstring m_current_half_icon;
   wstring m_current_full_icon;
   UICallbackFunc &m_uiCallback;
+  // window handle and per-instance click timer
+  HWND m_hWnd;
+  UINT_PTR m_clickTimer = 0;
 };
 } // namespace weasel

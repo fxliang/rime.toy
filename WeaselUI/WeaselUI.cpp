@@ -14,7 +14,7 @@ public:
       return;
     if (timer) {
       Hide();
-      KillTimer(panel.m_hWnd, AUTOHIDE_TIMER);
+      KillTimer(panel.hwnd(), AUTOHIDE_TIMER);
       timer = 0;
     }
     panel.Refresh();
@@ -25,7 +25,7 @@ public:
     panel.ShowWindow(SW_SHOWNA);
     shown = true;
     if (timer) {
-      KillTimer(panel.m_hWnd, AUTOHIDE_TIMER);
+      KillTimer(panel.hwnd(), AUTOHIDE_TIMER);
       timer = 0;
     }
   }
@@ -35,7 +35,7 @@ public:
     panel.ShowWindow(SW_HIDE);
     shown = false;
     if (timer) {
-      KillTimer(panel.m_hWnd, AUTOHIDE_TIMER);
+      KillTimer(panel.hwnd(), AUTOHIDE_TIMER);
       timer = 0;
     }
   }
@@ -54,7 +54,7 @@ void UIImpl::ShowWithTimeout(size_t millisec) {
     return;
   panel.ShowWindow(SW_SHOWNA);
   shown = true;
-  SetTimer(panel.m_hWnd, AUTOHIDE_TIMER, static_cast<UINT>(millisec),
+  SetTimer(panel.hwnd(), AUTOHIDE_TIMER, static_cast<UINT>(millisec),
            &UIImpl::OnTimer);
   timer = UINT_PTR(this);
 }
@@ -143,7 +143,7 @@ bool UI::GetIsReposition() { return pimpl_ && pimpl_->panel.GetIsReposition(); }
 
 HWND UI::hwnd() {
   if (pimpl_ && pimpl_->panel.IsWindow())
-    return pimpl_->panel.m_hWnd;
+    return pimpl_->panel.hwnd();
   return nullptr;
 }
 } // namespace weasel

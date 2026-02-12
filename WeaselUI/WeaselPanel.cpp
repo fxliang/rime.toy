@@ -51,6 +51,8 @@ WeaselPanel::WeaselPanel(UI &ui)
 
 BOOL WeaselPanel::IsWindow() const { return ::IsWindow(m_hWnd); }
 
+HWND WeaselPanel::hwnd() const { return m_hWnd; }
+
 void WeaselPanel::ShowWindow(int nCmdShow) {
   ::ShowWindow(m_hWnd, nCmdShow);
   if (m_pD2D) {
@@ -738,7 +740,7 @@ LRESULT WeaselPanel::OnLeftClickUp(UINT uMsg, WPARAM wParam, LPARAM lParam) {
 
   ::KillTimer(m_hWnd, AUTOREV_TIMER);
   m_bar_scale = 1.0;
-  ptimer = 0;
+  m_clickTimer = 0;
 
   auto rect = _GetInflatedCandRect(m_ctx.cinfo.highlighted);
   if (rect.PtInRect(point)) {
@@ -834,26 +836,12 @@ LRESULT WeaselPanel::OnLeftClickDown(UINT uMsg, WPARAM wParam, LPARAM lParam) {
         } else {
           RedrawWindow();
         }
-        ptimer = UINT_PTR(this);
-        ::SetTimer(m_hWnd, AUTOREV_TIMER, 1000, &WeaselPanel::OnClickTimer);
+        m_clickTimer = ::SetTimer(m_hWnd, AUTOREV_TIMER, 1000, NULL);
         return 0;
       }
     }
   }
   return 0;
-}
-
-UINT_PTR WeaselPanel::ptimer = 0;
-VOID CALLBACK WeaselPanel::OnClickTimer(_In_ HWND hwnd, _In_ UINT uMsg,
-                                        _In_ UINT_PTR idEvent,
-                                        _In_ DWORD dwTime) {
-  ::KillTimer(hwnd, idEvent);
-  WeaselPanel *self = (WeaselPanel *)ptimer;
-  ptimer = 0;
-  if (self) {
-    self->m_bar_scale = 1.0;
-    InvalidateRect(self->m_hWnd, nullptr, true);
-  }
 }
 
 LRESULT CALLBACK WeaselPanel::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
@@ -892,6 +880,14 @@ LRESULT WeaselPanel::MsgHandler(HWND hwnd, UINT uMsg, WPARAM wParam,
     return OnLeftClickUp(uMsg, wParam, lParam);
   case WM_LBUTTONDOWN:
     return OnLeftClickDown(uMsg, wParam, lParam);
+  case WM_TIMER:
+    if (wParam == AUTOREV_TIMER) {
+      ::KillTimer(m_hWnd, AUTOREV_TIMER);
+      m_clickTimer = 0;
+      m_bar_scale = 1.0f;
+      InvalidateRect(m_hWnd, nullptr, TRUE);
+      return 0;
+    }
   }
   return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
