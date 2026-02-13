@@ -14,7 +14,7 @@ target(project_name)
   add_includedirs("./include")
   add_links("user32", "Shlwapi", "shcore", "rime", "gdi32", "Shell32", "d2d1",
   "dwrite", 'dxgi', 'd3d11', 'dcomp', "oleaut32", "uiautomationcore", "ole32",
-  "oleacc", "imm32", "advapi32")
+  "oleacc", "imm32", "advapi32", "psapi")
   add_deps('WeaselUI')
   if not bundled_json then add_packages("nlohmann_json") end
   if is_plat('windows') then
