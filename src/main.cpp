@@ -162,6 +162,31 @@ LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam) {
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                     LPWSTR lpCmdLine, int nCmdShow) {
+  // A relaunched instance (--restart <pid>) waits for the previous instance to
+  // exit before acquiring the single-instance mutex, so the restart succeeds.
+  if (lpCmdLine) {
+    std::wstring cmd(lpCmdLine);
+    size_t pos = cmd.find(L"--restart");
+    if (pos != std::wstring::npos) {
+      size_t p = pos + 9; // length of "--restart"
+      while (p < cmd.size() && (cmd[p] == L' ' || cmd[p] == L'\t'))
+        ++p;
+      DWORD oldPid = 0;
+      try {
+        oldPid = static_cast<DWORD>(std::stoul(cmd.substr(p)));
+      } catch (...) {
+        oldPid = 0;
+      }
+      if (oldPid) {
+        HANDLE hOld = OpenProcess(SYNCHRONIZE, FALSE, oldPid);
+        if (hOld) {
+          WaitForSingleObject(hOld, 20000);
+          CloseHandle(hOld);
+        }
+      }
+    }
+  }
+
   HANDLE hMutex = ::CreateMutex(NULL, FALSE, L"rime.toy.single.instance");
   if (::GetLastError() == ERROR_ALREADY_EXISTS ||
       ::GetLastError() == ERROR_ACCESS_DENIED)

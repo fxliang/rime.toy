@@ -318,21 +318,20 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
       break;
     }
     case MENU_RESTART: {
-      // call restart_rime.toy.bat in the same directory as this exe
-      wchar_t exePath[MAX_PATH];
+      // Relaunch ourselves; the new instance carries --restart with our pid
+      // and waits for us to exit before taking the single-instance mutex.
+      wchar_t exePath[MAX_PATH] = {0};
       GetModuleFileName(NULL, exePath, MAX_PATH);
-      std::wstring exeDir(exePath);
-      exeDir = exeDir.substr(0, exeDir.find_last_of(L"\\"));
-      std::wstring batPath = exeDir + L"\\restart_rime.toy.bat";
-      if (std::filesystem::exists(batPath)) {
-        STARTUPINFOW si = {sizeof(si)};
-        PROCESS_INFORMATION pi;
-        if (CreateProcessW(batPath.c_str(), NULL, NULL, NULL, FALSE,
-                           CREATE_NO_WINDOW, NULL, exeDir.c_str(), &si, &pi)) {
-          CloseHandle(pi.hProcess);
-          CloseHandle(pi.hThread);
-          exit(0);
-        }
+      std::wstring cmdLine = L"\"" + std::wstring(exePath) + L"\" --restart " +
+                             std::to_wstring(GetCurrentProcessId());
+      STARTUPINFOW si = {sizeof(si)};
+      PROCESS_INFORMATION pi = {0};
+      if (CreateProcessW(exePath, cmdLine.data(), NULL, NULL, FALSE, 0, NULL,
+                         NULL, &si, &pi)) {
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        Hide();
+        PostQuitMessage(0);
       }
       break;
     }
