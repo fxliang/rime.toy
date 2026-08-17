@@ -25,7 +25,7 @@ public:
   UI();
   virtual ~UI();
   // 创建输入法界面
-  bool Create(HWND parent);
+  bool Create(HWND parent, bool preview_mode = false);
   // 销毁界面
   void Destroy(bool full = false);
   // 界面显隐
@@ -36,6 +36,7 @@ public:
   BOOL IsShown() const;
   // 重绘界面
   void Refresh();
+  void RepositionPreview();
   // 置输入焦点位置（光标跟随时移动候选窗）但不重绘
   void UpdateInputPosition(RECT const &rc);
   // 更新界面显示内容
@@ -45,6 +46,7 @@ public:
   Status &status() { return status_; }
   UIStyle &style() { return style_; }
   UIStyle &ostyle() { return ostyle_; }
+  bool &InServer() { return in_server_; }
   bool GetIsReposition();
   UICallbackFunc &uiCallback() { return _uiCallback; }
   void SetCallback(const UICallbackFunc &func) { _uiCallback = func; }
@@ -57,6 +59,7 @@ private:
   Status status_;
   UIStyle style_;
   UIStyle ostyle_;
+  bool in_server_ = true;
   UICallbackFunc _uiCallback;
 };
 } // namespace weasel

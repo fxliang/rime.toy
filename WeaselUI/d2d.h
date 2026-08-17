@@ -37,6 +37,7 @@ public:
   ComPtr<ID2D1Device1> d2Device;
   ComPtr<IDCompositionDevice> dcompDevice;
   ComPtr<IDWriteFactory2> m_pWriteFactory;
+  ComPtr<IWICImagingFactory> wicFactory;
 
 private:
   DeviceResources();
@@ -56,7 +57,6 @@ struct IsToRoundStruct {
 };
 
 struct D2D {
-
   // Construct without window; call AttachWindow when HWND is ready.
   D2D(UIStyle &style);
   // Allow constructing before window exists; attach window later to finish
@@ -93,7 +93,7 @@ struct D2D {
   HRESULT FillGeometry(const CRect &rect, uint32_t color, uint32_t radius,
                        IsToRoundStruct roundInfo, bool to_blur = false);
   HRESULT DrawTextLayout(ComPtr<IDWriteTextLayout> pTextLayout, float x,
-                         float y, uint32_t color, bool shadow = false);
+                         float y, uint32_t color);
   ComPtr<ID3D11Device> direct3dDevice;
   ComPtr<IDXGIDevice> dxgiDevice;
   ComPtr<IDXGIFactory2> dxFactory;

@@ -336,6 +336,8 @@ bool RimeWithToy::CheckCommit() {
   return committed;
 }
 BOOL RimeWithToy::ShowMessage(Context &ctx, Status &status) {
+  if (m_message_type.empty() || m_message_value.empty())
+    return m_ui->IsCountingDown();
   // show as auxiliary string
   std::wstring &tips(ctx.aux.str);
   if (m_message_type == "deploy") {
@@ -357,6 +359,8 @@ BOOL RimeWithToy::ShowMessage(Context &ctx, Status &status) {
       status.type = FULL_SHAPE;
     else
       status.type = SCHEMA;
+  } else if (m_message_type == "property") {
+    return false;
   }
 
   if (tips.empty())
@@ -370,7 +374,6 @@ void RimeWithToy::GetCandidateInfo(CandidateInfo &cinfo, RimeContext &ctx) {
   cinfo.candies.resize(ctx.menu.num_candidates);
   cinfo.comments.resize(ctx.menu.num_candidates);
   cinfo.labels.resize(ctx.menu.num_candidates);
-  const wstring &label_text_format = m_ui->style().label_text_format;
   for (int i = 0; i < ctx.menu.num_candidates; ++i) {
     cinfo.candies[i].str = u8tow(ctx.menu.candidates[i].text);
     if (ctx.menu.candidates[i].comment) {
@@ -383,8 +386,6 @@ void RimeWithToy::GetCandidateInfo(CandidateInfo &cinfo, RimeContext &ctx) {
     } else {
       cinfo.labels[i].str = std::to_wstring((i + 1) % 10);
     }
-    cinfo.labels[i].str =
-        GetLabelText(cinfo.labels[i].str, label_text_format.c_str());
   }
   cinfo.highlighted = ctx.menu.highlighted_candidate_index;
   cinfo.currentPage = ctx.menu.page_no;
@@ -423,7 +424,10 @@ void RimeWithToy::GetContext(Context &context, const Status &status) {
         auto hilite = ctx.menu.highlighted_candidate_index;
         for (auto i = 0; i < ctx.menu.num_candidates; i++) {
           string label =
-              style.label_font_point > 0 ? wtou8(cinfo.labels[i].str) : "";
+              style.label_font_point > 0
+                  ? wtou8(GetLabelText(cinfo.labels[i].str,
+                                       style.label_text_format.c_str()))
+                  : "";
           string comment =
               style.comment_font_point > 0 ? wtou8(cinfo.comments[i].str) : "";
           string mark_text =

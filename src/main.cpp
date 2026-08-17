@@ -61,7 +61,7 @@ void update_position(HWND hwnd) {
       }
     }
   }
-  m_toy->UpdateInputPosition({pt.x, 0, 0, pt.y});
+  m_toy->UpdateInputPosition({pt.x, pt.y, pt.x, pt.y});
 };
 
 static HWND hwnd_previous = nullptr;

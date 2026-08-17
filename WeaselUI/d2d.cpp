@@ -4,6 +4,16 @@
 #include <wincodec.h>
 
 namespace weasel {
+namespace {
+UINT GetDpiForWindowCompat(HWND hwnd) {
+  if (!hwnd)
+    return 0;
+  using GetDpiForWindowFunc = UINT(WINAPI *)(HWND);
+  static auto const pGetDpiForWindow = reinterpret_cast<GetDpiForWindowFunc>(
+      GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetDpiForWindow"));
+  return pGetDpiForWindow ? pGetDpiForWindow(hwnd) : 0;
+}
+} // namespace
 
 // DeviceResources implementation moved from cpp to header; provide definitions
 // here
@@ -68,6 +78,10 @@ HRESULT DeviceResources::EnsureInitialized() {
       reinterpret_cast<IUnknown **>(m_pWriteFactory.ReleaseAndGetAddressOf()));
   if (FAILED(hr))
     return hr;
+  hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+                        IID_PPV_ARGS(wicFactory.ReleaseAndGetAddressOf()));
+  if (FAILED(hr))
+    return hr;
 
   initialized = true;
   return S_OK;
@@ -76,7 +90,7 @@ HRESULT DeviceResources::EnsureInitialized() {
 void DeviceResources::Reset() {
   // release shared device resources so they can be recreated
   SafeReleaseAll(direct3dDevice, dxgiDevice, dxFactory, d2Factory, d2Device,
-                 dcompDevice, m_pWriteFactory);
+                 dcompDevice, m_pWriteFactory, wicFactory);
   initialized = false;
 }
 
@@ -114,8 +128,12 @@ D2D::D2D(UIStyle &style)
 }
 
 void D2D::AttachWindow(HWND hwnd) {
-  if (m_hWnd == hwnd && swapChain)
+  if (m_hWnd == hwnd && swapChain) {
+    // Keep DPI scale in sync when window stays the same but monitor DPI
+    // changes.
+    InitDpiInfo();
     return;
+  }
   m_hWnd = hwnd;
   InitDpiInfo();
   InitDirect2D();
@@ -242,6 +260,13 @@ void D2D::InitDirect2D() {
 }
 
 void D2D::OnResize(UINT width, UINT height) {
+  if (width == 0 || height == 0)
+    return;
+  if (!dc || !swapChain || !visual || !target || !dcompDevice) {
+    InitDirect2D();
+    if (!dc || !swapChain || !visual || !target || !dcompDevice)
+      return;
+  }
   // Release Direct2D resources
   dc->SetTarget(nullptr);
   bitmap.Reset();
@@ -311,7 +336,9 @@ PtTextFormat D2D::GetOrCreateTextFormat(const std::wstring &face, int point,
   if (!m_pWriteFactory || point <= 0 || face.empty()) {
     return PtTextFormat();
   }
-  bool vertical_text = m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT;
+  bool vertical_text =
+      (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+       m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN);
   DWRITE_FLOW_DIRECTION flow = m_style.vertical_text_left_to_right
                                    ? DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
                                    : DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT;
@@ -334,11 +361,14 @@ PtTextFormat D2D::GetOrCreateTextFormat(const std::wstring &face, int point,
     DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
     DWRITE_FONT_STRETCH fontStretch = DWRITE_FONT_STRETCH_NORMAL;
     ParseFontFace(face, fontWeight, fontStyle, fontStretch);
-    m_pWriteFactory->CreateTextFormat(_mainFontFace.c_str(), NULL, fontWeight,
-                                      fontStyle, fontStretch,
-                                      point * m_dpiScaleFontPoint, L"",
-                                      reinterpret_cast<IDWriteTextFormat **>(
-                                          pFormat.ReleaseAndGetAddressOf()));
+    ComPtr<IDWriteTextFormat> pFormatBase;
+    HRESULT hr = m_pWriteFactory->CreateTextFormat(
+        _mainFontFace.c_str(), NULL, fontWeight, fontStyle, fontStretch,
+        point * m_dpiScaleFontPoint, L"", pFormatBase.ReleaseAndGetAddressOf());
+    if (FAILED(hr) || !pFormatBase) {
+      return PtTextFormat();
+    }
+    pFormatBase.As(&pFormat);
     pFormat->SetWordWrapping(wrap);
 
     std::vector<std::wstring> fontFaceStrVector;
@@ -397,18 +427,17 @@ void D2D::InitFontFormats(const wstring &label_font_face,
                           const int font_point,
                           const wstring &comment_font_face,
                           const int comment_font_point) {
+  bool vertical_text_layout =
+      (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+       m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN);
   DWRITE_WORD_WRAPPING wrapping =
-      ((m_style.max_width == 0 &&
-        m_style.layout_type != UIStyle::LAYOUT_VERTICAL_TEXT) ||
-       (m_style.max_height == 0 &&
-        m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT))
+      ((m_style.max_width == 0 && !vertical_text_layout) ||
+       (m_style.max_height == 0 && vertical_text_layout))
           ? DWRITE_WORD_WRAPPING_NO_WRAP
           : DWRITE_WORD_WRAPPING_WHOLE_WORD;
   DWRITE_WORD_WRAPPING wrapping_preedit =
-      ((m_style.max_width == 0 &&
-        m_style.layout_type != UIStyle::LAYOUT_VERTICAL_TEXT) ||
-       (m_style.max_height == 0 &&
-        m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT))
+      ((m_style.max_width == 0 && !vertical_text_layout) ||
+       (m_style.max_height == 0 && vertical_text_layout))
           ? DWRITE_WORD_WRAPPING_NO_WRAP
           : DWRITE_WORD_WRAPPING_CHARACTER;
   pPreeditFormat =
@@ -433,6 +462,8 @@ void D2D::InitDirectWriteResources() {
 }
 
 void D2D::SetBrushColor(uint32_t color) {
+  if (!m_pBrush)
+    return;
   float a = ((color >> 24) & 0xFF) / 255.0f;
   float b = ((color >> 16) & 0xFF) / 255.0f;
   float g = ((color >> 8) & 0xFF) / 255.0f;
@@ -442,23 +473,44 @@ void D2D::SetBrushColor(uint32_t color) {
 }
 
 void D2D::InitDpiInfo() {
-  if (m_hWnd && IsWindowsBlueOrLaterEx()) {
-    HMONITOR const mon = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
-    UINT x = 0, y = 0;
-    HR(GetDpiForMonitor(mon, MDT_EFFECTIVE_DPI, &x, &y));
-    m_dpiX = static_cast<float>(x);
-    m_dpiY = static_cast<float>(y);
-    if (m_dpiY == 0)
-      m_dpiX = m_dpiY = 96.0f;
+  const auto oldDpiScaleFontPoint = m_dpiScaleFontPoint;
+  const auto oldDpiScaleLayout = m_dpiScaleLayout;
+  if (m_hWnd) {
+    const UINT dpi = GetDpiForWindowCompat(m_hWnd);
+    if (dpi > 0) {
+      m_dpiX = static_cast<float>(dpi);
+      m_dpiY = static_cast<float>(dpi);
+    } else if (IsWindowsBlueOrLaterEx()) {
+      HMONITOR const mon = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
+      UINT x = 0, y = 0;
+      HR(GetDpiForMonitor(mon, MDT_EFFECTIVE_DPI, &x, &y));
+      m_dpiX = static_cast<float>(x);
+      m_dpiY = static_cast<float>(y);
+      if (m_dpiY == 0)
+        m_dpiX = m_dpiY = 96.0f;
+    } else {
+      m_dpiY = m_dpiX = 96.0f;
+    }
   } else {
     m_dpiY = m_dpiX = 96.0f;
   }
   m_dpiScaleFontPoint = m_dpiY / 72.0f;
   m_dpiScaleLayout = m_dpiY / 96.0;
+  if (m_dpiScaleFontPoint != oldDpiScaleFontPoint ||
+      m_dpiScaleLayout != oldDpiScaleLayout) {
+    std::lock_guard<std::mutex> lk(cacheMutex);
+    textFormatCache.clear();
+    pPreeditFormat.Reset();
+    pTextFormat.Reset();
+    pLabelFormat.Reset();
+    pCommentFormat.Reset();
+  }
 }
 
 void D2D::SetFontFallback(PtTextFormat textFormat,
                           const std::vector<std::wstring> &fontVector) {
+  if (!m_pWriteFactory || !textFormat)
+    return;
   ComPtr<IDWriteFontFallback> pSysFallback;
   HR(m_pWriteFactory->GetSystemFontFallback(
       pSysFallback.ReleaseAndGetAddressOf()));
@@ -576,13 +628,12 @@ void D2D::ParseFontFace(const std::wstring &fontFaceStr,
   const auto it3 = _mapStretch.find(stretch);
   fontStretch =
       (it3 != _mapStretch.end()) ? it3->second : DWRITE_FONT_STRETCH_NORMAL;
-  if (DWRITE_FONT_STRETCH_UNDEFINED)
+  if (fontStretch == DWRITE_FONT_STRETCH_UNDEFINED)
     fontStretch = DWRITE_FONT_STRETCH_NORMAL;
 }
 
 void D2D::GetTextSize(const wstring &text, size_t nCount,
                       PtTextFormat &pTextFormat, LPSIZE lpSize) {
-
   D2D1_SIZE_F sz;
 
   if (!pTextFormat) {
@@ -594,13 +645,13 @@ void D2D::GetTextSize(const wstring &text, size_t nCount,
   bool vertical_text_layout =
       (m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
        m_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN);
+  DWRITE_FLOW_DIRECTION flow = m_style.vertical_text_left_to_right
+                                   ? DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
+                                   : DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT;
   if (vertical_text_layout) {
     HR(m_pWriteFactory->CreateTextLayout(
         text.c_str(), (int)nCount, pTextFormat.Get(), 0.0f,
         (float)m_style.max_height, pTextLayout.ReleaseAndGetAddressOf()));
-    DWRITE_FLOW_DIRECTION flow = m_style.vertical_text_left_to_right
-                                     ? DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
-                                     : DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT;
     HR(pTextLayout->SetReadingDirection(
         DWRITE_READING_DIRECTION_TOP_TO_BOTTOM));
     HR(pTextLayout->SetFlowDirection(flow));
@@ -625,7 +676,7 @@ void D2D::GetTextSize(const wstring &text, size_t nCount,
         pTextLayout.ReleaseAndGetAddressOf()));
     HR(pTextLayout->SetReadingDirection(
         DWRITE_READING_DIRECTION_TOP_TO_BOTTOM));
-    HR(pTextLayout->SetFlowDirection(DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT));
+    HR(pTextLayout->SetFlowDirection(flow));
   } else {
     auto max_width = m_style.max_width == 0
                          ? textMetrics.widthIncludingTrailingWhitespace
@@ -666,13 +717,13 @@ ConvertWicBitmapToSupportedFormat(IWICBitmap *pWicBitmap,
   // Convert the bitmap to a format supported by Direct2D (e.g.,
   // DXGI_FORMAT_B8G8R8A8_UNORM)
   hr = pWicFormatConverter->Initialize(
-      pWicBitmap,                    // Source bitmap
-      GUID_WICPixelFormat32bppPBGRA, // Supported pixel format for Direct2D
-                                     // (BGRA, 32bpp)
-      WICBitmapDitherTypeNone,       // No dithering
-      nullptr,                       // No palette
-      0.0f,                          // No alpha threshold
-      WICBitmapPaletteTypeCustom);   // Custom palette (none in this case)
+      pWicBitmap,                     // Source bitmap
+      GUID_WICPixelFormat32bppPBGRA,  // Supported pixel format for Direct2D
+                                      // (BGRA, 32bpp)
+      WICBitmapDitherTypeNone,        // No dithering
+      nullptr,                        // No palette
+      0.0f,                           // No alpha threshold
+      WICBitmapPaletteTypeMedianCut); // Robust default palette type
 
   if (FAILED(hr))
     return hr;
@@ -683,44 +734,72 @@ ConvertWicBitmapToSupportedFormat(IWICBitmap *pWicBitmap,
 HRESULT D2D::GetBmpFromIcon(HICON hIcon, ComPtr<ID2D1Bitmap1> &pBitmap) {
   if (!hIcon)
     return S_FALSE; // Failed to load icon
+  pBitmap.Reset();
   // Get icon info and HBITMAP
-  ICONINFO iconInfo;
+  ICONINFO iconInfo{};
   if (!GetIconInfo(hIcon, &iconInfo))
     return S_FALSE; // Failed to get icon info
-  HBITMAP hBitmap = iconInfo.hbmColor;
-  if (!hBitmap)
-    return S_FALSE; // Failed to get bitmap from icon
-  // Create a WIC factory
-  ComPtr<IWICImagingFactory> pWicFactory;
-  HR(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
-                      IID_PPV_ARGS(pWicFactory.ReleaseAndGetAddressOf())));
+
+  auto cleanupIconInfo = [&]() {
+    if (iconInfo.hbmColor) {
+      DeleteObject(iconInfo.hbmColor);
+      iconInfo.hbmColor = nullptr;
+    }
+    if (iconInfo.hbmMask) {
+      DeleteObject(iconInfo.hbmMask);
+      iconInfo.hbmMask = nullptr;
+    }
+  };
+
+  HBITMAP hBitmap = iconInfo.hbmColor ? iconInfo.hbmColor : iconInfo.hbmMask;
+  if (!hBitmap) {
+    cleanupIconInfo();
+    return E_INVALIDARG; // Failed to get bitmap from icon
+  }
+
+  // Use cached WIC factory
+  IWICImagingFactory *pWicFactory = DeviceResources::Get().wicFactory.Get();
+  if (!pWicFactory) {
+    cleanupIconInfo();
+    return E_POINTER;
+  }
   // Create WIC Bitmap from HBITMAP
   ComPtr<IWICBitmap> pWicBitmap;
-  HR(pWicFactory->CreateBitmapFromHBITMAP(hBitmap, nullptr, WICBitmapUseAlpha,
-                                          pWicBitmap.ReleaseAndGetAddressOf()));
+  HRESULT hr = pWicFactory->CreateBitmapFromHBITMAP(
+      hBitmap, nullptr, WICBitmapUseAlpha, pWicBitmap.ReleaseAndGetAddressOf());
+  if (FAILED(hr)) {
+    cleanupIconInfo();
+    return hr;
+  }
   // Convert the bitmap to a Direct2D compatible format
   ComPtr<IWICFormatConverter> pConvertedBitmap;
-  HR(ConvertWicBitmapToSupportedFormat(
-      pWicBitmap.Get(), pWicFactory.Get(),
-      pConvertedBitmap.ReleaseAndGetAddressOf()));
-  HR(dc->CreateBitmapFromWicBitmap(pConvertedBitmap.Get(), nullptr,
-                                   pBitmap.ReleaseAndGetAddressOf()));
-  return S_OK;
+  hr = ConvertWicBitmapToSupportedFormat(
+      pWicBitmap.Get(), pWicFactory, pConvertedBitmap.ReleaseAndGetAddressOf());
+  if (FAILED(hr)) {
+    cleanupIconInfo();
+    return hr;
+  }
+  if (!dc) {
+    cleanupIconInfo();
+    return E_POINTER;
+  }
+  hr = dc->CreateBitmapFromWicBitmap(pConvertedBitmap.Get(), nullptr,
+                                     pBitmap.ReleaseAndGetAddressOf());
+  cleanupIconInfo();
+  return hr;
 }
 
 HRESULT D2D::GetIconFromFile(const wstring &iconPath,
                              ComPtr<ID2D1Bitmap1> &pD2DBitmap) {
-  // Step 1: Create a WIC factory
-  ComPtr<IWICImagingFactory> pWicFactory;
-  HRESULT hr =
-      CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
-                       IID_PPV_ARGS(pWicFactory.ReleaseAndGetAddressOf()));
-  if (FAILED(hr)) {
-    DEBUG << "Failed to create WIC imaging factory, HRESULT: " << std::hex
-          << hr;
-    return hr;
+  IWICImagingFactory *pWicFactory = DeviceResources::Get().wicFactory.Get();
+  if (!pWicFactory) {
+    return E_POINTER;
+  }
+  if (!dc) {
+    return E_POINTER;
   }
 
+  HRESULT hr;
   // Step 2: Load the image from file into a WICBitmapDecoder
   ComPtr<IWICBitmapDecoder> pDecoder;
   hr = pWicFactory->CreateDecoderFromFilename(
@@ -878,67 +957,55 @@ HRESULT D2D::FillGeometry(const CRect &rect, uint32_t color, uint32_t radius,
   }
   SetBrushColor(color);
   ComPtr<ID2D1PathGeometry> pGeometry;
+  HRESULT hr;
   if (to_blur) {
     CRect rc = rect;
     rc.OffsetRect(m_dpiScaleLayout * m_style.shadow_offset_x,
                   m_dpiScaleLayout * m_style.shadow_offset_y);
     CreateRoundedRectanglePath(rc, radius, roundInfo, pGeometry);
     ComPtr<ID2D1BitmapRenderTarget> bitmapRenderTarget;
-    HR(dc->CreateCompatibleRenderTarget(&bitmapRenderTarget));
+    hr = dc->CreateCompatibleRenderTarget(&bitmapRenderTarget);
+    if (FAILED(hr)) {
+      DEBUG << "CreateCompatibleRenderTarget failed: " << StrzHr(hr);
+      return hr;
+    }
     bitmapRenderTarget->BeginDraw();
+    bitmapRenderTarget->Clear(D2D1::ColorF(0, 0.0f));
     bitmapRenderTarget->FillGeometry(pGeometry.Get(), m_pBrush.Get());
     bitmapRenderTarget->EndDraw();
     // Get the bitmap from the bitmap render target
     ComPtr<ID2D1Bitmap> bitmap;
-    HR(bitmapRenderTarget->GetBitmap(&bitmap));
+    hr = bitmapRenderTarget->GetBitmap(&bitmap);
+    if (FAILED(hr)) {
+      DEBUG << "GetBitmap failed: " << StrzHr(hr);
+      return hr;
+    }
     //// Create a Gaussian blur effect
     ComPtr<ID2D1Effect> blurEffect;
-    HR(dc->CreateEffect(CLSID_D2D1GaussianBlur, &blurEffect));
+    hr = dc->CreateEffect(CLSID_D2D1GaussianBlur, &blurEffect);
+    if (FAILED(hr)) {
+      DEBUG << "CreateEffect(GaussianBlur) failed: " << StrzHr(hr);
+      return hr;
+    }
     blurEffect->SetInput(0, bitmap.Get());
     blurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION,
-                         (float)m_style.shadow_radius);
+                         (float)(m_dpiScaleLayout * m_style.shadow_radius));
     // Draw the blurred rounded rectangle onto the main render target
     dc->DrawImage(blurEffect.Get());
   } else {
-    HR(CreateRoundedRectanglePath(rect, radius, roundInfo, pGeometry));
+    hr = CreateRoundedRectanglePath(rect, radius, roundInfo, pGeometry);
+    if (FAILED(hr)) {
+      DEBUG << "CreateRoundedRectanglePath failed: " << StrzHr(hr);
+      return hr;
+    }
     dc->FillGeometry(pGeometry.Get(), m_pBrush.Get());
   }
   return S_OK;
 }
 
-static uint32_t revert_color(uint32_t &color) {
-  // Revert color to D2D1 format
-  uint32_t a = (color >> 24) & 0xFF;
-  uint32_t b = (color >> 16) & 0xFF;
-  uint32_t g = (color >> 8) & 0xFF;
-  uint32_t r = color & 0xFF;
-  uint32_t color_ret =
-      ((255 - r) << 16) | ((255 - g) << 8) | ((255 - b) << 0) | (a << 24);
-  return color_ret;
-}
-
 HRESULT D2D::DrawTextLayout(ComPtr<IDWriteTextLayout> pTextLayout, float x,
-                            float y, uint32_t color, bool shadow) {
-  if (shadow) {
-    SetBrushColor(revert_color(color));
-    ComPtr<ID2D1BitmapRenderTarget> bitmapRenderTarget;
-    HR(dc->CreateCompatibleRenderTarget(&bitmapRenderTarget));
-    bitmapRenderTarget->BeginDraw();
-    bitmapRenderTarget->DrawTextLayout(
-        {x, y}, pTextLayout.Get(), m_pBrush.Get(),
-        D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
-    bitmapRenderTarget->EndDraw();
-    ComPtr<ID2D1Bitmap> bitmap;
-    HR(bitmapRenderTarget->GetBitmap(&bitmap));
-    //// Create a Gaussian blur effect
-    ComPtr<ID2D1Effect> blurEffect;
-    HR(dc->CreateEffect(CLSID_D2D1GaussianBlur, &blurEffect));
-    blurEffect->SetInput(0, bitmap.Get());
-    blurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION, 4.0f);
-    // Draw the blurred rounded rectangle onto the main render target
-    dc->DrawImage(blurEffect.Get());
-    SetBrushColor(color);
-  }
+                            float y, uint32_t color) {
+  SetBrushColor(color);
   dc->DrawTextLayout({x, y}, pTextLayout.Get(), m_pBrush.Get(),
                      D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
   return S_OK;

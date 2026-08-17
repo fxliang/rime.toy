@@ -52,6 +52,7 @@ public:
     left = x1, right = x2, top = y1, bottom = y2;
     NormalizeRect();
   }
+  void SetRectEmpty() noexcept { left = right = top = bottom = 0; }
   void InflateRect(int x, int y) noexcept {
     left -= x, right += x, top -= y, bottom += y;
     NormalizeRect();

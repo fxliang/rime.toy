@@ -83,6 +83,7 @@ struct CandidateInfo {
     highlighted = 0;
     is_last_page = false;
     candies.clear();
+    comments.clear();
     labels.clear();
   }
   bool empty() const { return candies.empty(); }
@@ -378,7 +379,7 @@ struct UIStyle {
         hilited_comment_text_color != st.hilited_comment_text_color ||
         hilited_mark_color != st.hilited_mark_color ||
         prevpage_color != st.prevpage_color ||
-        nextpage_color != st.nextpage_color);
+        nextpage_color != st.nextpage_color || client_caps != st.client_caps);
   }
 };
 } // namespace weasel

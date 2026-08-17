@@ -6,7 +6,7 @@ void weasel::FullScreenLayout::DoLayout() {
   if (_context.empty()) {
     int width = 0, height = 0;
     _UpdateStatusIconLayout(&width, &height);
-    _contentSize.SetSize(width, height);
+    _contentSize.SetSize(_statusIconRect.right, _statusIconRect.bottom);
     return;
   }
 
@@ -77,7 +77,10 @@ void weasel::FullScreenLayout::DoLayout() {
     _candidateRects[i].OffsetRect(offsetx, offsety);
   }
   _statusIconRect = m_layout->GetStatusIconRect();
-  _statusIconRect.OffsetRect(offsetx, offsety);
+  // VERTICAL_TEXT_FULLSCREEN with non-empty aux hides the icon;
+  // only offset if it wasn't hidden.
+  if (!_statusIconRect.IsRectNull())
+    _statusIconRect.OffsetRect(offsetx, offsety);
 
   // Get precomputed preedit sub-rectangles from m_layout and apply offset
   _preeditBeforeRect = m_layout->GetPreeditBeforeRect();
@@ -132,6 +135,12 @@ bool FullScreenLayout::AdjustFontPoint(const CRect &workArea, int &step) {
       fontPoint += step;
       fontPointLabel += step;
       fontPointComment += step;
+      if (fontPoint < 1)
+        fontPoint = 1;
+      if (fontPointLabel < 1)
+        fontPointLabel = 1;
+      if (fontPointComment < 1)
+        fontPointComment = 1;
       _pD2D->InitFontFormats(_style.label_font_face, fontPointLabel,
                              _style.font_face, fontPoint,
                              _style.comment_font_face, fontPointComment);
@@ -144,6 +153,12 @@ bool FullScreenLayout::AdjustFontPoint(const CRect &workArea, int &step) {
       fontPoint += step;
       fontPointLabel += step;
       fontPointComment += step;
+      if (fontPoint < 1)
+        fontPoint = 1;
+      if (fontPointLabel < 1)
+        fontPointLabel = 1;
+      if (fontPointComment < 1)
+        fontPointComment = 1;
       _pD2D->InitFontFormats(_style.label_font_face, fontPointLabel,
                              _style.font_face, fontPoint,
                              _style.comment_font_face, fontPointComment);

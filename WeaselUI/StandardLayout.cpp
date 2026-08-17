@@ -1,11 +1,17 @@
 #include "StandardLayout.h"
 
-#define DPI_SCALE(t) (int)(t * _pD2D->m_dpiScaleLayout)
-
 using namespace weasel;
 
 const wstring StandardLayout::_pre = L"<";
 const wstring StandardLayout::_next = L">";
+
+namespace {
+wstring FormatCandidateLabel(const wstring &label, const wchar_t *format) {
+  wchar_t buffer[128];
+  swprintf_s<128>(buffer, format, label.c_str());
+  return wstring(buffer);
+}
+} // namespace
 
 CSize StandardLayout::_GetPreeditSize(const Text &text,
                                       ComPtr<IDWriteTextFormat1> &pTextFormat) {
@@ -16,30 +22,30 @@ CSize StandardLayout::_GetPreeditSize(const Text &text,
     weasel::TextRange range;
     for (size_t j = 0; j < attrs.size(); ++j)
       if (attrs[j].type == weasel::HIGHLIGHTED)
-        _range = attrs[j].range;
-    if (_range.start < _range.end) {
-      wstring before_str = preedit.substr(0, _range.start);
-      wstring hilited_str = preedit.substr(_range.start, _range.end);
-      wstring after_str = preedit.substr(_range.end);
+        range = attrs[j].range;
+    if (range.start < range.end) {
+      wstring before_str = preedit.substr(0, range.start);
+      wstring hilited_str =
+          preedit.substr(range.start, range.end - range.start);
+      wstring after_str = preedit.substr(range.end);
+      CSize beforesz, hilitedsz, aftersz;
       _pD2D->GetTextSize(before_str, before_str.length(), pTextFormat,
-                         &_beforesz);
+                         &beforesz);
       _pD2D->GetTextSize(hilited_str, hilited_str.length(), pTextFormat,
-                         &_hilitedsz);
-      _pD2D->GetTextSize(after_str, after_str.length(), pTextFormat, &_aftersz);
+                         &hilitedsz);
+      _pD2D->GetTextSize(after_str, after_str.length(), pTextFormat, &aftersz);
       auto width_max = 0, height_max = 0;
       if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
           _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN) {
-        width_max = MAX(width_max, _beforesz.cx, _hilitedsz.cx, _aftersz.cx);
-        height_max += _beforesz.cy + (_beforesz.cy > 0) * _style.hilite_spacing;
-        height_max +=
-            _hilitedsz.cy + (_hilitedsz.cy > 0) * _style.hilite_spacing;
-        height_max += _aftersz.cy;
+        width_max = MAX(width_max, beforesz.cx, hilitedsz.cx, aftersz.cx);
+        height_max += beforesz.cy + (beforesz.cy > 0) * _style.hilite_spacing;
+        height_max += hilitedsz.cy + (hilitedsz.cy > 0) * _style.hilite_spacing;
+        height_max += aftersz.cy;
       } else {
-        height_max = MAX(height_max, _beforesz.cy, _hilitedsz.cy, _aftersz.cy);
-        width_max += _beforesz.cx + (_beforesz.cx > 0) * _style.hilite_spacing;
-        width_max +=
-            _hilitedsz.cx + (_hilitedsz.cx > 0) * _style.hilite_spacing;
-        width_max += _aftersz.cx;
+        height_max = MAX(height_max, beforesz.cy, hilitedsz.cy, aftersz.cy);
+        width_max += beforesz.cx + (beforesz.cx > 0) * _style.hilite_spacing;
+        width_max += hilitedsz.cx + (hilitedsz.cx > 0) * _style.hilite_spacing;
+        width_max += aftersz.cx;
       }
       size.cx = width_max;
       size.cy = height_max;
@@ -51,6 +57,10 @@ CSize StandardLayout::_GetPreeditSize(const Text &text,
 
 void StandardLayout::RecalculateSizes() {
   _preeditSize = _GetPreeditSize(_context.preedit, _pD2D->pPreeditFormat);
+  _range = TextRange();
+  for (size_t j = 0; j < _context.preedit.attributes.size(); ++j)
+    if (_context.preedit.attributes[j].type == HIGHLIGHTED)
+      _range = _context.preedit.attributes[j].range;
   _auxSize = _GetPreeditSize(_context.aux, _pD2D->pPreeditFormat);
   _pD2D->GetTextSize(_pre, _pre.length(), _pD2D->pPreeditFormat,
                      &_pagePrevSize);
@@ -64,8 +74,10 @@ void StandardLayout::RecalculateSizes() {
   for (size_t i = 0; i < candidates.size(); ++i) {
     CSize labelSize(0, 0), textSize(0, 0), commentSize(0, 0);
     if (labelFontValid) {
-      _pD2D->GetTextSize(labels.at(i).str, labels.at(i).str.length(),
-                         _pD2D->pLabelFormat, &labelSize);
+      const auto label = FormatCandidateLabel(labels.at(i).str,
+                                              _style.label_text_format.c_str());
+      _pD2D->GetTextSize(label, label.length(), _pD2D->pLabelFormat,
+                         &labelSize);
     }
     if (textFontValid) {
       _pD2D->GetTextSize(candidates.at(i).str, candidates.at(i).str.length(),
@@ -160,9 +172,7 @@ void StandardLayout::_CalcPageIndicator(bool vertical_text_layout, int &pgw,
     _pD2D->GetTextSize(_pre, _pre.length(), _pD2D->pPreeditFormat, &pgszl);
     _pD2D->GetTextSize(_next, _next.length(), _pD2D->pPreeditFormat, &pgszr);
   }
-  bool page_en = (_style.prevpage_color & 0xff000000) &&
-                 (_style.nextpage_color & 0xff000000);
-  if (!page_en) {
+  if (!_pageEnabled) {
     pgw = 0;
     pgh = 0;
     return;
@@ -231,12 +241,16 @@ bool StandardLayout::_IsHighlightOverCandidateWindow(const CRect &rc) {
 }
 
 void StandardLayout::_PrepareRoundInfo() {
-
   const int tmp[6] = {
       UIStyle::LAYOUT_VERTICAL,      UIStyle::LAYOUT_HORIZONTAL,
       UIStyle::LAYOUT_VERTICAL_TEXT, UIStyle::LAYOUT_VERTICAL,
       UIStyle::LAYOUT_HORIZONTAL,    UIStyle::LAYOUT_VERTICAL_TEXT};
-  int layout_type = tmp[_style.layout_type];
+  int style_layout = _style.layout_type;
+  if (style_layout < UIStyle::LAYOUT_VERTICAL ||
+      style_layout >= UIStyle::LAYOUT_TYPE_LAST) {
+    style_layout = UIStyle::LAYOUT_VERTICAL;
+  }
+  int layout_type = tmp[style_layout];
   bool textHemispherical = false, cand0Hemispherical = false;
   if (!_style.inline_preedit) {
     CRect textRect(_preeditRect);
@@ -402,66 +416,85 @@ void StandardLayout::_PrecomputePreeditRects(const CRect &baseRect,
   beforeRect = hiliteRect = afterRect = CRect(0, 0, 0, 0);
 
   if (baseRect.left >= baseRect.right || baseRect.top >= baseRect.bottom ||
-      text.str.empty() || _range.start >= _range.end)
+      text.str.empty())
     return;
+
+  TextRange range;
+  for (size_t j = 0; j < text.attributes.size(); ++j)
+    if (text.attributes[j].type == HIGHLIGHTED)
+      range = text.attributes[j].range;
+  if (range.start >= range.end)
+    return;
+
+  CSize beforesz, hilitedsz, aftersz;
+  auto &fmt = _pD2D->pPreeditFormat;
 
   int x = baseRect.left, y = baseRect.top;
 
   // Before part
-  if (_range.start > 0 && _beforesz.cx > 0 && _beforesz.cy > 0) {
-    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
-        _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
-      beforeRect = CRect(baseRect.left, y, baseRect.right, y + _beforesz.cy);
-    else
-      beforeRect = CRect(x, baseRect.top, x + _beforesz.cx, baseRect.bottom);
+  if (range.start > 0) {
+    _pD2D->GetTextSize(text.str.substr(0, range.start), range.start, fmt,
+                       &beforesz);
+    if (beforesz.cx > 0 && beforesz.cy > 0) {
+      if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+          _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
+        beforeRect = CRect(baseRect.left, y, baseRect.right, y + beforesz.cy);
+      else
+        beforeRect = CRect(x, baseRect.top, x + beforesz.cx, baseRect.bottom);
 
-    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
-        _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
-      y += _beforesz.cy + DPI_SCALE(_style.hilite_spacing);
-    else
-      x += _beforesz.cx + DPI_SCALE(_style.hilite_spacing);
+      if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+          _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
+        y += beforesz.cy + _style.hilite_spacing;
+      else
+        x += beforesz.cx + _style.hilite_spacing;
+    }
   }
 
   // Highlighted part
-  if (_hilitedsz.cx > 0 && _hilitedsz.cy > 0) {
-    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
-        _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
-      hiliteRect = CRect(baseRect.left, y, baseRect.right, y + _hilitedsz.cy);
-    else
-      hiliteRect = CRect(x, baseRect.top, x + _hilitedsz.cx, baseRect.bottom);
+  {
+    _pD2D->GetTextSize(text.str.substr(range.start, range.end - range.start),
+                       range.end - range.start, fmt, &hilitedsz);
+    if (hilitedsz.cx > 0 && hilitedsz.cy > 0) {
+      if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+          _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
+        hiliteRect = CRect(baseRect.left, y, baseRect.right, y + hilitedsz.cy);
+      else
+        hiliteRect = CRect(x, baseRect.top, x + hilitedsz.cx, baseRect.bottom);
 
-    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
-        _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
-      y += _hilitedsz.cy + DPI_SCALE(_style.hilite_spacing);
-    else
-      x += _hilitedsz.cx + DPI_SCALE(_style.hilite_spacing);
+      if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+          _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
+        y += hilitedsz.cy + _style.hilite_spacing;
+      else
+        x += hilitedsz.cx + _style.hilite_spacing;
+    }
   }
 
   // After part
-  if (_range.end < static_cast<int>(text.str.length()) && _aftersz.cx > 0 &&
-      _aftersz.cy > 0) {
-    if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
-        _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
-      afterRect = CRect(baseRect.left, y, baseRect.right, y + _aftersz.cy);
-    else
-      afterRect = CRect(x, baseRect.top, x + _aftersz.cx, baseRect.bottom);
+  if (range.end < static_cast<int>(text.str.length())) {
+    _pD2D->GetTextSize(text.str.substr(range.end),
+                       text.str.length() - range.end, fmt, &aftersz);
+    if (aftersz.cx > 0 && aftersz.cy > 0) {
+      if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT ||
+          _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT_FULLSCREEN)
+        afterRect = CRect(baseRect.left, y, baseRect.right, y + aftersz.cy);
+      else
+        afterRect = CRect(x, baseRect.top, x + aftersz.cx, baseRect.bottom);
+    }
   }
 }
 
 int StandardLayout::_CalcMarkMetrics(bool vertical_text_layout) {
-  if (!(_style.hilited_mark_color & 0xff000000)) {
+  if (!(_style.hilited_mark_color & 0xff000000) || !candidates_count) {
     mark_width = 0;
     mark_height = 0;
     mark_gap = 0;
     return 0;
   }
   CSize sg;
-  if (candidates_count) {
-    if (_style.mark_text.empty())
-      _pD2D->GetTextSize(L"|", 1, _pD2D->pTextFormat, &sg);
-    else
-      sg = _markTextSize;
-  }
+  if (_style.mark_text.empty())
+    _pD2D->GetTextSize(L"|", 1, _pD2D->pTextFormat, &sg);
+  else
+    sg = _markTextSize;
   mark_width = sg.cx;
   mark_height = sg.cy;
   if (_style.mark_text.empty()) {

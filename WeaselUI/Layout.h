@@ -64,7 +64,7 @@ protected:
   const vector<Text> &candidates;
   const vector<Text> &labels;
   const vector<Text> &comments;
-  const int &id;
+  const int id;
   const int candidates_count;
   const int labelFontValid;
   const int textFontValid;
