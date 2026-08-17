@@ -15,6 +15,31 @@ HHOOK hMouseHook = NULL;
 std::unique_ptr<RimeWithToy> m_toy;
 extern PositionType position_type;
 
+static HANDLE g_hDeployerMutex = NULL;
+
+namespace weasel {
+bool AcquireDeployerMutex() {
+  if (g_hDeployerMutex)
+    return true;
+  HANDLE hMutex = CreateMutex(NULL, TRUE, L"WeaselDeployerExclusiveMutex");
+  DWORD error = ::GetLastError();
+  if (error == ERROR_ALREADY_EXISTS || error == ERROR_ACCESS_DENIED) {
+    CloseHandle(hMutex);
+    return false;
+  }
+  g_hDeployerMutex = hMutex;
+  return true;
+}
+
+void ReleaseDeployerMutex() {
+  if (g_hDeployerMutex) {
+    ReleaseMutex(g_hDeployerMutex);
+    CloseHandle(g_hDeployerMutex);
+    g_hDeployerMutex = NULL;
+  }
+}
+} // namespace weasel
+
 void update_position(HWND hwnd) {
   POINT pt;
   if (!GetCursorPos(&pt)) {
@@ -131,11 +156,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   if (::GetLastError() == ERROR_ALREADY_EXISTS ||
       ::GetLastError() == ERROR_ACCESS_DENIED)
     return 0;
-  HANDLE hDeployerMutex =
-      CreateMutex(NULL, TRUE, L"WeaselDeployerExclusiveMutex");
-  if (::GetLastError() == ERROR_ALREADY_EXISTS ||
-      ::GetLastError() == ERROR_ACCESS_DENIED)
+  if (!AcquireDeployerMutex()) {
+    MessageBoxW(NULL, L"WeaselDeployer 正在运行，rime.toy 无法启动。",
+                L"rime.toy", MB_ICONWARNING | MB_OK);
     return 0;
+  }
   SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
   HR(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED));
   m_toy = std::make_unique<RimeWithToy>(hInstance);

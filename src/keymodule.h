@@ -236,6 +236,9 @@ struct KeyInfo {
 };
 
 extern BYTE keyState[256];
+// deployer exclusive mutex, held while rime.toy is in use
+bool AcquireDeployerMutex();
+void ReleaseDeployerMutex();
 void send_input_to_window(const std::wstring &text);
 void update_keystates(WPARAM wParam, LPARAM lParam);
 KeyInfo parse_key(WPARAM wParam, LPARAM lParam);

@@ -202,8 +202,14 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
     }
     case MENU_RIME_TOY_EN: {
       rime_toy_enabled = !rime_toy_enabled;
-      if (!rime_toy_enabled)
+      if (!rime_toy_enabled) {
         memset(weasel::keyState, 0, sizeof(weasel::keyState));
+        weasel::ReleaseDeployerMutex();
+      } else {
+        // recreate the deployer exclusive mutex when re-enabled
+        if (!weasel::AcquireDeployerMutex())
+          rime_toy_enabled = false;
+      }
       if (hMenu)
         CheckMenuItem(hMenu, MENU_RIME_TOY_EN,
                       rime_toy_enabled ? MF_CHECKED : MF_UNCHECKED);
