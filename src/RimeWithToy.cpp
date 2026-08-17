@@ -1,4 +1,5 @@
 #include "RimeWithToy.h"
+#include "caret.h"
 #include "i18n.h"
 #include "key_table.h"
 #include <fstream>
@@ -119,9 +120,13 @@ void RimeWithToy::setup_rime() {
           position_type = PositionType::kBottomCenter;
         else if (pos_type == "center")
           position_type = PositionType::kCenter;
+        else if (pos_type == "auto")
+          position_type = PositionType::kAuto;
         else
           position_type = PositionType::kMousePos;
       }
+      if (j.contains("use_caret_hook"))
+        caret::SetUseCaretHook(j["use_caret_hook"].get<bool>());
       if (j.contains("watch_files")) {
         const auto files = j["watch_files"].get<std::vector<string>>();
         if (m_file_monitor) {

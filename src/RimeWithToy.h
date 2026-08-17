@@ -29,7 +29,8 @@ enum class PositionType {
   kTopRight,
   kBottomLeft,
   kBottomCenter,
-  kBottomRight
+  kBottomRight,
+  kAuto
 };
 
 namespace weasel {

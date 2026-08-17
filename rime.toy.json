@@ -1,9 +1,9 @@
 {
   "language": "zh-Hans",
   "log_dir": "log",
-  "position_type": "mouse",
+  "position_type": "auto",
+  "use_caret_hook": true,
   "shared_data_dir": "shared",
   "user_data_dir": "usr",
-  "watch_files": [
-  ]
+  "watch_files": []
 }

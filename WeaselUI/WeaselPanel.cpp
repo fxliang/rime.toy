@@ -171,25 +171,30 @@ void WeaselPanel::MoveTo(RECT rc) {
   if (!m_hWnd || !m_layout)
     return;
   m_redraw_by_monitor_change = false;
-  RECT input_pos = rc;
-  input_pos.bottom += 6;
-  const bool position_changed = input_pos.left != m_inputPos.left ||
-                                input_pos.top != m_inputPos.top ||
-                                input_pos.right != m_inputPos.right ||
-                                input_pos.bottom != m_inputPos.bottom;
+  bool should_reset_sticky =
+      (m_ctx.empty() || (abs(rc.left - m_inputPos.left) > 50) ||
+       (abs(rc.top - m_inputPos.top) > 50));
+  if (should_reset_sticky && m_sticky) {
+    m_sticky = false;
+    m_inputPos = rc;
+    m_inputPos.bottom += 6;
+    _Reposition(true);
+    RedrawWindow();
+    return;
+  }
   if (m_style.ascii_tip_follow_cursor && m_ctx.empty() &&
       (!m_status.composing) && m_layout->ShouldDisplayStatusIcon()) {
     POINT p;
     ::GetCursorPos(&p);
     RECT irc{p.x - STATUS_ICON_SIZE, p.y - STATUS_ICON_SIZE, p.x, p.y};
     m_inputPos = irc;
-    m_sticky = false;
     _Reposition(true);
     RedrawWindow();
-  } else if (position_changed || m_layout->ShouldDisplayStatusIcon()) {
-    if (position_changed)
-      m_sticky = false;
-    m_inputPos = input_pos;
+  } else if (!(rc.left == m_inputPos.left && rc.bottom != m_inputPos.bottom &&
+               abs(rc.bottom - m_inputPos.bottom) < 6) ||
+             m_layout->ShouldDisplayStatusIcon()) {
+    m_inputPos = rc;
+    m_inputPos.bottom += 6;
     bool m_istorepos_buf = m_istorepos;
     _Reposition(true);
     if (m_redraw_by_monitor_change) {
@@ -849,6 +854,7 @@ void WeaselPanel::_Reposition(bool adj) {
   }
   if (y < rcWorkArea.top)
     y = rcWorkArea.top;
+  m_inputPos.bottom = y;
   SetWindowPos(m_hWnd, HWND_TOPMOST, x, y, 0, 0,
                SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOREDRAW);
 }

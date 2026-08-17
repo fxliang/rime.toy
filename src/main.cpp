@@ -1,6 +1,7 @@
 // Copyright fxliang
 // Distrobuted under GPLv3 https://www.gnu.org/licenses/gpl-3.0.en.html
 #include "RimeWithToy.h"
+#include "caret.h"
 #include "i18n.h"
 #include "keymodule.h"
 #include <ShellScalingApi.h>
@@ -42,6 +43,14 @@ void ReleaseDeployerMutex() {
 } // namespace weasel
 
 void update_position(HWND hwnd) {
+  if (position_type == PositionType::kAuto) {
+    RECT caret;
+    if (caret::GetScreenRect(&caret)) {
+      m_toy->UpdateInputPosition(caret);
+      return;
+    }
+    // No caret detected; fall through to the mouse position.
+  }
   POINT pt;
   if (!GetCursorPos(&pt)) {
     RECT rect;
@@ -119,9 +128,9 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
       bool eat = false;
       m_toy->StartUI();
       eat = m_toy->ProcessKeyEvent(ke);
-      update_position(hwnd);
 
       auto committed = m_toy->CheckCommit();
+      update_position(hwnd);
       if (ke.keycode == ibus::Caps_Lock && eat) {
         if (keyState[VK_CAPITAL] & 0x01) {
           keyState[VK_CAPITAL] = 0;
