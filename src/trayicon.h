@@ -18,8 +18,15 @@ struct OptionSwitchItem {
   bool radio_group;
 };
 
+struct PositionItem {
+  int id;
+  std::wstring label;
+  bool checked;
+};
+
 typedef std::function<std::vector<SchemaItem>()> schema_list_handler;
 typedef std::function<std::vector<OptionSwitchItem>()> option_list_handler;
+typedef std::function<std::vector<PositionItem>()> position_list_handler;
 typedef std::function<std::wstring()> current_schema_handler;
 typedef std::function<void(const std::wstring &)> string_handler;
 typedef std::function<void(int)> int_handler;
@@ -55,6 +62,10 @@ public:
     get_option_list = func;
   }
   void SetToggleOptionFunc(const string_handler &func) { toggle_option = func; }
+  void SetPositionListFunc(const position_list_handler &func) {
+    get_position_list = func;
+  }
+  void SetSetPositionFunc(const int_handler &func) { set_position = func; }
   void SetSwitchLanguageFunc(const int_handler &func) {
     switch_language = func;
   }
@@ -88,9 +99,12 @@ private:
   current_schema_handler get_current_schema;
   option_list_handler get_option_list;
   string_handler toggle_option;
+  position_list_handler get_position_list;
+  int_handler set_position;
   int_handler switch_language;
   std::vector<std::wstring> m_schema_ids;
   std::vector<std::wstring> m_option_names;
+  std::vector<int> m_position_ids;
   bool enable_debug;
   bool current_dark_mode;
 

@@ -129,6 +129,8 @@ public:
   std::wstring CurrentSchemaId() const;
   std::vector<SchemaItem> GetSchemaList();
   std::vector<OptionSwitchItem> GetOptionSwitchList();
+  std::vector<PositionItem> GetPositionList();
+  void SetPosition(int pos);
   RimeSessionId session_id() const { return m_session_id; }
   void UpdateInputPosition(const RECT &rc);
   bool StartUI();

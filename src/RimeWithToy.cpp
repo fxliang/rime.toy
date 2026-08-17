@@ -85,6 +85,45 @@ static void write_language_to_config(int language) {
   }
 }
 
+static string position_type_to_string(PositionType t) {
+  switch (t) {
+  case PositionType::kCenter:
+    return "center";
+  case PositionType::kTopLeft:
+    return "top_left";
+  case PositionType::kTopCenter:
+    return "top_center";
+  case PositionType::kTopRight:
+    return "top_right";
+  case PositionType::kBottomLeft:
+    return "bottom_left";
+  case PositionType::kBottomCenter:
+    return "bottom_center";
+  case PositionType::kBottomRight:
+    return "bottom_right";
+  case PositionType::kAuto:
+    return "auto";
+  default:
+    return "mouse";
+  }
+}
+
+static void write_position_type_to_config(PositionType t) {
+  auto json_file = data_path("rime.toy.json");
+  try {
+    json j;
+    if (fs::exists(json_file)) {
+      std::ifstream ifs(json_file);
+      ifs >> j;
+    }
+    j["position_type"] = position_type_to_string(t);
+    std::ofstream ofs(json_file);
+    ofs << j.dump(2);
+  } catch (const std::exception &e) {
+    DEBUG << "Failed to write rime.toy.json: " << e.what();
+  }
+}
+
 void RimeWithToy::setup_rime() {
   RIME_STRUCT(RimeTraits, traits);
   shared_path = data_path("shared");
@@ -263,6 +302,8 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance)
   m_trayIcon->SetOptionListFunc([&]() { return GetOptionSwitchList(); });
   m_trayIcon->SetToggleOptionFunc(
       [&](const std::wstring &name) { ToggleOption(name); });
+  m_trayIcon->SetPositionListFunc([&]() { return GetPositionList(); });
+  m_trayIcon->SetSetPositionFunc([&](int pos) { SetPosition(pos); });
   m_trayIcon->SetSwitchLanguageFunc([&](int language) {
     if (!i18n::SetLanguage(language))
       return;
@@ -426,6 +467,38 @@ std::vector<OptionSwitchItem> RimeWithToy::GetOptionSwitchList() {
   }
   rime_api->config_close(&config);
   return items;
+}
+
+std::vector<PositionItem> RimeWithToy::GetPositionList() {
+  static const struct {
+    PositionType type;
+    const char *key;
+  } kModes[] = {
+      {PositionType::kMousePos, "menu_pos_mouse"},
+      {PositionType::kCenter, "menu_pos_center"},
+      {PositionType::kTopLeft, "menu_pos_top_left"},
+      {PositionType::kTopCenter, "menu_pos_top_center"},
+      {PositionType::kTopRight, "menu_pos_top_right"},
+      {PositionType::kBottomLeft, "menu_pos_bottom_left"},
+      {PositionType::kBottomCenter, "menu_pos_bottom_center"},
+      {PositionType::kBottomRight, "menu_pos_bottom_right"},
+      {PositionType::kAuto, "menu_pos_auto"},
+  };
+  std::vector<PositionItem> items;
+  for (const auto &m : kModes) {
+    PositionItem item;
+    item.id = static_cast<int>(m.type);
+    item.label = i18n::Get(m.key);
+    item.checked = (position_type == m.type);
+    items.push_back(std::move(item));
+  }
+  return items;
+}
+
+void RimeWithToy::SetPosition(int pos) {
+  auto type = static_cast<PositionType>(pos);
+  position_type = type;
+  write_position_type_to_config(type);
 }
 
 void RimeWithToy::SwitchSchema(const std::wstring &schema_id) {

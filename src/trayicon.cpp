@@ -20,6 +20,7 @@
 #define MENU_EXE_DIR 1011
 #define MENU_SCHEMA_FIRST 2000
 #define MENU_OPTION_FIRST 3000
+#define MENU_POSITION_FIRST 4000
 #define MENU_LANG_ENGLISH 1020
 #define MENU_LANG_SIMPLIFIED 1021
 #define MENU_LANG_TRADITIONAL 1022
@@ -83,6 +84,7 @@ void TrayIcon::CreateContextMenu() {
   hMenu = CreatePopupMenu();
   m_schema_ids.clear();
   m_option_names.clear();
+  m_position_ids.clear();
   AppendMenu(hMenu, MF_STRING | (rime_toy_enabled ? MF_CHECKED : MFS_UNCHECKED),
              MENU_RIME_TOY_EN, i18n::Get("menu_use_rime_toy").c_str());
   AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
@@ -136,6 +138,21 @@ void TrayIcon::CreateContextMenu() {
     }
     AppendMenu(hMenu, MF_POPUP, (UINT_PTR)option_menu,
                i18n::Get("menu_option_switch").c_str());
+  }
+  if (get_position_list) {
+    auto positions = get_position_list();
+    HMENU position_menu = CreatePopupMenu();
+    UINT id = MENU_POSITION_FIRST;
+    for (const auto &p : positions) {
+      UINT flags = MF_STRING;
+      if (p.checked)
+        flags |= MF_CHECKED;
+      AppendMenu(position_menu, flags, id, p.label.c_str());
+      m_position_ids.push_back(p.id);
+      ++id;
+    }
+    AppendMenu(hMenu, MF_POPUP, (UINT_PTR)position_menu,
+               i18n::Get("menu_position").c_str());
   }
   AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
   AppendMenu(hMenu, MF_STRING, MENU_LOG_DIR, i18n::Get("menu_log_dir").c_str());
@@ -243,6 +260,12 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
       const auto &option_name = m_option_names[cmd - MENU_OPTION_FIRST];
       if (toggle_option && !option_name.empty())
         toggle_option(option_name);
+      break;
+    }
+    if (cmd >= MENU_POSITION_FIRST &&
+        cmd < MENU_POSITION_FIRST + m_position_ids.size()) {
+      if (set_position)
+        set_position(m_position_ids[cmd - MENU_POSITION_FIRST]);
       break;
     }
     if (cmd >= MENU_LANG_ENGLISH && cmd <= MENU_LANG_TRADITIONAL) {
