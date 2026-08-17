@@ -15,4 +15,8 @@ void SetUseCaretHook(bool enable);
 // the mouse position.
 bool GetScreenRect(RECT *out);
 
+// Join the background caret-hook worker. Call before process exit so the
+// worker does not outlive the global objects it touches.
+void Shutdown();
+
 } // namespace caret

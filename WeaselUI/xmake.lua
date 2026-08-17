@@ -6,6 +6,7 @@ target("WeaselUI")
   add_files("./*.cpp")
   add_defines('INITGUID')
   if is_plat('windows') then
+    set_runtimes("MT")
     add_cxflags("/utf-8")
     add_cxflags("/Zi")
     add_cxflags("/FS")

@@ -18,6 +18,7 @@ target(project_name)
   add_deps('WeaselUI')
   if not bundled_json then add_packages("nlohmann_json") end
   if is_plat('windows') then
+    set_runtimes("MT")
     add_cxflags("/utf-8")
     add_cxflags("/Zi")
     add_cxflags("/FS")

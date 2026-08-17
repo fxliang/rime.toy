@@ -193,9 +193,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     TranslateMessage(&msg);
     DispatchMessage(&msg);
   }
-  m_toy->Finalize();
   UnhookWindowsHookEx(hKeyboardHook);
   UnhookWindowsHookEx(hMouseHook);
+  caret::Shutdown();
+  m_toy->Finalize();
   CoUninitialize();
   return 0;
 }

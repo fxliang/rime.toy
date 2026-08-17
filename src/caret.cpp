@@ -454,12 +454,20 @@ RECT g_hook_rect{0};
 std::chrono::steady_clock::time_point g_hook_time{};
 bool g_hook_valid = false;
 std::atomic<bool> g_hook_probe_inflight{false};
+// The worker is kept joinable (never detached) so it can be reaped on
+// shutdown. A detached thread could still be running GetCaretFromHook while
+// these globals are destroyed at process exit, causing an access violation.
+std::thread g_hook_worker;
 
 void TriggerAsyncHook(HWND hwnd) {
   bool expected = false;
   if (!g_hook_probe_inflight.compare_exchange_strong(expected, true))
     return;
-  std::thread([hwnd]() {
+  // Reap the previous worker. The flag was false, so the previous thread has
+  // already released the mutex and is about to exit; this join is immediate.
+  if (g_hook_worker.joinable())
+    g_hook_worker.join();
+  g_hook_worker = std::thread([hwnd]() {
     RECT r{0};
     if (GetCaretFromHook(hwnd, &r)) {
       std::lock_guard<std::mutex> lk(g_hook_mutex);
@@ -469,19 +477,24 @@ void TriggerAsyncHook(HWND hwnd) {
       g_hook_valid = true;
     }
     g_hook_probe_inflight = false;
-  }).detach();
+  });
 }
 
 bool GetCaretViaHook(HWND hwnd, RECT *out) {
   auto now = std::chrono::steady_clock::now();
+  bool stale = false;
   {
     std::lock_guard<std::mutex> lk(g_hook_mutex);
     if (g_hook_valid && g_hook_hwnd == hwnd) {
       *out = g_hook_rect;
-      if (now - g_hook_time > std::chrono::milliseconds(300))
-        TriggerAsyncHook(hwnd);
-      return true;
+      stale = now - g_hook_time > std::chrono::milliseconds(300);
+      if (!stale)
+        return true;
     }
+  }
+  if (stale) {
+    TriggerAsyncHook(hwnd);
+    return true;
   }
   RECT r{0};
   if (!GetCaretFromHook(hwnd, &r))
@@ -508,6 +521,11 @@ bool IsUwpClass(HWND hwnd) {
 } // namespace
 
 void SetUseCaretHook(bool enable) { g_use_caret_hook = enable; }
+
+void Shutdown() {
+  if (g_hook_worker.joinable())
+    g_hook_worker.join();
+}
 
 bool GetScreenRect(RECT *out) {
   if (!out)
