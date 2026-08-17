@@ -440,6 +440,41 @@ void RimeWithToy::SwitchSchema(const std::wstring &schema_id) {
   m_trayIcon->RefreshIcon();
 }
 
+// Only persist options listed in switcher/save_options; librime's engine
+// restores exactly that set from user.yaml on startup (see
+// Switcher::RestoreSavedOptions), so persisting anything else would leave a
+// value that silently resets after restart.
+static bool is_saved_option(const string &name) {
+  RimeConfig config;
+  if (!rime_api->config_open("default", &config))
+    return false;
+  bool found = false;
+  RimeConfigIterator it = {0};
+  if (rime_api->config_begin_list(&it, &config, "switcher/save_options")) {
+    while (rime_api->config_next(&it)) {
+      const char *value = rime_api->config_get_cstring(&config, it.path);
+      if (value && name == value) {
+        found = true;
+        break;
+      }
+    }
+    rime_api->config_end(&it);
+  }
+  rime_api->config_close(&config);
+  return found;
+}
+
+static void persist_option(const string &name, bool value) {
+  if (!is_saved_option(name))
+    return;
+  RimeConfig user_config;
+  if (rime_api->user_config_open("user", &user_config)) {
+    rime_api->config_set_bool(&user_config, ("var/option/" + name).c_str(),
+                              value);
+    rime_api->config_close(&user_config);
+  }
+}
+
 void RimeWithToy::ToggleOption(const std::wstring &option_name) {
   if (m_disabled)
     return;
@@ -485,8 +520,11 @@ void RimeWithToy::ToggleOption(const std::wstring &option_name) {
                 char opt_buf[128] = {0};
                 std::string opt_path = opts_path + "/" + sel_it.key;
                 if (rime_api->config_get_string(&config, opt_path.c_str(),
-                                                opt_buf, sizeof(opt_buf)))
-                  rime_api->set_option(m_session_id, opt_buf, id == opt_buf);
+                                                opt_buf, sizeof(opt_buf))) {
+                  bool val = (id == opt_buf);
+                  rime_api->set_option(m_session_id, opt_buf, val);
+                  persist_option(opt_buf, val);
+                }
               }
               rime_api->config_end(&sel_it);
             }
@@ -501,6 +539,7 @@ void RimeWithToy::ToggleOption(const std::wstring &option_name) {
   if (!found || !handled_radio) {
     bool on = !!rime_api->get_option(m_session_id, id.c_str());
     rime_api->set_option(m_session_id, id.c_str(), !on);
+    persist_option(id, !on);
   }
   UpdateUI();
 }
