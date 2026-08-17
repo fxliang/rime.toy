@@ -1,8 +1,9 @@
 {
-  "shared_data_dir": "shared",
-  "user_data_dir": "usr",
+  "language": "zh-Hans",
   "log_dir": "log",
   "position_type": "mouse",
+  "shared_data_dir": "shared",
+  "user_data_dir": "usr",
   "watch_files": [
   ]
 }

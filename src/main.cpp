@@ -1,6 +1,7 @@
 // Copyright fxliang
 // Distrobuted under GPLv3 https://www.gnu.org/licenses/gpl-3.0.en.html
 #include "RimeWithToy.h"
+#include "i18n.h"
 #include "keymodule.h"
 #include <ShellScalingApi.h>
 #include <WeaselIPCData.h>
@@ -156,9 +157,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   if (::GetLastError() == ERROR_ALREADY_EXISTS ||
       ::GetLastError() == ERROR_ACCESS_DENIED)
     return 0;
+  i18n::Initialize(hInstance, i18n::kLanguageAuto);
   if (!AcquireDeployerMutex()) {
-    MessageBoxW(NULL, L"WeaselDeployer 正在运行，rime.toy 无法启动。",
-                L"rime.toy", MB_ICONWARNING | MB_OK);
+    MessageBoxW(NULL, i18n::Get("msgbox_deployer_running").c_str(), L"rime.toy",
+                MB_ICONWARNING | MB_OK);
     return 0;
   }
   SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);

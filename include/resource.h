@@ -7,3 +7,5 @@
 #define IDI_EN 105
 #define IDI_FULL_SHAPE 106
 #define IDI_HALF_SHAPE 107
+
+#define IDR_I18N_JSON 300

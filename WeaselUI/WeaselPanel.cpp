@@ -428,7 +428,7 @@ void WeaselPanel::DoPaint() {
     }
     if (m_layout->ShouldDisplayStatusIcon()) {
       ComPtr<ID2D1Bitmap1> pBitmap;
-#define LOADICON(x, icon, id) LoadIconIfNeed(m_##x, m_style.##x, icon, id)
+#define LOADICON(x, icon, id) LoadIconIfNeed(m_##x, m_style.x, icon, id)
       LOADICON(current_ascii_icon, m_iconAlpha, IDI_EN);
       LOADICON(current_zhung_icon, m_iconEnabled, IDI_ZH);
       LOADICON(current_full_icon, m_iconFull, IDI_FULL_SHAPE);

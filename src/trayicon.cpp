@@ -1,4 +1,5 @@
 #include "trayicon.h"
+#include "i18n.h"
 #include "keymodule.h"
 #include <filesystem>
 #include <resource.h>
@@ -19,6 +20,9 @@
 #define MENU_EXE_DIR 1011
 #define MENU_SCHEMA_FIRST 2000
 #define MENU_OPTION_FIRST 3000
+#define MENU_LANG_ENGLISH 1020
+#define MENU_LANG_SIMPLIFIED 1021
+#define MENU_LANG_TRADITIONAL 1022
 
 bool rime_toy_enabled = true;
 HICON icon_error = LoadIcon(NULL, IDI_ERROR);
@@ -80,7 +84,7 @@ void TrayIcon::CreateContextMenu() {
   m_schema_ids.clear();
   m_option_names.clear();
   AppendMenu(hMenu, MF_STRING | (rime_toy_enabled ? MF_CHECKED : MFS_UNCHECKED),
-             MENU_RIME_TOY_EN, L"使用rime.toy");
+             MENU_RIME_TOY_EN, i18n::Get("menu_use_rime_toy").c_str());
   AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
   if (get_schema_list) {
     std::wstring current_schema =
@@ -96,10 +100,12 @@ void TrayIcon::CreateContextMenu() {
       m_schema_ids.push_back(s.schema_id);
     }
     if (m_schema_ids.empty()) {
-      AppendMenu(schema_menu, MF_STRING | MF_GRAYED, id, L"(无可用方案)");
+      AppendMenu(schema_menu, MF_STRING | MF_GRAYED, id,
+                 i18n::Get("menu_no_schema").c_str());
       m_schema_ids.push_back(L"");
     }
-    AppendMenu(hMenu, MF_POPUP, (UINT_PTR)schema_menu, L"方案切换");
+    AppendMenu(hMenu, MF_POPUP, (UINT_PTR)schema_menu,
+               i18n::Get("menu_schema_switch").c_str());
   }
   if (get_option_list) {
     auto options = get_option_list();
@@ -124,23 +130,46 @@ void TrayIcon::CreateContextMenu() {
     if (last_was_group)
       AppendMenu(option_menu, MF_SEPARATOR, 0, NULL);
     if (m_option_names.empty()) {
-      AppendMenu(option_menu, MF_STRING | MF_GRAYED, id, L"(无选项开关)");
+      AppendMenu(option_menu, MF_STRING | MF_GRAYED, id,
+                 i18n::Get("menu_no_option").c_str());
       m_option_names.push_back(L"");
     }
-    AppendMenu(hMenu, MF_POPUP, (UINT_PTR)option_menu, L"选项开关");
+    AppendMenu(hMenu, MF_POPUP, (UINT_PTR)option_menu,
+               i18n::Get("menu_option_switch").c_str());
   }
   AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
-  AppendMenu(hMenu, MF_STRING, MENU_LOG_DIR, L"日志目录");
-  AppendMenu(hMenu, MF_STRING, MENU_SHARED_DIR, L"共享目录");
-  AppendMenu(hMenu, MF_STRING, MENU_USER_DIR, L"用户目录");
-  AppendMenu(hMenu, MF_STRING, MENU_EXE_DIR, L"程序目录");
+  AppendMenu(hMenu, MF_STRING, MENU_LOG_DIR, i18n::Get("menu_log_dir").c_str());
+  AppendMenu(hMenu, MF_STRING, MENU_SHARED_DIR,
+             i18n::Get("menu_shared_dir").c_str());
+  AppendMenu(hMenu, MF_STRING, MENU_USER_DIR,
+             i18n::Get("menu_user_dir").c_str());
+  AppendMenu(hMenu, MF_STRING, MENU_EXE_DIR, i18n::Get("menu_exe_dir").c_str());
+  HMENU language_menu = CreatePopupMenu();
+  UINT lang_flags =
+      MF_STRING |
+      (i18n::Current() == AppLanguage::English ? MF_CHECKED : MFS_UNCHECKED);
+  AppendMenu(language_menu, lang_flags, MENU_LANG_ENGLISH,
+             i18n::LanguageDisplayName(AppLanguage::English).c_str());
+  lang_flags = MF_STRING | (i18n::Current() == AppLanguage::SimplifiedChinese
+                                ? MF_CHECKED
+                                : MFS_UNCHECKED);
+  AppendMenu(language_menu, lang_flags, MENU_LANG_SIMPLIFIED,
+             i18n::LanguageDisplayName(AppLanguage::SimplifiedChinese).c_str());
+  lang_flags = MF_STRING | (i18n::Current() == AppLanguage::TraditionalChinese
+                                ? MF_CHECKED
+                                : MFS_UNCHECKED);
+  AppendMenu(
+      language_menu, lang_flags, MENU_LANG_TRADITIONAL,
+      i18n::LanguageDisplayName(AppLanguage::TraditionalChinese).c_str());
+  AppendMenu(hMenu, MF_POPUP, (UINT_PTR)language_menu,
+             i18n::Get("menu_language").c_str());
   AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
   AppendMenu(hMenu, MF_STRING | (enable_debug ? MF_CHECKED : MFS_UNCHECKED),
-             MENU_DEBUG, L"调试信息");
-  AppendMenu(hMenu, MF_STRING, MENU_SYNC, L"同步数据");
-  AppendMenu(hMenu, MF_STRING, MENU_DEPLOY, L"重新部署");
-  AppendMenu(hMenu, MF_STRING, MENU_RESTART, L"重启rime.toy");
-  AppendMenu(hMenu, MF_STRING, MENU_QUIT, L"退出");
+             MENU_DEBUG, i18n::Get("menu_debug").c_str());
+  AppendMenu(hMenu, MF_STRING, MENU_SYNC, i18n::Get("menu_sync").c_str());
+  AppendMenu(hMenu, MF_STRING, MENU_DEPLOY, i18n::Get("menu_deploy").c_str());
+  AppendMenu(hMenu, MF_STRING, MENU_RESTART, i18n::Get("menu_restart").c_str());
+  AppendMenu(hMenu, MF_STRING, MENU_QUIT, i18n::Get("menu_quit").c_str());
 }
 
 void TrayIcon::ShowBalloonTip(const std::wstring &title,
@@ -214,6 +243,11 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
       const auto &option_name = m_option_names[cmd - MENU_OPTION_FIRST];
       if (toggle_option && !option_name.empty())
         toggle_option(option_name);
+      break;
+    }
+    if (cmd >= MENU_LANG_ENGLISH && cmd <= MENU_LANG_TRADITIONAL) {
+      if (switch_language)
+        switch_language(cmd - MENU_LANG_ENGLISH);
       break;
     }
     switch (cmd) {

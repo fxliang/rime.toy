@@ -1,4 +1,5 @@
 #include "RimeWithToy.h"
+#include "i18n.h"
 #include "key_table.h"
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -50,6 +51,38 @@ string RimeWithToy::m_option_name;
 
 static path shared_path, usr_path, log_path;
 #define CONDDEBUG DEBUGIF(m_trayIcon->debug())
+
+static int detect_language_from_config() {
+  auto json_file = data_path("rime.toy.json");
+  if (fs::exists(json_file)) {
+    try {
+      std::ifstream ifs(json_file);
+      json j;
+      ifs >> j;
+      if (j.contains("language"))
+        return i18n::LanguageFromString(j["language"].get<string>());
+    } catch (const std::exception &e) {
+      DEBUG << "Failed to read language from rime.toy.json: " << e.what();
+    }
+  }
+  return i18n::kLanguageAuto;
+}
+
+static void write_language_to_config(int language) {
+  auto json_file = data_path("rime.toy.json");
+  try {
+    json j;
+    if (fs::exists(json_file)) {
+      std::ifstream ifs(json_file);
+      ifs >> j;
+    }
+    j["language"] = i18n::LanguageString(language);
+    std::ofstream ofs(json_file);
+    ofs << j.dump(2);
+  } catch (const std::exception &e) {
+    DEBUG << "Failed to write rime.toy.json: " << e.what();
+  }
+}
 
 void RimeWithToy::setup_rime() {
   RIME_STRUCT(RimeTraits, traits);
@@ -142,11 +175,11 @@ void RimeWithToy::on_message(void *context_object, RimeSessionId session_id,
 
   if (m_message_type == "deploy") {
     if (m_message_value == "start")
-      self->BalloonMsg("开始部署");
+      self->BalloonMsg(wtou8(i18n::Get("balloon_deploy_start")));
     else if (m_message_value == "success")
-      self->BalloonMsg("部署完成");
+      self->BalloonMsg(wtou8(i18n::Get("balloon_deploy_success")));
     else if (m_message_value == "failure")
-      self->BalloonMsg("部署失败，请查看日志");
+      self->BalloonMsg(wtou8(i18n::Get("balloon_deploy_failure")));
   }
 
   RimeApi *rime_api = rime_get_api();
@@ -172,7 +205,8 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance)
       m_show_notifications_time(1200) {
   rime_api = rime_get_api();
   m_ui = std::make_shared<UI>();
-  const auto tooltip = L"rime.toy\n左键点击切换ASCII\n右键菜单可退出^_^";
+  i18n::Initialize(hInstance, detect_language_from_config());
+  const auto tooltip = i18n::Get("tooltip");
   m_trayIcon = std::make_unique<TrayIcon>(hInstance, tooltip);
   m_reload_icon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_RELOAD));
   m_trayIcon->SetIcon(m_reload_icon);
@@ -206,7 +240,7 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance)
     m_trayIcon->SetIcon(m_reload_icon);
     CONDDEBUG << L"Sync Menu clicked";
     if (!rime_api->sync_user_data())
-      BalloonMsg("同步用户数据失败");
+      BalloonMsg(wtou8(i18n::Get("balloon_sync_failure")));
     Initialize();
     BOOL ascii = rime_api->get_option(m_session_id, "ascii_mode");
     m_trayIcon->SetIcon(ascii ? m_ascii_icon : m_ime_icon);
@@ -224,6 +258,12 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance)
   m_trayIcon->SetOptionListFunc([&]() { return GetOptionSwitchList(); });
   m_trayIcon->SetToggleOptionFunc(
       [&](const std::wstring &name) { ToggleOption(name); });
+  m_trayIcon->SetSwitchLanguageFunc([&](int language) {
+    if (!i18n::SetLanguage(language))
+      return;
+    write_language_to_config(language);
+    m_trayIcon->SetTooltip(i18n::Get("tooltip"));
+  });
   m_trayIcon->SetIcon(m_ime_icon);
   m_trayIconCallback = [&](const Status &sta) {
     m_trayIcon->SetIcon(sta.ascii_mode ? m_ascii_icon : m_ime_icon);
@@ -530,18 +570,18 @@ BOOL RimeWithToy::ShowMessage(Context &ctx, Status &status) {
   std::wstring &tips(ctx.aux.str);
   if (m_message_type == "deploy") {
     if (m_message_value == "start")
-      tips = L"正在部署";
+      tips = i18n::Get("tip_deploying");
     else if (m_message_value == "success")
-      tips = L"部署完成";
+      tips = i18n::Get("tip_deploy_done");
     else if (m_message_value == "failure")
-      tips = L"有错误，请查看日志 %TEMP%\\rime.toy\\rime.toy.*.INFO";
+      tips = i18n::Get("tip_deploy_error");
   } else if (m_message_type == "option") {
     if (!m_message_label.empty())
       tips = u8tow(m_message_label);
     else if (m_message_value == "!ascii_mode") {
-      tips = L"中文";
+      tips = i18n::Get("tip_chinese");
     } else if (m_message_value == "ascii_mode") {
-      tips = L"英文";
+      tips = i18n::Get("tip_english");
     }
     if (m_message_value == "full_shape" || m_message_value == "!full_shape")
       status.type = FULL_SHAPE;
