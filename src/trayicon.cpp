@@ -17,6 +17,8 @@
 #define MENU_RIME_TOY_EN 1009
 #define MENU_RESTART 1010
 #define MENU_EXE_DIR 1011
+#define MENU_SCHEMA_FIRST 2000
+#define MENU_OPTION_FIRST 3000
 
 bool rime_toy_enabled = true;
 HICON icon_error = LoadIcon(NULL, IDI_ERROR);
@@ -72,24 +74,73 @@ void TrayIcon::SetTooltip(const std::wstring &tooltip) {
 }
 
 void TrayIcon::CreateContextMenu() {
-  if (hMenu == NULL) {
-    hMenu = CreatePopupMenu();
-    AppendMenu(hMenu,
-               MF_STRING | (rime_toy_enabled ? MF_CHECKED : MFS_UNCHECKED),
-               MENU_RIME_TOY_EN, L"使用rime.toy");
-    AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
-    AppendMenu(hMenu, MF_STRING, MENU_LOG_DIR, L"日志目录");
-    AppendMenu(hMenu, MF_STRING, MENU_SHARED_DIR, L"共享目录");
-    AppendMenu(hMenu, MF_STRING, MENU_USER_DIR, L"用户目录");
-    AppendMenu(hMenu, MF_STRING, MENU_EXE_DIR, L"程序目录");
-    AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
-    AppendMenu(hMenu, MF_STRING | (enable_debug ? MF_CHECKED : MFS_UNCHECKED),
-               MENU_DEBUG, L"调试信息");
-    AppendMenu(hMenu, MF_STRING, MENU_SYNC, L"同步数据");
-    AppendMenu(hMenu, MF_STRING, MENU_DEPLOY, L"重新部署");
-    AppendMenu(hMenu, MF_STRING, MENU_RESTART, L"重启rime.toy");
-    AppendMenu(hMenu, MF_STRING, MENU_QUIT, L"退出");
+  if (hMenu)
+    DestroyMenu(hMenu);
+  hMenu = CreatePopupMenu();
+  m_schema_ids.clear();
+  m_option_names.clear();
+  AppendMenu(hMenu, MF_STRING | (rime_toy_enabled ? MF_CHECKED : MFS_UNCHECKED),
+             MENU_RIME_TOY_EN, L"使用rime.toy");
+  AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
+  if (get_schema_list) {
+    std::wstring current_schema =
+        get_current_schema ? get_current_schema() : L"";
+    auto schemas = get_schema_list();
+    HMENU schema_menu = CreatePopupMenu();
+    UINT id = MENU_SCHEMA_FIRST;
+    for (const auto &s : schemas) {
+      UINT flags = MF_STRING;
+      if (s.schema_id == current_schema)
+        flags |= MF_CHECKED;
+      AppendMenu(schema_menu, flags, id++, s.name.c_str());
+      m_schema_ids.push_back(s.schema_id);
+    }
+    if (m_schema_ids.empty()) {
+      AppendMenu(schema_menu, MF_STRING | MF_GRAYED, id, L"(无可用方案)");
+      m_schema_ids.push_back(L"");
+    }
+    AppendMenu(hMenu, MF_POPUP, (UINT_PTR)schema_menu, L"方案切换");
   }
+  if (get_option_list) {
+    auto options = get_option_list();
+    HMENU option_menu = CreatePopupMenu();
+    UINT id = MENU_OPTION_FIRST;
+    bool first_item = true;
+    bool last_was_group = false;
+    for (const auto &o : options) {
+      bool is_group = o.radio_group;
+      if (is_group && (first_item || !last_was_group))
+        AppendMenu(option_menu, MF_SEPARATOR, 0, NULL);
+      else if (last_was_group && !is_group)
+        AppendMenu(option_menu, MF_SEPARATOR, 0, NULL);
+      UINT flags = MF_STRING;
+      if (o.checked)
+        flags |= MF_CHECKED;
+      AppendMenu(option_menu, flags, id++, o.label.c_str());
+      m_option_names.push_back(o.option_name);
+      last_was_group = is_group;
+      first_item = false;
+    }
+    if (last_was_group)
+      AppendMenu(option_menu, MF_SEPARATOR, 0, NULL);
+    if (m_option_names.empty()) {
+      AppendMenu(option_menu, MF_STRING | MF_GRAYED, id, L"(无选项开关)");
+      m_option_names.push_back(L"");
+    }
+    AppendMenu(hMenu, MF_POPUP, (UINT_PTR)option_menu, L"选项开关");
+  }
+  AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
+  AppendMenu(hMenu, MF_STRING, MENU_LOG_DIR, L"日志目录");
+  AppendMenu(hMenu, MF_STRING, MENU_SHARED_DIR, L"共享目录");
+  AppendMenu(hMenu, MF_STRING, MENU_USER_DIR, L"用户目录");
+  AppendMenu(hMenu, MF_STRING, MENU_EXE_DIR, L"程序目录");
+  AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
+  AppendMenu(hMenu, MF_STRING | (enable_debug ? MF_CHECKED : MFS_UNCHECKED),
+             MENU_DEBUG, L"调试信息");
+  AppendMenu(hMenu, MF_STRING, MENU_SYNC, L"同步数据");
+  AppendMenu(hMenu, MF_STRING, MENU_DEPLOY, L"重新部署");
+  AppendMenu(hMenu, MF_STRING, MENU_RESTART, L"重启rime.toy");
+  AppendMenu(hMenu, MF_STRING, MENU_QUIT, L"退出");
 }
 
 void TrayIcon::ShowBalloonTip(const std::wstring &title,
@@ -150,7 +201,22 @@ void TrayIcon::ProcessMessage(HWND hwnd, UINT msg, WPARAM wParam,
       OnBalloonTimeout();
     break;
   case WM_COMMAND: {
-    switch (LOWORD(wParam)) {
+    UINT cmd = LOWORD(wParam);
+    if (cmd >= MENU_SCHEMA_FIRST &&
+        cmd < MENU_SCHEMA_FIRST + m_schema_ids.size()) {
+      const auto &schema_id = m_schema_ids[cmd - MENU_SCHEMA_FIRST];
+      if (switch_schema && !schema_id.empty())
+        switch_schema(schema_id);
+      break;
+    }
+    if (cmd >= MENU_OPTION_FIRST &&
+        cmd < MENU_OPTION_FIRST + m_option_names.size()) {
+      const auto &option_name = m_option_names[cmd - MENU_OPTION_FIRST];
+      if (toggle_option && !option_name.empty())
+        toggle_option(option_name);
+      break;
+    }
+    switch (cmd) {
     case MENU_QUIT: {
       Hide();
       if (quit_app)

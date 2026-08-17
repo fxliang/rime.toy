@@ -217,6 +217,13 @@ RimeWithToy::RimeWithToy(HINSTANCE hInstance)
     m_trayIcon->SetIcon(status.ascii_mode ? m_ascii_icon : m_ime_icon);
   });
   m_trayIcon->SetQuitHandler([&]() { rime_api->finalize(); });
+  m_trayIcon->SetSchemaListFunc([&]() { return GetSchemaList(); });
+  m_trayIcon->SetSwitchSchemaFunc(
+      [&](const std::wstring &id) { SwitchSchema(id); });
+  m_trayIcon->SetCurrentSchemaFunc([&]() { return CurrentSchemaId(); });
+  m_trayIcon->SetOptionListFunc([&]() { return GetOptionSwitchList(); });
+  m_trayIcon->SetToggleOptionFunc(
+      [&](const std::wstring &name) { ToggleOption(name); });
   m_trayIcon->SetIcon(m_ime_icon);
   m_trayIconCallback = [&](const Status &sta) {
     m_trayIcon->SetIcon(sta.ascii_mode ? m_ascii_icon : m_ime_icon);
@@ -270,6 +277,187 @@ void RimeWithToy::SwitchAsciiMode() {
   GetStatus(status);
   if (m_trayIconCallback)
     m_trayIconCallback(status);
+}
+
+static std::wstring get_switch_label(RimeConfig *config,
+                                     const std::string &prefix,
+                                     const char *kind, int index) {
+  const int BUF_SIZE = 128;
+  char buffer[BUF_SIZE] = {0};
+  std::string path = prefix + "/" + kind + "/@" + std::to_string(index);
+  if (rime_api->config_get_string(config, path.c_str(), buffer, BUF_SIZE))
+    return u8tow(buffer);
+  return L"";
+}
+
+std::wstring RimeWithToy::CurrentSchemaId() const {
+  char schema_buf[128] = {0};
+  if (rime_api->get_current_schema(m_session_id, schema_buf,
+                                   sizeof(schema_buf)))
+    return u8tow(schema_buf);
+  return L"";
+}
+
+std::vector<SchemaItem> RimeWithToy::GetSchemaList() {
+  std::vector<SchemaItem> items;
+  RimeSchemaList list;
+  if (rime_api->get_schema_list(&list)) {
+    for (size_t i = 0; i < list.size; ++i) {
+      SchemaItem item;
+      item.schema_id = u8tow(list.list[i].schema_id);
+      item.name = u8tow(list.list[i].name);
+      items.push_back(std::move(item));
+    }
+    rime_api->free_schema_list(&list);
+  }
+  return items;
+}
+
+std::vector<OptionSwitchItem> RimeWithToy::GetOptionSwitchList() {
+  std::vector<OptionSwitchItem> items;
+  if (m_disabled)
+    return items;
+  auto schema_id = wtou8(CurrentSchemaId());
+  RimeConfig config;
+  if (!rime_api->schema_open(schema_id.c_str(), &config))
+    return items;
+  RimeConfigIterator it = {0};
+  if (rime_api->config_begin_list(&it, &config, "switches")) {
+    while (rime_api->config_next(&it)) {
+      std::string prefix = std::string("switches/") + it.key;
+      char name_buf[128] = {0};
+      std::string name_path = prefix + "/name";
+      if (rime_api->config_get_string(&config, name_path.c_str(), name_buf,
+                                      sizeof(name_buf))) {
+        OptionSwitchItem item;
+        item.option_name = u8tow(name_buf);
+        item.checked = !!rime_api->get_option(m_session_id, name_buf);
+        item.radio_group = false;
+        auto s0 = get_switch_label(&config, prefix, "abbrev", 0);
+        if (s0.empty())
+          s0 = get_switch_label(&config, prefix, "states", 0);
+        auto s1 = get_switch_label(&config, prefix, "abbrev", 1);
+        if (s1.empty())
+          s1 = get_switch_label(&config, prefix, "states", 1);
+        if (!s0.empty() && !s1.empty())
+          item.label = s0 + L" -> " + s1;
+        else
+          item.label = item.option_name;
+        items.push_back(std::move(item));
+        continue;
+      }
+      RimeConfigIterator opt_it = {0};
+      std::string opts_path = prefix + "/options";
+      if (rime_api->config_begin_list(&opt_it, &config, opts_path.c_str())) {
+        std::vector<std::string> group;
+        while (rime_api->config_next(&opt_it)) {
+          char opt_buf[128] = {0};
+          std::string opt_path = opts_path + "/" + opt_it.key;
+          if (rime_api->config_get_string(&config, opt_path.c_str(), opt_buf,
+                                          sizeof(opt_buf)))
+            group.push_back(opt_buf);
+        }
+        rime_api->config_end(&opt_it);
+        int current = 0;
+        for (size_t i = 0; i < group.size(); ++i) {
+          if (rime_api->get_option(m_session_id, group[i].c_str())) {
+            current = (int)i;
+            break;
+          }
+        }
+        for (size_t i = 0; i < group.size(); ++i) {
+          OptionSwitchItem item;
+          item.option_name = u8tow(group[i]);
+          item.checked = (int)i == current;
+          item.radio_group = true;
+          item.label = get_switch_label(&config, prefix, "states", (int)i);
+          if (item.label.empty())
+            item.label = item.option_name;
+          items.push_back(std::move(item));
+        }
+      }
+    }
+    rime_api->config_end(&it);
+  }
+  rime_api->config_close(&config);
+  return items;
+}
+
+void RimeWithToy::SwitchSchema(const std::wstring &schema_id) {
+  if (m_disabled)
+    return;
+  rime_api->select_schema(m_session_id, wtou8(schema_id).c_str());
+  Status &status = m_ui->status();
+  GetStatus(status);
+  rime_api->set_option(m_session_id, "soft_cursor",
+                       Bool(!m_ui->style().inline_preedit));
+  m_ui->Refresh();
+  m_trayIcon->RefreshIcon();
+}
+
+void RimeWithToy::ToggleOption(const std::wstring &option_name) {
+  if (m_disabled)
+    return;
+  auto id = wtou8(option_name);
+  RimeConfig config;
+  auto schema_id = wtou8(CurrentSchemaId());
+  bool found = false;
+  bool handled_radio = false;
+  if (rime_api->schema_open(schema_id.c_str(), &config)) {
+    RimeConfigIterator it = {0};
+    if (rime_api->config_begin_list(&it, &config, "switches")) {
+      while (!found && rime_api->config_next(&it)) {
+        std::string prefix = std::string("switches/") + it.key;
+        char name_buf[128] = {0};
+        std::string name_path = prefix + "/name";
+        if (rime_api->config_get_string(&config, name_path.c_str(), name_buf,
+                                        sizeof(name_buf))) {
+          if (id == name_buf) {
+            found = true;
+            break;
+          }
+        }
+        RimeConfigIterator opt_it = {0};
+        std::string opts_path = prefix + "/options";
+        if (rime_api->config_begin_list(&opt_it, &config, opts_path.c_str())) {
+          bool contains = false;
+          while (rime_api->config_next(&opt_it)) {
+            char opt_buf[128] = {0};
+            std::string opt_path = opts_path + "/" + opt_it.key;
+            if (rime_api->config_get_string(&config, opt_path.c_str(), opt_buf,
+                                            sizeof(opt_buf)) &&
+                id == opt_buf)
+              contains = true;
+          }
+          rime_api->config_end(&opt_it);
+          if (contains) {
+            found = true;
+            handled_radio = true;
+            RimeConfigIterator sel_it = {0};
+            if (rime_api->config_begin_list(&sel_it, &config,
+                                            opts_path.c_str())) {
+              while (rime_api->config_next(&sel_it)) {
+                char opt_buf[128] = {0};
+                std::string opt_path = opts_path + "/" + sel_it.key;
+                if (rime_api->config_get_string(&config, opt_path.c_str(),
+                                                opt_buf, sizeof(opt_buf)))
+                  rime_api->set_option(m_session_id, opt_buf, id == opt_buf);
+              }
+              rime_api->config_end(&sel_it);
+            }
+            break;
+          }
+        }
+      }
+      rime_api->config_end(&it);
+    }
+    rime_api->config_close(&config);
+  }
+  if (!found || !handled_radio) {
+    bool on = !!rime_api->get_option(m_session_id, id.c_str());
+    rime_api->set_option(m_session_id, id.c_str(), !on);
+  }
+  UpdateUI();
 }
 
 BOOL RimeWithToy::ProcessKeyEvent(KeyEvent keyEvent) {

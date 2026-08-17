@@ -123,6 +123,11 @@ public:
   BOOL ProcessKeyEvent(KeyEvent keyEvent);
   void UpdateUI();
   void SwitchAsciiMode();
+  void SwitchSchema(const std::wstring &schema_id);
+  void ToggleOption(const std::wstring &option_name);
+  std::wstring CurrentSchemaId() const;
+  std::vector<SchemaItem> GetSchemaList();
+  std::vector<OptionSwitchItem> GetOptionSwitchList();
   RimeSessionId session_id() const { return m_session_id; }
   void UpdateInputPosition(const RECT &rc);
   bool StartUI();
