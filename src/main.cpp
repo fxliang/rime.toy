@@ -48,16 +48,30 @@ void update_position(HWND hwnd) {
 }
 
 static HWND hwnd_previous = nullptr;
+static HWINEVENTHOOK g_foregroundHook = nullptr;
 static bool caps_key_down = false;
+
+static void handle_window_change(HWND hwnd) {
+  if (!m_toy || !hwnd || hwnd == hwnd_previous)
+    return;
+  hwnd_previous = hwnd;
+  m_toy->DestroyUI();
+}
+
 // ----------------------------------------------------------------------------
+void CALLBACK ForegroundWindowEventHook(HWINEVENTHOOK hook, DWORD event,
+                                        HWND hwnd, LONG idObject, LONG idChild,
+                                        DWORD idEventThread,
+                                        DWORD dwmsEventTime) {
+  if (event == EVENT_SYSTEM_FOREGROUND)
+    handle_window_change(hwnd);
+}
+
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
   if (!rime_toy_enabled)
     return CallNextHookEx(hKeyboardHook, nCode, wParam, lParam);
   HWND hwnd = GetForegroundWindow();
-  if (hwnd != hwnd_previous) {
-    hwnd_previous = hwnd;
-    m_toy->DestroyUI();
-  }
+  handle_window_change(hwnd);
   // ensure ime keyboard not open, not ok yet to Weasel
   HWND hImcWnd = ImmGetDefaultIMEWnd(hwnd);
   if (hImcWnd) {
@@ -174,6 +188,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     DEBUG << L"Failed to install mouse hook! " << std::hex << GetLastError();
     exit(1);
   }
+  g_foregroundHook =
+      SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, NULL,
+                      ForegroundWindowEventHook, 0, 0,
+                      WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+  if (!g_foregroundHook) {
+    DEBUG << L"Failed to install foreground-window hook! " << std::hex
+          << GetLastError();
+  }
   MSG msg;
   while (GetMessage(&msg, NULL, 0, 0)) {
     TranslateMessage(&msg);
@@ -181,6 +203,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   }
   UnhookWindowsHookEx(hKeyboardHook);
   UnhookWindowsHookEx(hMouseHook);
+  if (g_foregroundHook)
+    UnhookWinEvent(g_foregroundHook);
   caret::Shutdown();
   m_toy->Finalize();
   CoUninitialize();
