@@ -170,7 +170,7 @@ private:
   static string m_option_name;
 
   std::function<void(const Status &)> m_trayIconCallback;
-  std::mutex m_message_mutex;
+  std::recursive_mutex m_message_mutex;
 
   std::unique_ptr<TrayIcon> m_trayIcon;
   HICON m_ime_icon;

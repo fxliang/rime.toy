@@ -170,6 +170,16 @@ void WeaselPanel::ReleaseAllResources() {
 void WeaselPanel::MoveTo(RECT rc) {
   if (!m_hWnd || !m_layout)
     return;
+  if (rc.right <= rc.left)
+    rc.right = rc.left + 1;
+  if (rc.bottom <= rc.top)
+    rc.bottom = rc.top + 1;
+
+  // Use the caret's bottom-left as the anchor point for the panel: different
+  // apps expose the caret as a line rect or a collapsed caret, but the panel's
+  // x/y placement always consumes left and bottom. Using the raw top/left
+  // corner here makes the panel stick to the cursor's upper-left in some apps.
+  rc.top = rc.bottom;
   m_redraw_by_monitor_change = false;
   bool should_reset_sticky =
       (m_ctx.empty() || (abs(rc.left - m_inputPos.left) > 50) ||

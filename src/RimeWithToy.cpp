@@ -213,7 +213,7 @@ void RimeWithToy::on_message(void *context_object, RimeSessionId session_id,
   RimeWithToy *self = reinterpret_cast<RimeWithToy *>(context_object);
   if (!self || !message_type || !message_value)
     return;
-  std::lock_guard<std::mutex> lock(self->m_message_mutex);
+  std::lock_guard<std::recursive_mutex> lock(self->m_message_mutex);
   m_message_type = message_type;
   m_message_value = message_value;
 
@@ -652,9 +652,10 @@ void RimeWithToy::UpdateUI(bool show) {
   GetStatus(status);
   GetContext(ctx, status);
   m_ui->style().client_caps = m_ui->style().inline_preedit;
-  std::lock_guard<std::mutex> lock(m_message_mutex);
   if (show && m_ui->hwnd())
     RefreshInputPosition(GetForegroundWindow());
+
+  std::lock_guard<std::recursive_mutex> lock(m_message_mutex);
   if (show) {
     if (status.composing) {
       m_ui->Update(ctx, status);

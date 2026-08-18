@@ -152,13 +152,13 @@ bool BoundingRect(IUIAutomationTextRange *range, RECT *out) {
   return ok;
 }
 
-// A caret range is degenerate (zero width). Use the line unit for a stable
-// vertical position/height, and the character unit (or the collapsed caret
-// itself) for the horizontal position; this avoids the y-jitter caused by
-// characters of varying height. The range must be cloned before each
-// expansion: ExpandToEnclosingUnit mutates the range in place, so expanding
-// the same object twice would leave the second expansion a no-op and make the
-// horizontal position stick to the line's left edge.
+// Prefer the actual collapsed-caret rect when the platform exposes one; the
+// full line rect is only a fallback because using line bounds as the window
+// anchor makes different apps appear to snap to the line's top or bottom edge.
+// The range must be cloned before each expansion: ExpandToEnclosingUnit
+// mutates the range in place, so expanding the same object twice would leave
+// the second expansion a no-op and make the horizontal position stick to the
+// line's left edge.
 bool RangeRect(IUIAutomationTextRange *range, RECT *out) {
   RECT caret = {0};
   bool have_caret = BoundingRect(range, &caret);
@@ -181,24 +181,38 @@ bool RangeRect(IUIAutomationTextRange *range, RECT *out) {
     chr_range->Release();
   }
 
-  if (!have_line && !have_chr && !have_caret)
+  if (!have_caret && !have_line && !have_chr)
     return false;
 
-  if (!have_line) {
-    *out = have_caret ? caret : chr;
+  if (have_caret && caret.bottom > caret.top) {
+    *out = caret;
+    out->right = out->left;
+    return true;
+  }
+  if (have_chr && chr.bottom > chr.top) {
+    *out = chr;
+    out->right = out->left;
+    return true;
+  }
+  if (have_line && line.bottom > line.top) {
+    *out = line;
     out->right = out->left;
     return true;
   }
 
-  out->top = line.top;
-  out->bottom = line.bottom;
+  // Extremely degenerate ranges can still collapse to zero-sized rectangles.
+  // Fall back to the nearest non-empty geometry and keep the x anchor stable.
   if (have_caret) {
-    out->left = caret.left; // exact caret x
-  } else if (have_chr && chr.top < line.bottom && chr.bottom > line.top) {
-    out->left = chr.left; // caret sits within this line
-  } else {
-    out->left = line.right; // caret at end of line
+    *out = caret;
+    out->right = out->left;
+    return true;
   }
+  if (have_chr) {
+    *out = chr;
+    out->right = out->left;
+    return true;
+  }
+  *out = line;
   out->right = out->left;
   return true;
 }
@@ -540,18 +554,33 @@ bool GetScreenRect(RECT *out) {
 
   // UWP surfaces prefer UIA; legacy apps prefer MSAA first. The hook is the
   // last resort for both.
+  bool ok = false;
   if (IsUwpClass(hwnd)) {
-    if (GetCaretFromUia(out))
-      return true;
-    if (GetCaretFromMsaa(hwnd, out))
-      return true;
-    return GetCaretViaHook(hwnd, out);
+    ok = GetCaretFromUia(out);
+    if (!ok)
+      ok = GetCaretFromMsaa(hwnd, out);
+    if (!ok)
+      ok = GetCaretViaHook(hwnd, out);
+  } else {
+    ok = GetCaretFromMsaa(hwnd, out);
+    if (!ok)
+      ok = GetCaretFromUia(out);
+    if (!ok)
+      ok = GetCaretViaHook(hwnd, out);
   }
-  if (GetCaretFromMsaa(hwnd, out))
-    return true;
-  if (GetCaretFromUia(out))
-    return true;
-  return GetCaretViaHook(hwnd, out);
+  if (!ok)
+    return false;
+
+  // Some apps expose a collapsed caret rect with zero height (or a line rect
+  // that collapses to a single point), while the candidate window assumes the
+  // anchor is the caret's bottom-left. Expand degenerate rects to a sensible
+  // minimum height so the candidate window settles below the caret instead of
+  // snapping to its top-left corner.
+  if (out->bottom <= out->top)
+    out->bottom = out->top + 12;
+  if (out->right <= out->left)
+    out->right = out->left + 1;
+  return true;
 }
 
 } // namespace caret
