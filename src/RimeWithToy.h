@@ -122,7 +122,7 @@ public:
   void Initialize();
   void Finalize();
   BOOL ProcessKeyEvent(KeyEvent keyEvent);
-  void UpdateUI();
+  void UpdateUI(bool show = true);
   void SwitchAsciiMode();
   void SwitchSchema(const std::wstring &schema_id);
   void ToggleOption(const std::wstring &option_name);
@@ -133,6 +133,7 @@ public:
   void SetPosition(int pos);
   RimeSessionId session_id() const { return m_session_id; }
   void UpdateInputPosition(const RECT &rc);
+  void RefreshInputPosition(HWND hwnd = nullptr);
   bool StartUI();
   void DestroyUI();
   void HideUI() {
@@ -142,7 +143,7 @@ public:
   Status &GetRimeStatus() { return m_ui->status(); }
   wstring &GetCommitStr() { return m_commit_str; }
   HWND UIHwnd() { return m_ui ? m_ui->hwnd() : nullptr; }
-  bool CheckCommit();
+  bool CheckCommit(bool update_ui = true);
 
 private:
   void setup_rime();

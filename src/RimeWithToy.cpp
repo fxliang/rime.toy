@@ -637,11 +637,14 @@ BOOL RimeWithToy::ProcessKeyEvent(KeyEvent keyEvent) {
   } else {
     m_commit_str.clear();
   }
-  UpdateUI();
+  // A pending commit moves the target application's caret. Defer showing the
+  // new composition until the caller has sent the commit and refreshed the
+  // input position; otherwise the window briefly appears before the commit.
+  UpdateUI(m_commit_str.empty());
   return handled;
 }
 
-void RimeWithToy::UpdateUI() {
+void RimeWithToy::UpdateUI(bool show) {
   if (!m_ui || m_disabled)
     return;
   Status &status = m_ui->status();
@@ -650,12 +653,16 @@ void RimeWithToy::UpdateUI() {
   GetContext(ctx, status);
   m_ui->style().client_caps = m_ui->style().inline_preedit;
   std::lock_guard<std::mutex> lock(m_message_mutex);
-  if (status.composing) {
-    m_ui->Update(ctx, status);
-    m_ui->Show();
-  } else if (!ShowMessage(ctx, status)) {
-    m_ui->Hide();
-    m_ui->Update(ctx, status);
+  if (show && m_ui->hwnd())
+    RefreshInputPosition(GetForegroundWindow());
+  if (show) {
+    if (status.composing) {
+      m_ui->Update(ctx, status);
+      m_ui->Show();
+    } else if (!ShowMessage(ctx, status)) {
+      m_ui->Hide();
+      m_ui->Update(ctx, status);
+    }
   }
 
   if (m_trayIconCallback)
@@ -667,14 +674,14 @@ void RimeWithToy::UpdateUI() {
   m_option_name.clear();
 }
 
-bool RimeWithToy::CheckCommit() {
+bool RimeWithToy::CheckCommit(bool update_ui) {
   auto committed = !m_commit_str.empty();
   if (!m_commit_str.empty()) {
     send_input_to_window(m_commit_str);
     m_commit_str.clear();
     if (!m_ui->status().composing)
       HideUI();
-    else {
+    else if (update_ui) {
       UpdateUI();
     }
   }
@@ -893,6 +900,67 @@ void RimeWithToy::HandleUICallback(size_t *select_index, size_t *hover_index,
 void RimeWithToy::UpdateInputPosition(const RECT &rc) {
   if (m_ui)
     m_ui->UpdateInputPosition(rc);
+}
+
+void RimeWithToy::RefreshInputPosition(HWND hwnd) {
+  if (!m_ui)
+    return;
+  if (position_type == PositionType::kAuto) {
+    RECT caret;
+    if (caret::GetScreenRect(&caret)) {
+      UpdateInputPosition(caret);
+      return;
+    }
+  }
+
+  POINT pt;
+  if (!GetCursorPos(&pt)) {
+    RECT rect{};
+    if (hwnd)
+      GetWindowRect(hwnd, &rect);
+    pt.x = rect.left + (rect.right - rect.left) / 2 - 150;
+    pt.y = rect.bottom - (rect.bottom - rect.top) / 2 - 100;
+  }
+
+  if (position_type != PositionType::kMousePos) {
+    HMONITOR hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO mi;
+    RECT rcWork;
+    mi.cbSize = sizeof(MONITORINFO);
+    HWND panel = UIHwnd();
+    RECT rcPanel;
+    if (panel)
+      GetWindowRect(panel, &rcPanel);
+    if (GetMonitorInfo(hMonitor, &mi)) {
+      rcWork = mi.rcWork;
+      int panelWidth = rcPanel.right - rcPanel.left;
+      if (position_type == PositionType::kTopLeft) {
+        pt.x = rcWork.left;
+        pt.y = rcWork.top;
+      } else if (position_type == PositionType::kTopCenter) {
+        pt.x = rcWork.left + (rcWork.right - rcWork.left - panelWidth) / 2;
+        pt.y = rcWork.top;
+      } else if (position_type == PositionType::kTopRight) {
+        pt.x = rcWork.right;
+        pt.y = rcWork.top;
+      } else if (position_type == PositionType::kBottomLeft) {
+        pt.x = rcWork.left;
+        pt.y = rcWork.bottom;
+      } else if (position_type == PositionType::kBottomCenter) {
+        pt.x = rcWork.left + (rcWork.right - rcWork.left - panelWidth) / 2;
+        pt.y = rcWork.bottom;
+      } else if (position_type == PositionType::kBottomRight) {
+        pt.x = rcWork.right;
+        pt.y = rcWork.bottom;
+      } else if (position_type == PositionType::kCenter) {
+        int panelHeight = rcPanel.bottom - rcPanel.top;
+        pt.x = rcWork.left + (rcWork.right - rcWork.left - panelWidth) / 2;
+        pt.y = rcWork.top + (rcWork.bottom - rcWork.top - panelHeight) / 2;
+      }
+    }
+  }
+
+  UpdateInputPosition({pt.x, pt.y, pt.x, pt.y});
 }
 
 void RimeWithToy::DestroyUI() {

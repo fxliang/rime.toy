@@ -43,61 +43,9 @@ void ReleaseDeployerMutex() {
 } // namespace weasel
 
 void update_position(HWND hwnd) {
-  if (position_type == PositionType::kAuto) {
-    RECT caret;
-    if (caret::GetScreenRect(&caret)) {
-      m_toy->UpdateInputPosition(caret);
-      return;
-    }
-    // No caret detected; fall through to the mouse position.
-  }
-  POINT pt;
-  if (!GetCursorPos(&pt)) {
-    RECT rect;
-    if (hwnd)
-      GetWindowRect(hwnd, &rect);
-    pt.x = rect.left + (rect.right - rect.left) / 2 - 150;
-    pt.y = rect.bottom - (rect.bottom - rect.top) / 2 - 100;
-  }
-  if (position_type != PositionType::kMousePos) {
-    HMONITOR hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
-    MONITORINFO mi;
-    RECT rcWork;
-    mi.cbSize = sizeof(MONITORINFO);
-    HWND panel = m_toy->UIHwnd();
-    RECT rcPanel;
-    if (panel)
-      GetWindowRect(panel, &rcPanel);
-    if (GetMonitorInfo(hMonitor, &mi)) {
-      rcWork = mi.rcWork;
-      int panelWidth = rcPanel.right - rcPanel.left;
-      if (position_type == PositionType::kTopLeft) {
-        pt.x = rcWork.left;
-        pt.y = rcWork.top;
-      } else if (position_type == PositionType::kTopCenter) {
-        pt.x = rcWork.left + (rcWork.right - rcWork.left - panelWidth) / 2;
-        pt.y = rcWork.top;
-      } else if (position_type == PositionType::kTopRight) {
-        pt.x = rcWork.right;
-        pt.y = rcWork.top;
-      } else if (position_type == PositionType::kBottomLeft) {
-        pt.x = rcWork.left;
-        pt.y = rcWork.bottom;
-      } else if (position_type == PositionType::kBottomCenter) {
-        pt.x = rcWork.left + (rcWork.right - rcWork.left - panelWidth) / 2;
-        pt.y = rcWork.bottom;
-      } else if (position_type == PositionType::kBottomRight) {
-        pt.x = rcWork.right;
-        pt.y = rcWork.bottom;
-      } else if (position_type == PositionType::kCenter) {
-        int panelHeight = rcPanel.bottom - rcPanel.top;
-        pt.x = rcWork.left + (rcWork.right - rcWork.left - panelWidth) / 2;
-        pt.y = rcWork.top + (rcWork.bottom - rcWork.top - panelHeight) / 2;
-      }
-    }
-  }
-  m_toy->UpdateInputPosition({pt.x, pt.y, pt.x, pt.y});
-};
+  if (m_toy)
+    m_toy->RefreshInputPosition(hwnd);
+}
 
 static HWND hwnd_previous = nullptr;
 static bool caps_key_down = false;
@@ -130,8 +78,10 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
       m_toy->StartUI();
       eat = m_toy->ProcessKeyEvent(ke);
 
-      auto committed = m_toy->CheckCommit();
+      auto committed = m_toy->CheckCommit(false);
       update_position(hwnd);
+      if (committed)
+        m_toy->UpdateUI();
       if (ke.keycode == ibus::Caps_Lock) {
         if (!(ke.mask & ibus::RELEASE_MASK)) {
           // fresh press (not auto-repeat): mirror the system caps toggle
