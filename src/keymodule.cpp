@@ -4,6 +4,7 @@
 namespace weasel {
 
 BYTE keyState[256] = {0};
+bool caps_lock_on = (GetAsyncKeyState(VK_CAPITAL) & 0x01) != 0;
 // ----------------------------------------------------------------------------
 ibus::Keycode TranslateKeycode(UINT vkey, KeyInfo kinfo) {
   switch (vkey) {
@@ -222,16 +223,17 @@ bool ConvertKeyEvent(const KBDLLHOOKSTRUCT *pKeyboard, KeyInfo &kinfo,
   if ((keyState[VK_LWIN] & KEY_DOWN) || (keyState[VK_RWIN] & KEY_DOWN))
     result.mask |= ibus::SUPER_MASK;
 
-  if ((keyState[VK_CAPITAL] & TOGGLED) || (GetKeyState(VK_CAPITAL) & TOGGLED)) {
+  // CapsLock toggle state is tracked manually in caps_lock_on. The low-level
+  // hook races with the system's async toggle, so GetKeyState/GetAsyncKeyState
+  // are unreliable for the CapsLock key itself. caps_lock_on is toggled by the
+  // hook only after rime decides whether to eat the key, so at this point it
+  // still holds the pre-toggle state rime expects.
+  if (caps_lock_on) {
     result.mask |= ibus::LOCK_MASK;
   }
 
   if (kinfo.isKeyUp)
     result.mask |= ibus::RELEASE_MASK;
-
-  if (vkey == VK_CAPITAL && !kinfo.isKeyUp) {
-    result.mask ^= ibus::LOCK_MASK;
-  }
 
   ibus::Keycode code = TranslateKeycode(vkey, kinfo);
   if (code) {

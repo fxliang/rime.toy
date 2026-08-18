@@ -236,6 +236,11 @@ struct KeyInfo {
 };
 
 extern BYTE keyState[256];
+// CapsLock toggle state, tracked manually: the low-level hook races with the
+// system's async toggle, so GetKeyState/GetAsyncKeyState are unreliable for the
+// CapsLock key itself. ConvertKeyEvent reports it as LOCK_MASK; the hook
+// toggles it after rime decides whether the key was eaten.
+extern bool caps_lock_on;
 // deployer exclusive mutex, held while rime.toy is in use
 bool AcquireDeployerMutex();
 void ReleaseDeployerMutex();

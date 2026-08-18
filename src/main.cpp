@@ -100,6 +100,7 @@ void update_position(HWND hwnd) {
 };
 
 static HWND hwnd_previous = nullptr;
+static bool caps_key_down = false;
 // ----------------------------------------------------------------------------
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
   if (!rime_toy_enabled)
@@ -131,13 +132,23 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 
       auto committed = m_toy->CheckCommit();
       update_position(hwnd);
-      if (ke.keycode == ibus::Caps_Lock && eat) {
-        if (keyState[VK_CAPITAL] & 0x01) {
-          keyState[VK_CAPITAL] = 0;
-          SetKeyboardState(keyState);
-          if (committed || m_toy->GetRimeStatus().composing)
-            return 1;
-          goto skip;
+      if (ke.keycode == ibus::Caps_Lock) {
+        if (!(ke.mask & ibus::RELEASE_MASK)) {
+          // fresh press (not auto-repeat): mirror the system caps toggle
+          if (!caps_key_down && !eat)
+            caps_lock_on = !caps_lock_on;
+          caps_key_down = true;
+          if (eat) {
+            // key eaten (candidate selection / mode switch): revert the caps
+            // toggle the system applied before the hook
+            keyState[VK_CAPITAL] = 0;
+            SetKeyboardState(keyState);
+            if (committed || m_toy->GetRimeStatus().composing)
+              return 1;
+            goto skip;
+          }
+        } else {
+          caps_key_down = false;
         }
       }
       if (eat && !(ke.mask & ibus::RELEASE_MASK))
